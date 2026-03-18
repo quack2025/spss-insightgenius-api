@@ -1,0 +1,31 @@
+# Core Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+python-multipart>=0.0.6
+python-dotenv>=1.0.0
+
+# Data Processing
+pyreadstat>=1.2.6
+pandas>=2.1.4
+numpy>=1.26.3
+scipy>=1.12.0
+
+# Market Research Engine (QuantipyMRX fork)
+# In Docker: installed separately in Dockerfile (pinned commit)
+# For local dev: pip install quantipymrx @ git+https://github.com/quack2025/QuantiyFork2026.git@main
+quantipymrx @ git+https://github.com/quack2025/QuantiyFork2026.git@main
+
+# AI (Haiku for ticket parsing + smart labeling)
+anthropic>=0.18.0
+
+# File parsing
+python-docx>=1.1.0
+openpyxl>=3.1.2
+
+# Export formats
+pyarrow>=14.0.0
+
+# HTTP (for future webhook support)
+httpx>=0.26.0
