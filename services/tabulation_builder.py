@@ -103,6 +103,8 @@ class TabulateSpec:
     significance_level: float = 0.95
     nets: dict[str, dict[str, list[Any]]] | None = None
     mrs_groups: dict[str, list[str]] | None = None
+    grid_groups: dict[str, dict[str, Any]] | None = None  # Grid/Battery summaries
+    # Format: {"Satisfaction": {"variables": ["sat_speed","sat_price",...], "show": ["t2b","b2b","mean"]}}
     include_means: bool = False
     show_counts: bool = True
     show_percentages: bool = True
@@ -136,6 +138,14 @@ class BannerColumn:
 
 
 @dataclass
+class GridGroupSpec:
+    """A grid/battery summary group."""
+    name: str
+    variables: list[str]
+    show: list[str]  # ["t2b", "b2b", "mean", "median"]
+
+
+@dataclass
 class SheetResult:
     """Result for one stub variable."""
     variable: str
@@ -145,6 +155,8 @@ class SheetResult:
     crosstab_data: dict[str, Any] | None = None
     is_mrs: bool = False
     mrs_members: list[str] | None = None
+    is_grid: bool = False
+    grid_data: dict[str, Any] | None = None  # {"variables": [...], "metrics": {...}}
 
 
 @dataclass
@@ -245,7 +257,7 @@ def build_tabulation(engine_cls: Any, data: Any, spec: TabulateSpec) -> Tabulati
     result = TabulationResult(
         banners=banners,
         banner_labels=[col_labels.get(b, b) for b in banners],
-        total_stubs=len(stubs) + len(spec.mrs_groups or {}),
+        total_stubs=len(stubs) + len(spec.mrs_groups or {}) + len(spec.grid_groups or {}),
         successful=0,
         failed=0,
         banner_columns=banner_columns,
@@ -291,6 +303,22 @@ def build_tabulation(engine_cls: Any, data: Any, spec: TabulateSpec) -> Tabulati
             result.successful += 1
         except Exception as e:
             sheet = SheetResult(variable=group_name, label=str(group_name), status="error", error=str(e), is_mrs=True)
+            result.failed += 1
+        result.sheets.append(sheet)
+
+    # ── Grid/Battery summary groups ──
+    for grid_name, grid_cfg in (spec.grid_groups or {}).items():
+        try:
+            gvars = grid_cfg.get("variables", [])
+            gshow = grid_cfg.get("show", ["t2b", "mean"])
+            grid_result = _compute_grid_summary(data, gvars, banners, banner_columns, spec.weight, spec.significance_level, gshow)
+            sheet = SheetResult(
+                variable=grid_name, label=grid_name, status="success",
+                is_grid=True, grid_data=grid_result,
+            )
+            result.successful += 1
+        except Exception as e:
+            sheet = SheetResult(variable=grid_name, label=grid_name, status="error", error=str(e), is_grid=True)
             result.failed += 1
         result.sheets.append(sheet)
 
@@ -385,6 +413,176 @@ def _mrs_crosstab(
 
 # ── Means computation with T-test (T1-1) ──
 
+def _compute_grid_summary(
+    data: Any, variables: list[str], banners: list[str],
+    banner_columns: list, weight: str | None, sig_level: float, show: list[str],
+) -> dict[str, Any]:
+    """Compute T2B, B2B, Mean per variable per banner column for a grid/battery summary."""
+    df = data.df
+    meta = data.meta
+    col_labels = getattr(meta, "column_names_to_labels", {})
+    value_labels_all = getattr(meta, "variable_value_labels", {})
+    alpha = 1 - sig_level
+
+    rows = []  # Each row: {"variable": str, "label": str, "metric": str, "columns": {letter: {value, sig_letters}}}
+    w = df[weight] if weight and weight in df.columns else None
+
+    for var in variables:
+        if var not in df.columns or not pd.api.types.is_numeric_dtype(df[var]):
+            continue
+
+        series = df[var].dropna()
+        vl = value_labels_all.get(var, {})
+        var_label = col_labels.get(var, var)
+
+        # Detect scale endpoints for T2B/B2B
+        if vl:
+            scale_vals = sorted([k for k in vl.keys() if isinstance(k, (int, float))])
+        else:
+            scale_vals = sorted(series.unique())
+        if len(scale_vals) < 3:
+            continue
+
+        top2 = scale_vals[-2:]
+        bot2 = scale_vals[:2]
+
+        for metric in show:
+            row = {"variable": var, "label": var_label, "metric": metric, "columns": {}}
+
+            # Compute metric per banner column
+            for bc in banner_columns:
+                bvar = bc.banner_var
+                if bvar not in df.columns:
+                    continue
+                try:
+                    bval = float(bc.value) if bc.value.replace('.', '', 1).replace('-', '', 1).isdigit() else bc.value
+                except (ValueError, AttributeError):
+                    bval = bc.value
+                col_mask = df[bvar] == bval
+                subset = df.loc[col_mask & series.notna()]
+                sub_series = series[subset.index]
+
+                if len(sub_series) == 0:
+                    row["columns"][bc.letter] = {"value": None, "sig_letters": []}
+                    continue
+
+                sub_w = w[subset.index] if w is not None else None
+
+                if metric == "t2b":
+                    if sub_w is not None:
+                        val = float((sub_series.isin(top2) * sub_w).sum()) / float(sub_w.sum()) * 100
+                    else:
+                        val = float(sub_series.isin(top2).sum()) / len(sub_series) * 100
+                    row["columns"][bc.letter] = {"value": round(val, 1), "sig_letters": []}
+
+                elif metric == "b2b":
+                    if sub_w is not None:
+                        val = float((sub_series.isin(bot2) * sub_w).sum()) / float(sub_w.sum()) * 100
+                    else:
+                        val = float(sub_series.isin(bot2).sum()) / len(sub_series) * 100
+                    row["columns"][bc.letter] = {"value": round(val, 1), "sig_letters": []}
+
+                elif metric == "mean":
+                    if sub_w is not None:
+                        val = float(np.average(sub_series, weights=sub_w))
+                    else:
+                        val = float(sub_series.mean())
+                    row["columns"][bc.letter] = {"value": round(val, 2), "sig_letters": []}
+
+                elif metric == "median":
+                    val = float(sub_series.median())
+                    row["columns"][bc.letter] = {"value": round(val, 2), "sig_letters": []}
+
+            # Sig testing for means (T-test between columns within same banner group)
+            if metric == "mean":
+                _add_mean_sig_to_grid_row(row, df, series, banner_columns, w, alpha)
+            elif metric in ("t2b", "b2b"):
+                target_vals = top2 if metric == "t2b" else bot2
+                _add_prop_sig_to_grid_row(row, df, series, target_vals, banner_columns, w, alpha)
+
+            # Total column
+            if w is not None:
+                valid_w = w[series.notna().reindex(w.index, fill_value=False)]
+            if metric == "t2b":
+                total = float(series.isin(top2).sum()) / len(series) * 100 if len(series) > 0 else 0
+            elif metric == "b2b":
+                total = float(series.isin(bot2).sum()) / len(series) * 100 if len(series) > 0 else 0
+            elif metric == "mean":
+                total = float(np.average(series, weights=w[series.index]) if w is not None else series.mean())
+            elif metric == "median":
+                total = float(series.median())
+            else:
+                total = 0
+            row["total"] = round(total, 2)
+
+            rows.append(row)
+
+    return {"rows": rows}
+
+
+def _add_mean_sig_to_grid_row(row, df, series, banner_columns, w, alpha):
+    """Add T-test sig letters to mean metric in grid row."""
+    # Group columns by banner_index for within-group testing
+    groups = {}
+    for bc in banner_columns:
+        groups.setdefault(bc.banner_index, []).append(bc)
+
+    for bcs in groups.values():
+        for i, bc_i in enumerate(bcs):
+            for j, bc_j in enumerate(bcs):
+                if i == j:
+                    continue
+                try:
+                    bval_i = float(bc_i.value) if bc_i.value.replace('.','',1).replace('-','',1).isdigit() else bc_i.value
+                    bval_j = float(bc_j.value) if bc_j.value.replace('.','',1).replace('-','',1).isdigit() else bc_j.value
+                    mask_i = df[bc_i.banner_var] == bval_i
+                    mask_j = df[bc_j.banner_var] == bval_j
+                    vals_i = series[mask_i & series.notna()]
+                    vals_j = series[mask_j & series.notna()]
+                    if len(vals_i) < 2 or len(vals_j) < 2:
+                        continue
+                    t_stat, p_val = stats.ttest_ind(vals_i, vals_j, equal_var=False)
+                    if p_val < alpha and vals_i.mean() > vals_j.mean():
+                        if bc_i.letter in row["columns"]:
+                            row["columns"][bc_i.letter]["sig_letters"].append(bc_j.letter)
+                except Exception:
+                    pass
+
+
+def _add_prop_sig_to_grid_row(row, df, series, target_vals, banner_columns, w, alpha):
+    """Add z-test sig letters to proportion metric (T2B/B2B) in grid row."""
+    groups = {}
+    for bc in banner_columns:
+        groups.setdefault(bc.banner_index, []).append(bc)
+
+    for bcs in groups.values():
+        for i, bc_i in enumerate(bcs):
+            for j, bc_j in enumerate(bcs):
+                if i == j:
+                    continue
+                try:
+                    bval_i = float(bc_i.value) if bc_i.value.replace('.','',1).replace('-','',1).isdigit() else bc_i.value
+                    bval_j = float(bc_j.value) if bc_j.value.replace('.','',1).replace('-','',1).isdigit() else bc_j.value
+                    mask_i = df[bc_i.banner_var] == bval_i
+                    mask_j = df[bc_j.banner_var] == bval_j
+                    sub_i = series[mask_i & series.notna()]
+                    sub_j = series[mask_j & series.notna()]
+                    n_i, n_j = len(sub_i), len(sub_j)
+                    if n_i < 2 or n_j < 2:
+                        continue
+                    c_i = int(sub_i.isin(target_vals).sum())
+                    c_j = int(sub_j.isin(target_vals).sum())
+                    from statsmodels.stats.proportion import proportions_ztest
+                    z_stat, p_val = proportions_ztest([c_i, c_j], [n_i, n_j], alternative="two-sided")
+                    p_i = c_i / n_i
+                    p_j = c_j / n_j
+                    if p_val < alpha and p_i > p_j:
+                        if bc_i.letter in row["columns"]:
+                            row["columns"][bc_i.letter]["sig_letters"].append(bc_j.letter)
+                except Exception:
+                    pass
+
+
 def _compute_means_by_column(
     df: pd.DataFrame, stub: str, banner_var: str, col_values: list, weight: str | None, alpha: float,
 ) -> dict[str, Any]:
@@ -447,14 +645,17 @@ def _build_excel(result: TabulationResult, spec: TabulateSpec, data: Any) -> byt
     _write_summary_sheet(ws_summary, result, spec, data)
 
     for sheet_result in result.sheets:
-        if sheet_result.status != "success" or not sheet_result.crosstab_data:
+        if sheet_result.status != "success":
             continue
         sheet_name = sheet_result.variable[:31]
         existing = [ws.title for ws in wb.worksheets]
         if sheet_name in existing:
             sheet_name = sheet_name[:28] + "_" + str(existing.count(sheet_name))
         ws = wb.create_sheet(title=sheet_name)
-        _write_crosstab_sheet(ws, sheet_result, spec, data, result.banner_columns)
+        if sheet_result.is_grid and sheet_result.grid_data:
+            _write_grid_sheet(ws, sheet_result, spec, result.banner_columns)
+        elif sheet_result.crosstab_data:
+            _write_crosstab_sheet(ws, sheet_result, spec, data, result.banner_columns)
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -844,3 +1045,148 @@ def _write_crosstab_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, dat
     for i in range(n_banner_cols + 1):
         ws.column_dimensions[get_column_letter(2 + i)].width = 16
     ws.freeze_panes = f"B{data_start}"
+
+
+def _write_grid_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, banner_columns: list[BannerColumn]):
+    """Write a grid/battery summary sheet — compact view of multiple variables.
+
+    Layout:
+    Row 1: Title
+    Row 2: Sig note
+    Row 3: Banner group headers (if multi-banner)
+    Row 4: Column value labels
+    Row 5: Column letters
+    Row 6+: One row per variable per metric, grouped by metric
+    """
+    grid = sheet_result.grid_data
+    if not grid:
+        return
+
+    rows = grid.get("rows", [])
+    banners = spec.resolved_banners
+    n_cols = len(banner_columns)
+    total_col = 2 + n_cols
+
+    METRIC_LABELS = {"t2b": "Top 2 Box %", "b2b": "Bottom 2 Box %", "mean": "Mean", "median": "Median"}
+    METRIC_FILL = {
+        "t2b": PatternFill(start_color="DCFCE7", end_color="DCFCE7", fill_type="solid"),
+        "b2b": PatternFill(start_color="FEE2E2", end_color="FEE2E2", fill_type="solid"),
+        "mean": MEAN_FILL,
+        "median": PatternFill(start_color="EDE9FE", end_color="EDE9FE", fill_type="solid"),
+    }
+    METRIC_FONT = {
+        "t2b": Font(size=10, color="166534"),
+        "b2b": Font(size=10, color="991B1B"),
+        "mean": MEAN_FONT,
+        "median": Font(size=10, color="5B21B6"),
+    }
+
+    # Row 1: Title
+    ws.cell(row=1, column=1, value=f"{sheet_result.label or sheet_result.variable} (Grid Summary)").font = TITLE_FONT
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_col)
+
+    # Row 2: Sig note
+    sig_note = f"Significance: {spec.significance_level:.0%} confidence"
+    if spec.weight:
+        sig_note += f" | Weighted by: {spec.weight}"
+    ws.cell(row=2, column=1, value=sig_note).font = Font(italic=True, size=9, color="6B7280")
+
+    # Row 3: Banner group headers
+    has_multi = len(banners) > 1
+    offset = 1 if has_multi else 0
+    if has_multi:
+        col_idx = 2
+        for b_idx, bvar in enumerate(banners):
+            group_cols = [bc for bc in banner_columns if bc.banner_index == b_idx]
+            if group_cols:
+                cell = ws.cell(row=3, column=col_idx, value=group_cols[0].banner_label)
+                cell.font = Font(bold=True, size=10, color="FFFFFF")
+                cell.fill = BANNER_GROUP_FILL
+                cell.alignment = CENTER
+                if len(group_cols) > 1:
+                    ws.merge_cells(start_row=3, start_column=col_idx, end_row=3, end_column=col_idx + len(group_cols) - 1)
+                col_idx += len(group_cols)
+
+    # Column labels
+    label_row = 3 + offset
+    for i, bc in enumerate(banner_columns):
+        cell = ws.cell(row=label_row, column=2 + i, value=bc.value_label)
+        cell.font = HEADER_FONT
+        cell.fill = HEADER_FILL
+        cell.alignment = CENTER
+    cell = ws.cell(row=label_row, column=total_col, value="Total")
+    cell.font = HEADER_FONT
+    cell.fill = HEADER_FILL
+    cell.alignment = CENTER
+
+    # Letters
+    letter_row = label_row + 1
+    for i, bc in enumerate(banner_columns):
+        cell = ws.cell(row=letter_row, column=2 + i, value=bc.letter)
+        cell.font = Font(bold=True, size=10, color="FFFFFF")
+        cell.fill = LETTER_HEADER_FILL
+        cell.alignment = CENTER
+
+    # Data rows grouped by metric
+    current_row = letter_row + 1
+    metrics_seen = []
+    for r in rows:
+        if r["metric"] not in metrics_seen:
+            metrics_seen.append(r["metric"])
+
+    for metric in metrics_seen:
+        # Metric header row
+        metric_label = METRIC_LABELS.get(metric, metric)
+        cell = ws.cell(row=current_row, column=1, value=metric_label)
+        cell.font = Font(bold=True, size=11, color="374151")
+        fill = METRIC_FILL.get(metric, TOTAL_FILL)
+        for c in range(1, total_col + 1):
+            ws.cell(row=current_row, column=c).fill = fill
+        current_row += 1
+
+        metric_rows = [r for r in rows if r["metric"] == metric]
+        for r in metric_rows:
+            ws.cell(row=current_row, column=1, value=r["label"]).font = LABEL_FONT
+            ws.cell(row=current_row, column=1).alignment = LEFT
+
+            font = METRIC_FONT.get(metric, PCT_FONT)
+            is_pct = metric in ("t2b", "b2b")
+
+            for i, bc in enumerate(banner_columns):
+                col_data = r.get("columns", {}).get(bc.letter, {})
+                val = col_data.get("value")
+                sig = col_data.get("sig_letters", [])
+
+                if val is None:
+                    ws.cell(row=current_row, column=2 + i, value="-").font = COUNT_FONT
+                else:
+                    display = f"{val:.1f}%" if is_pct else f"{val:.2f}"
+                    if sig:
+                        display += " " + "".join(sig)
+                        cell = ws.cell(row=current_row, column=2 + i, value=display)
+                        cell.font = SIG_FONT
+                    else:
+                        cell = ws.cell(row=current_row, column=2 + i, value=display)
+                        cell.font = font
+                ws.cell(row=current_row, column=2 + i).alignment = CENTER
+
+            # Total
+            total_val = r.get("total")
+            if total_val is not None:
+                display = f"{total_val:.1f}%" if is_pct else f"{total_val:.2f}"
+                cell = ws.cell(row=current_row, column=total_col, value=display)
+                cell.font = font
+                cell.fill = TOTAL_FILL
+                cell.alignment = CENTER
+
+            for c in range(1, total_col + 1):
+                ws.cell(row=current_row, column=c).border = THIN_BORDER
+            current_row += 1
+
+        current_row += 1  # Gap between metric groups
+
+    # Column widths
+    ws.column_dimensions["A"].width = 40
+    for i in range(n_cols + 1):
+        ws.column_dimensions[get_column_letter(2 + i)].width = 16
+    ws.freeze_panes = f"B{letter_row + 1}"

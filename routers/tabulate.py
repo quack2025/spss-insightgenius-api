@@ -98,6 +98,7 @@ async def tabulate(
         significance_level=spec_dict.get("significance_level", 0.95),
         nets=spec_dict.get("nets"),
         mrs_groups=spec_dict.get("mrs_groups"),
+        grid_groups=spec_dict.get("grid_groups"),
         include_means=spec_dict.get("include_means", False),
         show_counts=spec_dict.get("show_counts", True),
         show_percentages=spec_dict.get("show_percentages", True),

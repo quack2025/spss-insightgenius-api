@@ -176,6 +176,42 @@ def test_tabulate_mrs(client, auth_headers, test_sav_bytes_with_mrs):
     assert "Brand Awareness" in wb.sheetnames
 
 
+def test_tabulate_grid_summary(client, auth_headers, test_sav_bytes):
+    """Grid/Battery summary: T2B + Mean for multiple scale variables in one sheet."""
+    spec = json.dumps({
+        "banner": "gender",
+        "stubs": [],
+        "grid_groups": {
+            "Satisfaction Battery": {
+                "variables": ["satisfaction", "recommend"],
+                "show": ["t2b", "mean"]
+            }
+        },
+    })
+    resp = client.post(
+        "/v1/tabulate",
+        headers=auth_headers,
+        files={"file": ("test.sav", test_sav_bytes, "application/octet-stream")},
+        data={"spec": spec},
+    )
+    assert resp.status_code == 200
+    assert int(resp.headers["X-Stubs-Success"]) >= 1
+    wb = load_workbook(io.BytesIO(resp.content))
+    assert "Satisfaction Battery" in wb.sheetnames
+    ws = wb["Satisfaction Battery"]
+    # Should have "Top 2 Box %" and "Mean" metric headers
+    found_t2b = False
+    found_mean = False
+    for row in ws.iter_rows(min_col=1, max_col=1):
+        val = str(row[0].value or "")
+        if "Top 2 Box" in val:
+            found_t2b = True
+        if val == "Mean":
+            found_mean = True
+    assert found_t2b, "T2B metric header not found"
+    assert found_mean, "Mean metric header not found"
+
+
 def test_tabulate_custom_groups(client, auth_headers, test_sav_bytes):
     """Custom groups: virtual banner columns defined by conditions."""
     spec = json.dumps({

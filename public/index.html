@@ -123,6 +123,38 @@
           </div>
         </div>
       </div>
+
+      <!-- Grid/Battery Summary -->
+      <div class="mt-4 pt-4 border-t border-gray-100">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-sm font-medium text-gray-700">Grid / Battery Summary</label>
+          <button onclick="toggleGridPanel()" class="text-xs text-orange-600 hover:text-orange-800 font-medium" id="grid-add-btn">+ Add grid group</button>
+        </div>
+        <p class="text-xs text-gray-400 mb-2">Group scale variables with the same response scale (e.g., 7 satisfaction questions). Shows T2B%, B2B%, and Mean in a compact summary sheet.</p>
+        <div id="grid-groups" class="space-y-2"></div>
+        <div id="grid-panel" class="hidden mt-3 p-4 bg-orange-50 rounded-lg border border-orange-200 fade-in">
+          <div class="mb-3">
+            <label class="block text-xs font-medium text-gray-600 mb-1">Group name</label>
+            <input type="text" id="grid-name" placeholder="e.g. Satisfaction Battery" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+          </div>
+          <div class="mb-1">
+            <label class="block text-xs font-medium text-gray-600 mb-1">Select scale variables <span id="grid-count" class="text-gray-400">(0 selected)</span></label>
+            <input type="text" id="grid-filter" placeholder="Type to filter (e.g. sat_, Q20)..." class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs mb-1" oninput="filterGridMembers()">
+          </div>
+          <select id="grid-members" multiple class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" style="min-height:140px" onchange="updateGridCount()"></select>
+          <p class="text-xs text-gray-400 mt-1">Select variables that share the same scale (e.g., all 1-5 satisfaction questions)</p>
+          <div class="flex flex-wrap gap-3 mt-3 mb-3">
+            <label class="text-xs font-medium text-gray-600">Show:</label>
+            <label class="flex items-center gap-1 text-xs"><input type="checkbox" id="grid-show-t2b" checked class="rounded text-orange-600"> Top 2 Box</label>
+            <label class="flex items-center gap-1 text-xs"><input type="checkbox" id="grid-show-b2b" checked class="rounded text-orange-600"> Bottom 2 Box</label>
+            <label class="flex items-center gap-1 text-xs"><input type="checkbox" id="grid-show-mean" checked class="rounded text-orange-600"> Mean</label>
+          </div>
+          <div class="flex gap-2 pt-2 border-t border-orange-200">
+            <button onclick="addGridGroup()" class="px-4 py-1.5 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700">Add grid</button>
+            <button onclick="toggleGridPanel()" class="px-4 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300">Cancel</button>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- Step 4: Options -->
@@ -316,7 +348,7 @@ async function loadMetadata() {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     metadata = (await resp.json()).data;
     infoText.textContent = `${metadata.file_name} \u2014 ${metadata.n_cases.toLocaleString()} cases \u00d7 ${metadata.n_variables} variables`;
-    selectedBanners = []; mrsGroups = {};
+    selectedBanners = []; mrsGroups = {}; gridGroups = {}; customGroups = [];
     populateUI();
     ['banners-section','stubs-section','options-section','custom-groups-section','generate-section'].forEach(id => document.getElementById(id).classList.remove('hidden'));
   } catch (e) {
@@ -330,7 +362,8 @@ function populateUI() {
   const stubsSel = document.getElementById('stubs-select');
   const weightSel = document.getElementById('weight-select');
   const mrsSel = document.getElementById('mrs-members');
-  chipsEl.innerHTML = ''; stubsSel.innerHTML = ''; mrsSel.innerHTML = '';
+  const gridSel = document.getElementById('grid-members');
+  chipsEl.innerHTML = ''; stubsSel.innerHTML = ''; mrsSel.innerHTML = ''; gridSel.innerHTML = '';
   weightSel.innerHTML = '<option value="">None (unweighted)</option>';
 
   for (const v of metadata.variables) {
@@ -355,10 +388,16 @@ function populateUI() {
       stubsSel.appendChild(opt);
     }
 
-    // MRS candidates: all variables (user picks which ones form a group)
-    {
+    // MRS candidates: binary variables (2 labels like Yes/No, or numeric with only 0/1 values)
+    if (vl === 2 || (v.type === 'numeric' && vl <= 2)) {
       const opt = document.createElement('option'); opt.value = v.name; opt.textContent = label;
       mrsSel.appendChild(opt);
+    }
+
+    // Grid candidates: scale variables (4+ value labels, numeric)
+    if (vl >= 4 && v.type === 'numeric') {
+      const opt = document.createElement('option'); opt.value = v.name; opt.textContent = label;
+      gridSel.appendChild(opt);
     }
 
     // Weight
@@ -451,6 +490,58 @@ function renderMrsGroups() {
   el.innerHTML = entries.map(([name, members]) =>
     `<div class="flex items-center gap-2"><span class="pill pill-purple">${name} (${members.length} vars) <span class="remove" onclick="removeMrsGroup('${name}')">&times;</span></span></div>`
   ).join('');
+}
+
+// ── Grid/Battery Groups ──
+let gridGroups = {};  // {"Satisfaction Battery": {variables: [...], show: ["t2b","b2b","mean"]}}
+
+function toggleGridPanel() { document.getElementById('grid-panel').classList.toggle('hidden'); }
+
+function filterGridMembers() {
+  const q = document.getElementById('grid-filter').value.toLowerCase();
+  for (const opt of document.getElementById('grid-members').options) {
+    opt.hidden = q && !opt.textContent.toLowerCase().includes(q) && !opt.value.toLowerCase().includes(q);
+  }
+}
+
+function updateGridCount() {
+  document.getElementById('grid-count').textContent = `(${document.getElementById('grid-members').selectedOptions.length} selected)`;
+}
+
+function addGridGroup() {
+  const name = document.getElementById('grid-name').value.trim();
+  const members = Array.from(document.getElementById('grid-members').selectedOptions).map(o => o.value);
+  if (!name) { alert('Enter a group name'); return; }
+  if (members.length < 2) { alert('Select at least 2 variables'); return; }
+  const show = [];
+  if (document.getElementById('grid-show-t2b').checked) show.push('t2b');
+  if (document.getElementById('grid-show-b2b').checked) show.push('b2b');
+  if (document.getElementById('grid-show-mean').checked) show.push('mean');
+  if (show.length === 0) { alert('Select at least one metric to show'); return; }
+  gridGroups[name] = { variables: members, show };
+  renderGridGroups();
+  document.getElementById('grid-name').value = '';
+  document.getElementById('grid-members').selectedIndex = -1;
+  toggleGridPanel();
+  updateSummary();
+}
+
+function removeGridGroup(name) { delete gridGroups[name]; renderGridGroups(); updateSummary(); }
+
+function renderGridGroups() {
+  const el = document.getElementById('grid-groups');
+  const entries = Object.entries(gridGroups);
+  if (entries.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = entries.map(([name, cfg]) => {
+    const metrics = cfg.show.map(s => ({t2b:'T2B', b2b:'B2B', mean:'Mean', median:'Median'}[s] || s)).join(', ');
+    return `<div class="flex items-start gap-2 p-2 bg-orange-50 rounded-lg border border-orange-200">
+      <div class="flex-1">
+        <span class="text-sm font-medium text-orange-900">${name}</span>
+        <p class="text-xs text-orange-600 mt-0.5">${cfg.variables.length} variables | Metrics: ${metrics}</p>
+      </div>
+      <button onclick="removeGridGroup('${name}')" class="text-orange-400 hover:text-orange-700 text-lg leading-none mt-0.5">&times;</button>
+    </div>`;
+  }).join('');
 }
 
 // ── Custom Groups ──
@@ -584,12 +675,14 @@ function updateSummary() {
   const stubMode = document.querySelector('input[name="stub-mode"]:checked')?.value || 'all';
   const nStubs = stubMode === 'all' ? 'all' : document.getElementById('stubs-select').selectedOptions.length || 'all';
   const nMrs = Object.keys(mrsGroups).length;
+  const nGrid = Object.keys(gridGroups).length;
   const nCg = customGroups.length;
   const parts = [];
   if (selectedBanners.length > 0) parts.push(`Banners: ${selectedBanners.join(' + ')}`);
   parts.push(`Stubs: ${nStubs}`);
   if (nMrs > 0) parts.push(`MRS: ${nMrs}`);
-  if (nCg > 0) parts.push(`Custom groups: ${nCg}`);
+  if (nGrid > 0) parts.push(`Grids: ${nGrid}`);
+  if (nCg > 0) parts.push(`Custom: ${nCg}`);
   el.textContent = parts.join(' | ');
 }
 
@@ -633,6 +726,7 @@ async function generate() {
 
   if (selectedBanners.length > 0) spec.banners = selectedBanners;
   if (customGroups.length > 0) spec.custom_groups = customGroups;
+  if (Object.keys(gridGroups).length > 0) spec.grid_groups = gridGroups;
 
   const weight = document.getElementById('weight-select').value;
   if (weight) spec.weight = weight;
