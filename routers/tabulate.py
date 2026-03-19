@@ -83,16 +83,20 @@ async def tabulate(
     except json.JSONDecodeError as e:
         raise HTTPException(400, detail={"code": "INVALID_SPEC", "message": f"Invalid JSON in spec: {e}"})
 
-    banner = spec_dict.get("banner")
-    if not banner:
-        raise HTTPException(400, detail={"code": "INVALID_SPEC", "message": "spec.banner is required"})
+    banner = spec_dict.get("banner", "")
+    banners = spec_dict.get("banners")
+    if not banner and not banners:
+        raise HTTPException(400, detail={"code": "INVALID_SPEC", "message": "spec.banner or spec.banners is required"})
 
     tab_spec = TabulateSpec(
         banner=banner,
+        banners=banners,
         stubs=spec_dict.get("stubs", ["_all_"]),
         weight=spec_dict.get("weight"),
         significance_level=spec_dict.get("significance_level", 0.95),
         nets=spec_dict.get("nets"),
+        mrs_groups=spec_dict.get("mrs_groups"),
+        include_means=spec_dict.get("include_means", False),
         show_counts=spec_dict.get("show_counts", True),
         show_percentages=spec_dict.get("show_percentages", True),
         title=spec_dict.get("title", ""),
@@ -106,12 +110,13 @@ async def tabulate(
     except Exception as e:
         raise HTTPException(400, detail={"code": "INVALID_FILE_FORMAT", "message": f"Failed to load SPSS file: {e}"})
 
-    # Validate banner exists
-    if tab_spec.banner not in data.df.columns:
-        raise HTTPException(400, detail={
-            "code": "VARIABLE_NOT_FOUND",
-            "message": f"Banner variable '{tab_spec.banner}' not found. Available: {list(data.df.columns[:20])}...",
-        })
+    # Validate banners exist
+    for b in tab_spec.resolved_banners:
+        if b not in data.df.columns:
+            raise HTTPException(400, detail={
+                "code": "VARIABLE_NOT_FOUND",
+                "message": f"Banner variable '{b}' not found. Available: {list(data.df.columns[:20])}...",
+            })
 
     # Validate stubs exist (if explicitly specified)
     if tab_spec.stubs != ["_all_"]:
@@ -120,6 +125,15 @@ async def tabulate(
             raise HTTPException(400, detail={
                 "code": "VARIABLE_NOT_FOUND",
                 "message": f"Stub variables not found: {missing}",
+            })
+
+    # Validate MRS members exist
+    for group_name, members in (tab_spec.mrs_groups or {}).items():
+        missing = [m for m in members if m not in data.df.columns]
+        if missing:
+            raise HTTPException(400, detail={
+                "code": "VARIABLE_NOT_FOUND",
+                "message": f"MRS group '{group_name}' members not found: {missing}",
             })
 
     # ── Run tabulation ──
@@ -132,14 +146,15 @@ async def tabulate(
         raise HTTPException(500, detail={"code": "PROCESSING_FAILED", "message": str(e)})
 
     elapsed = int((time.perf_counter() - start) * 1000)
+    banners_str = "+".join(tab_spec.resolved_banners)
     logger.info(
-        "[TABULATE] key=%s banner=%s stubs=%d success=%d failed=%d time_ms=%d",
-        key.name, tab_spec.banner, result.total_stubs, result.successful, result.failed, elapsed,
+        "[TABULATE] key=%s banners=%s stubs=%d success=%d failed=%d time_ms=%d",
+        key.name, banners_str, result.total_stubs, result.successful, result.failed, elapsed,
     )
 
     # ── Return Excel ──
     import io
-    file_name = f"tabulation_{tab_spec.banner}_{data.file_name.replace('.sav', '')}.xlsx"
+    file_name = f"tabulation_{banners_str}_{data.file_name.replace('.sav', '')}.xlsx"
 
     return StreamingResponse(
         io.BytesIO(result.excel_bytes),

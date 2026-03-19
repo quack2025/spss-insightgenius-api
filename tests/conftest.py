@@ -73,7 +73,43 @@ def test_sav_bytes():
         "satisfaction": {1.0: "Very dissatisfied", 2.0: "Dissatisfied", 3.0: "Neutral", 4.0: "Satisfied", 5.0: "Very satisfied"},
     }
 
-    # Use mkstemp instead of NamedTemporaryFile to avoid Windows file locking
+    fd, tmp_path = tempfile.mkstemp(suffix=".sav")
+    os.close(fd)
+    try:
+        pyreadstat.write_sav(
+            df, tmp_path,
+            column_labels=column_labels,
+            variable_value_labels=variable_value_labels,
+        )
+        with open(tmp_path, "rb") as f:
+            return f.read()
+    finally:
+        os.unlink(tmp_path)
+
+
+@pytest.fixture(scope="session")
+def test_sav_bytes_with_mrs():
+    """Generate a test .sav file with MRS (multiple response) variables."""
+    np.random.seed(99)
+    n = 100
+    df = pd.DataFrame({
+        "gender": np.random.choice([1.0, 2.0], size=n),
+        "AWARE_A": np.random.choice([0.0, 1.0], size=n),
+        "AWARE_B": np.random.choice([0.0, 1.0], size=n),
+        "AWARE_C": np.random.choice([0.0, 1.0], size=n),
+    })
+    column_labels = {
+        "gender": "Gender",
+        "AWARE_A": "Awareness: Brand A",
+        "AWARE_B": "Awareness: Brand B",
+        "AWARE_C": "Awareness: Brand C",
+    }
+    variable_value_labels = {
+        "gender": {1.0: "Male", 2.0: "Female"},
+        "AWARE_A": {0.0: "No", 1.0: "Yes"},
+        "AWARE_B": {0.0: "No", 1.0: "Yes"},
+        "AWARE_C": {0.0: "No", 1.0: "Yes"},
+    }
     fd, tmp_path = tempfile.mkstemp(suffix=".sav")
     os.close(fd)
     try:
