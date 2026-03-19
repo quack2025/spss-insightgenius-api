@@ -106,6 +106,8 @@ class TabulateSpec:
     grid_groups: dict[str, dict[str, Any]] | None = None  # Grid/Battery summaries
     # Format: {"Satisfaction": {"variables": ["sat_speed","sat_price",...], "show": ["t2b","b2b","mean"]}}
     include_means: bool = False
+    include_total_column: bool = True  # Total as first column (T2-5)
+    output_mode: str = "multi_sheet"  # "multi_sheet" or "single_sheet"
     show_counts: bool = True
     show_percentages: bool = True
     title: str = ""
@@ -181,6 +183,16 @@ def build_tabulation(engine_cls: Any, data: Any, spec: TabulateSpec) -> Tabulati
     col_labels = getattr(meta, "column_names_to_labels", {})
     banners = spec.resolved_banners
 
+    # ── Insert Total as first banner if requested ──
+    if spec.include_total_column:
+        total_col_name = "_total_"
+        df[total_col_name] = 1.0
+        vvl = getattr(meta, "variable_value_labels", {})
+        vvl[total_col_name] = {1.0: "Total"}
+        cnl = getattr(meta, "column_names_to_labels", {})
+        cnl[total_col_name] = "Total"
+        banners = [total_col_name] + list(banners)
+
     # ── Build banner columns with continuous letter assignment ──
     banner_columns: list[BannerColumn] = []
     letter_idx = 0
@@ -191,16 +203,18 @@ def build_tabulation(engine_cls: Any, data: Any, spec: TabulateSpec) -> Tabulati
             continue
         vl = getattr(meta, "variable_value_labels", {}).get(banner_var, {})
         col_values = sorted(df[banner_var].dropna().unique())
+        is_total = banner_var == "_total_" if spec.include_total_column else False
         for cv in col_values:
             banner_columns.append(BannerColumn(
                 banner_var=banner_var,
                 banner_label=col_labels.get(banner_var, banner_var),
                 value=str(cv),
                 value_label=vl.get(cv, str(cv)),
-                letter=all_letters[letter_idx],
+                letter="" if is_total else all_letters[letter_idx],
                 banner_index=b_idx,
             ))
-            letter_idx += 1
+            if not is_total:
+                letter_idx += 1
 
     # ── Custom groups as virtual banner columns ──
     custom_groups = spec.parsed_custom_groups
@@ -644,18 +658,22 @@ def _build_excel(result: TabulationResult, spec: TabulateSpec, data: Any) -> byt
     ws_summary.title = "Summary"
     _write_summary_sheet(ws_summary, result, spec, data)
 
-    for sheet_result in result.sheets:
-        if sheet_result.status != "success":
-            continue
-        sheet_name = sheet_result.variable[:31]
-        existing = [ws.title for ws in wb.worksheets]
-        if sheet_name in existing:
-            sheet_name = sheet_name[:28] + "_" + str(existing.count(sheet_name))
-        ws = wb.create_sheet(title=sheet_name)
-        if sheet_result.is_grid and sheet_result.grid_data:
-            _write_grid_sheet(ws, sheet_result, spec, result.banner_columns)
-        elif sheet_result.crosstab_data:
-            _write_crosstab_sheet(ws, sheet_result, spec, data, result.banner_columns)
+    if spec.output_mode == "single_sheet":
+        ws = wb.create_sheet(title="Tabulation")
+        _write_single_sheet(ws, result, spec, data)
+    else:
+        for sheet_result in result.sheets:
+            if sheet_result.status != "success":
+                continue
+            sheet_name = sheet_result.variable[:31]
+            existing = [ws.title for ws in wb.worksheets]
+            if sheet_name in existing:
+                sheet_name = sheet_name[:28] + "_" + str(existing.count(sheet_name))
+            ws = wb.create_sheet(title=sheet_name)
+            if sheet_result.is_grid and sheet_result.grid_data:
+                _write_grid_sheet(ws, sheet_result, spec, result.banner_columns)
+            elif sheet_result.crosstab_data:
+                _write_crosstab_sheet(ws, sheet_result, spec, data, result.banner_columns)
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -741,7 +759,7 @@ def _write_crosstab_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, dat
 
     banners = spec.resolved_banners
     n_banner_cols = len(banner_columns)
-    total_col = 2 + n_banner_cols  # Last column = Total
+    last_data_col = 1 + n_banner_cols  # Column A = labels, then banner cols
 
     # Row 1: Title
     title = f"{sheet_result.variable}"
@@ -750,7 +768,7 @@ def _write_crosstab_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, dat
     if sheet_result.is_mrs:
         title += " (Multiple Response)"
     ws.cell(row=1, column=1, value=title).font = TITLE_FONT
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_col)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=last_data_col)
 
     # Row 2: Sig note
     sig_note = f"Significance: {spec.significance_level:.0%} confidence"
@@ -786,19 +804,16 @@ def _write_crosstab_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, dat
 
     # Row: Column value labels
     for i, bc in enumerate(banner_columns):
+        is_total = bc.banner_var == "_total_"
         cell = ws.cell(row=row_labels, column=2 + i, value=bc.value_label)
         cell.font = HEADER_FONT
-        cell.fill = HEADER_FILL
+        cell.fill = TOTAL_FILL if is_total else HEADER_FILL
         cell.alignment = CENTER
         cell.border = HEADER_BORDER
-    cell = ws.cell(row=row_labels, column=total_col, value="Total")
-    cell.font = HEADER_FONT
-    cell.fill = HEADER_FILL
-    cell.alignment = CENTER
 
     # Row: Letters
     for i, bc in enumerate(banner_columns):
-        cell = ws.cell(row=row_letters, column=2 + i, value=bc.letter)
+        cell = ws.cell(row=row_letters, column=2 + i, value=bc.letter or "")
         cell.font = Font(bold=True, size=10, color="FFFFFF")
         cell.fill = LETTER_HEADER_FILL
         cell.alignment = CENTER
@@ -806,49 +821,40 @@ def _write_crosstab_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, dat
     # Row: Base (weighted) — compute from data
     base_label = "Base (weighted)" if has_dual_base else "Base (N)"
     ws.cell(row=row_base_w, column=1, value=base_label).font = BASE_FONT
-    grand_total = 0
-    col_bases = {}  # letter -> weighted count
-    col_bases_uw = {}  # letter -> unweighted count
+    col_bases = {}  # column index -> weighted count
+    col_bases_uw = {}
 
-    for bc in banner_columns:
+    for i, bc in enumerate(banner_columns):
         ct = all_ct.get(bc.banner_var, {})
         table = ct.get("table", [])
         w_total = sum(
             row_data.get(bc.value, {}).get("count", 0)
             for row_data in table if isinstance(row_data.get(bc.value), dict)
         )
-        col_bases[bc.letter] = w_total
-        grand_total += w_total
+        col_bases[i] = w_total
 
-        # Unweighted base
         if has_dual_base:
-            mask = data.df[bc.banner_var] == float(bc.value) if bc.value.replace('.', '', 1).replace('-', '', 1).isdigit() else data.df[bc.banner_var] == bc.value
-            col_bases_uw[bc.letter] = int(mask.sum())
+            try:
+                bval = float(bc.value) if bc.value.replace('.', '', 1).replace('-', '', 1).isdigit() else bc.value
+            except (ValueError, AttributeError):
+                bval = bc.value
+            mask = data.df[bc.banner_var] == bval
+            col_bases_uw[i] = int(mask.sum())
 
-    for i, bc in enumerate(banner_columns):
-        cell = ws.cell(row=row_base_w, column=2 + i, value=int(round(col_bases.get(bc.letter, 0))))
+        is_total = bc.banner_var == "_total_"
+        cell = ws.cell(row=row_base_w, column=2 + i, value=int(round(w_total)))
         cell.font = BASE_FONT
         cell.alignment = CENTER
-        cell.fill = TOTAL_FILL
-    # Grand total
-    cell = ws.cell(row=row_base_w, column=total_col, value=int(round(grand_total)))
-    cell.font = BASE_FONT
-    cell.alignment = CENTER
-    cell.fill = TOTAL_FILL
+        cell.fill = TOTAL_FILL if is_total else PatternFill()
 
     # Row: Base (unweighted) — T1-4
     if has_dual_base:
         ws.cell(row=row_base_uw, column=1, value="Base (unweighted)").font = Font(bold=True, size=9, color="9CA3AF")
-        total_uw = 0
         for i, bc in enumerate(banner_columns):
-            uw = col_bases_uw.get(bc.letter, 0)
-            total_uw += uw
+            uw = col_bases_uw.get(i, 0)
             cell = ws.cell(row=row_base_uw, column=2 + i, value=uw)
             cell.font = Font(size=9, color="9CA3AF")
             cell.alignment = CENTER
-        cell = ws.cell(row=row_base_uw, column=total_col, value=total_uw)
-        cell.font = Font(size=9, color="9CA3AF")
-        cell.alignment = CENTER
 
     # ── Data rows ──
     # Collect all unique row values/labels across all banner crosstabs
@@ -902,9 +908,10 @@ def _write_crosstab_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, dat
                             break
 
             col_idx = 2 + i
+            is_total_col = bc.banner_var == "_total_"
             if spec.show_percentages:
                 pct_str = f"{pct:.1f}%"
-                if global_sig:
+                if global_sig and not is_total_col:
                     pct_str += " " + "".join(global_sig)
                     cell = ws.cell(row=current_row, column=col_idx, value=pct_str)
                     cell.font = SIG_FONT
@@ -912,16 +919,10 @@ def _write_crosstab_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, dat
                     cell = ws.cell(row=current_row, column=col_idx, value=pct_str)
                     cell.font = PCT_FONT
                 cell.alignment = CENTER
+                if is_total_col:
+                    cell.fill = TOTAL_FILL
 
-        # Total
-        if grand_total > 0:
-            total_pct = round(row_total_count / grand_total * 100, 1)
-            cell = ws.cell(row=current_row, column=total_col, value=f"{total_pct:.1f}%")
-            cell.font = PCT_FONT
-            cell.alignment = CENTER
-            cell.fill = TOTAL_FILL
-
-        for c in range(1, total_col + 1):
+        for c in range(1, last_data_col + 1):
             ws.cell(row=current_row, column=c).border = THIN_BORDER
         current_row += 1
 
@@ -935,26 +936,18 @@ def _write_crosstab_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, dat
             ws.cell(row=current_row, column=1, value=net_name).font = Font(bold=True, size=10, color="166534")
             ws.cell(row=current_row, column=1).fill = NET_FILL
 
-            net_grand = 0
             for i, bc in enumerate(banner_columns):
                 ct = all_ct.get(bc.banner_var, {})
                 net_count = 0
-                col_base = col_bases.get(bc.letter, 0)
+                col_base = col_bases.get(i, 0)
                 for rd in ct.get("table", []):
                     rv = rd.get("row_value")
                     if rv in net_values or (isinstance(rv, float) and int(rv) in net_values):
                         cd = rd.get(bc.value, {})
                         if isinstance(cd, dict):
                             net_count += cd.get("count", 0)
-                net_grand += net_count
                 net_pct = round(net_count / col_base * 100, 1) if col_base > 0 else 0
                 cell = ws.cell(row=current_row, column=2 + i, value=f"{net_pct:.1f}%")
-                cell.font = Font(size=10, color="166534")
-                cell.fill = NET_FILL
-                cell.alignment = CENTER
-
-            if grand_total > 0:
-                cell = ws.cell(row=current_row, column=total_col, value=f"{round(net_grand / grand_total * 100, 1):.1f}%")
                 cell.font = Font(size=10, color="166534")
                 cell.fill = NET_FILL
                 cell.alignment = CENTER
@@ -1010,19 +1003,6 @@ def _write_crosstab_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, dat
                     cell.fill = MEAN_FILL
                     cell.alignment = CENTER
 
-                # Total mean
-                total_vals = data.df[stub_var].dropna()
-                if len(total_vals) > 0:
-                    if spec.weight and spec.weight in data.df.columns:
-                        tw = data.df[spec.weight].loc[total_vals.index]
-                        total_mean = float(np.average(total_vals, weights=tw))
-                    else:
-                        total_mean = float(total_vals.mean())
-                    cell = ws.cell(row=current_row, column=total_col, value=f"{total_mean:.2f}")
-                    cell.font = MEAN_FONT
-                    cell.fill = MEAN_FILL
-                    cell.alignment = CENTER
-
             current_row += 1
 
             # Std Dev row
@@ -1042,7 +1022,7 @@ def _write_crosstab_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, dat
 
     # Column widths
     ws.column_dimensions["A"].width = 40
-    for i in range(n_banner_cols + 1):
+    for i in range(n_banner_cols):
         ws.column_dimensions[get_column_letter(2 + i)].width = 16
     ws.freeze_panes = f"B{data_start}"
 
@@ -1190,3 +1170,287 @@ def _write_grid_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, banner_
     for i in range(n_cols + 1):
         ws.column_dimensions[get_column_letter(2 + i)].width = 16
     ws.freeze_panes = f"B{letter_row + 1}"
+
+
+STUB_HEADER_FILL = PatternFill(start_color="F3F4F6", end_color="F3F4F6", fill_type="solid")
+STUB_HEADER_FONT = Font(bold=True, size=11, color="1F2937")
+STUB_SEPARATOR = Border(top=Side(style="medium", color="374151"))
+
+
+def _write_single_sheet(ws, result: TabulationResult, spec: TabulateSpec, data: Any):
+    """Write all stubs stacked on a single sheet.
+
+    Layout:
+    Row 1: Title
+    Row 2: Sig note
+    Row 3: Banner group headers (if multi)
+    Row 4: Column value labels
+    Row 5: Column letters
+    Row 6+: Stubs stacked, each with header + base + data + nets + means
+    """
+    banner_columns = result.banner_columns
+    banners = spec.resolved_banners
+    n_cols = len(banner_columns)
+    last_col = 1 + n_cols
+    col_labels = getattr(data.meta, "column_names_to_labels", {})
+
+    # Row 1: Title
+    title = spec.title or "Tabulation Report"
+    ws.cell(row=1, column=1, value=title).font = Font(bold=True, size=14, color="1F2937")
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=last_col)
+
+    # Row 2: Sig note
+    sig_note = f"Significance: {spec.significance_level:.0%} confidence"
+    if spec.weight:
+        sig_note += f" | Weighted by: {spec.weight}"
+    ws.cell(row=2, column=1, value=sig_note).font = Font(italic=True, size=9, color="6B7280")
+
+    # Row 3: Banner group headers
+    has_multi = len(banners) > 1
+    offset = 1 if has_multi else 0
+    if has_multi:
+        col_idx = 2
+        for b_idx, bvar in enumerate(banners):
+            group_cols = [bc for bc in banner_columns if bc.banner_index == b_idx]
+            if group_cols:
+                cell = ws.cell(row=3, column=col_idx, value=group_cols[0].banner_label)
+                cell.font = Font(bold=True, size=10, color="FFFFFF")
+                cell.fill = BANNER_GROUP_FILL
+                cell.alignment = CENTER
+                if len(group_cols) > 1:
+                    ws.merge_cells(start_row=3, start_column=col_idx, end_row=3, end_column=col_idx + len(group_cols) - 1)
+                col_idx += len(group_cols)
+
+    # Column value labels
+    label_row = 3 + offset
+    for i, bc in enumerate(banner_columns):
+        is_total = bc.banner_var == "_total_"
+        cell = ws.cell(row=label_row, column=2 + i, value=bc.value_label)
+        cell.font = HEADER_FONT
+        cell.fill = TOTAL_FILL if is_total else HEADER_FILL
+        cell.alignment = CENTER
+        cell.border = HEADER_BORDER
+
+    # Letters
+    letter_row = label_row + 1
+    for i, bc in enumerate(banner_columns):
+        cell = ws.cell(row=letter_row, column=2 + i, value=bc.letter or "")
+        cell.font = Font(bold=True, size=10, color="FFFFFF")
+        cell.fill = LETTER_HEADER_FILL
+        cell.alignment = CENTER
+
+    current_row = letter_row + 1
+
+    # ── Stack each stub ──
+    for sheet_result in result.sheets:
+        if sheet_result.status != "success":
+            continue
+
+        # Grid sheets get their own treatment
+        if sheet_result.is_grid and sheet_result.grid_data:
+            current_row = _write_grid_block_in_single_sheet(
+                ws, sheet_result, spec, banner_columns, current_row, last_col,
+            )
+            continue
+
+        all_ct = sheet_result.crosstab_data
+        if not all_ct:
+            continue
+
+        # ── Stub header ──
+        stub_label = f"{sheet_result.variable}"
+        if sheet_result.label and sheet_result.label != sheet_result.variable:
+            stub_label += f": {sheet_result.label}"
+        if sheet_result.is_mrs:
+            stub_label += " (MRS)"
+
+        for c in range(1, last_col + 1):
+            ws.cell(row=current_row, column=c).border = STUB_SEPARATOR
+        ws.cell(row=current_row, column=1, value=stub_label).font = STUB_HEADER_FONT
+        for c in range(1, last_col + 1):
+            ws.cell(row=current_row, column=c).fill = STUB_HEADER_FILL
+        current_row += 1
+
+        # ── Base row ──
+        has_dual_base = spec.weight is not None
+        base_label = "Base (weighted)" if has_dual_base else "Base (N)"
+        ws.cell(row=current_row, column=1, value=base_label).font = BASE_FONT
+        for i, bc in enumerate(banner_columns):
+            ct = all_ct.get(bc.banner_var, {})
+            base = sum(
+                rd.get(bc.value, {}).get("count", 0)
+                for rd in ct.get("table", []) if isinstance(rd.get(bc.value), dict)
+            )
+            cell = ws.cell(row=current_row, column=2 + i, value=int(round(base)))
+            cell.font = BASE_FONT
+            cell.alignment = CENTER
+        current_row += 1
+
+        if has_dual_base:
+            ws.cell(row=current_row, column=1, value="Base (unweighted)").font = Font(size=9, color="9CA3AF")
+            for i, bc in enumerate(banner_columns):
+                try:
+                    bval = float(bc.value) if bc.value.replace('.', '', 1).replace('-', '', 1).isdigit() else bc.value
+                except (ValueError, AttributeError):
+                    bval = bc.value
+                uw = int((data.df[bc.banner_var] == bval).sum())
+                cell = ws.cell(row=current_row, column=2 + i, value=uw)
+                cell.font = Font(size=9, color="9CA3AF")
+                cell.alignment = CENTER
+            current_row += 1
+
+        # ── Data rows ──
+        all_rows = []
+        seen_rv = set()
+        for bvar in banners:
+            ct = all_ct.get(bvar, {})
+            for rd in ct.get("table", []):
+                rv = rd.get("row_value")
+                if rv not in seen_rv:
+                    seen_rv.add(rv)
+                    all_rows.append({"row_value": rv, "row_label": rd.get("row_label", str(rv))})
+
+        for row_info in all_rows:
+            rv = row_info["row_value"]
+            ws.cell(row=current_row, column=1, value=row_info["row_label"]).font = LABEL_FONT
+
+            for i, bc in enumerate(banner_columns):
+                ct = all_ct.get(bc.banner_var, {})
+                cell_data = None
+                for rd in ct.get("table", []):
+                    if rd.get("row_value") == rv:
+                        cell_data = rd.get(bc.value, {})
+                        break
+                if not isinstance(cell_data, dict):
+                    ws.cell(row=current_row, column=2 + i, value="-").font = COUNT_FONT
+                    ws.cell(row=current_row, column=2 + i).alignment = CENTER
+                    continue
+
+                pct = cell_data.get("percentage", 0)
+                orig_sig = cell_data.get("significance_letters", [])
+
+                # Remap sig letters
+                ct_cl = ct.get("col_labels", {})
+                rev_map = {v: k for k, v in ct_cl.items()}
+                global_sig = []
+                for ol in orig_sig:
+                    ov = rev_map.get(ol)
+                    if ov:
+                        for gbc in banner_columns:
+                            if gbc.banner_var == bc.banner_var and gbc.value == ov:
+                                global_sig.append(gbc.letter)
+                                break
+
+                is_total_col = bc.banner_var == "_total_"
+                pct_str = f"{pct:.1f}%"
+                if global_sig and not is_total_col:
+                    pct_str += " " + "".join(global_sig)
+                    cell = ws.cell(row=current_row, column=2 + i, value=pct_str)
+                    cell.font = SIG_FONT
+                else:
+                    cell = ws.cell(row=current_row, column=2 + i, value=pct_str)
+                    cell.font = PCT_FONT
+                cell.alignment = CENTER
+                if is_total_col:
+                    cell.fill = TOTAL_FILL
+
+            for c in range(1, last_col + 1):
+                ws.cell(row=current_row, column=c).border = THIN_BORDER
+            current_row += 1
+
+        # ── Nets ──
+        var_nets = (spec.nets or {}).get(sheet_result.variable, {})
+        for net_name, net_values in var_nets.items():
+            ws.cell(row=current_row, column=1, value=f"  {net_name}").font = Font(bold=True, size=9, color="166534")
+            for i, bc in enumerate(banner_columns):
+                ct = all_ct.get(bc.banner_var, {})
+                net_count = 0
+                col_base = sum(rd.get(bc.value, {}).get("count", 0) for rd in ct.get("table", []) if isinstance(rd.get(bc.value), dict))
+                for rd in ct.get("table", []):
+                    rv = rd.get("row_value")
+                    if rv in net_values or (isinstance(rv, float) and int(rv) in net_values):
+                        cd = rd.get(bc.value, {})
+                        if isinstance(cd, dict):
+                            net_count += cd.get("count", 0)
+                net_pct = round(net_count / col_base * 100, 1) if col_base > 0 else 0
+                cell = ws.cell(row=current_row, column=2 + i, value=f"{net_pct:.1f}%")
+                cell.font = Font(size=9, color="166534")
+                cell.fill = NET_FILL
+                cell.alignment = CENTER
+            current_row += 1
+
+        # ── Means ──
+        if spec.include_means and not sheet_result.is_mrs:
+            stub_var = sheet_result.variable
+            if pd.api.types.is_numeric_dtype(data.df[stub_var]):
+                alpha = 1 - spec.significance_level
+                ws.cell(row=current_row, column=1, value="  Mean").font = Font(bold=True, size=9, color="9A3412")
+                for i, bc in enumerate(banner_columns):
+                    try:
+                        bval = float(bc.value) if bc.value.replace('.', '', 1).replace('-', '', 1).isdigit() else bc.value
+                    except (ValueError, AttributeError):
+                        bval = bc.value
+                    mask = (data.df[bc.banner_var] == bval) & data.df[stub_var].notna()
+                    vals = data.df[stub_var][mask]
+                    if len(vals) < 1:
+                        ws.cell(row=current_row, column=2 + i, value="-").font = COUNT_FONT
+                        ws.cell(row=current_row, column=2 + i).alignment = CENTER
+                        continue
+                    m = float(vals.mean())
+                    cell = ws.cell(row=current_row, column=2 + i, value=f"{m:.2f}")
+                    cell.font = Font(size=9, color="9A3412")
+                    cell.fill = MEAN_FILL
+                    cell.alignment = CENTER
+                current_row += 1
+
+        current_row += 1  # Gap between stubs
+
+    # Column widths
+    ws.column_dimensions["A"].width = 45
+    for i in range(n_cols):
+        ws.column_dimensions[get_column_letter(2 + i)].width = 16
+    ws.freeze_panes = f"B{letter_row + 1}"
+
+
+def _write_grid_block_in_single_sheet(ws, sheet_result, spec, banner_columns, start_row, last_col):
+    """Write a grid summary block within the single-sheet layout."""
+    grid = sheet_result.grid_data
+    if not grid:
+        return start_row
+
+    rows = grid.get("rows", [])
+    METRIC_LABELS = {"t2b": "T2B %", "b2b": "B2B %", "mean": "Mean", "median": "Median"}
+
+    # Header
+    for c in range(1, last_col + 1):
+        ws.cell(row=start_row, column=c).border = STUB_SEPARATOR
+        ws.cell(row=start_row, column=c).fill = STUB_HEADER_FILL
+    label = sheet_result.label or sheet_result.variable
+    ws.cell(row=start_row, column=1, value=f"{label} (Grid Summary)").font = STUB_HEADER_FONT
+    start_row += 1
+
+    metrics_seen = list(dict.fromkeys(r["metric"] for r in rows))
+    for metric in metrics_seen:
+        metric_rows = [r for r in rows if r["metric"] == metric]
+        for r in metric_rows:
+            ws.cell(row=start_row, column=1, value=f"  {r['label']} ({METRIC_LABELS.get(metric, metric)})").font = LABEL_FONT
+            is_pct = metric in ("t2b", "b2b")
+            for i, bc in enumerate(banner_columns):
+                col_data = r.get("columns", {}).get(bc.letter, {})
+                val = col_data.get("value")
+                sig = col_data.get("sig_letters", [])
+                if val is None:
+                    ws.cell(row=start_row, column=2 + i, value="-").font = COUNT_FONT
+                else:
+                    display = f"{val:.1f}%" if is_pct else f"{val:.2f}"
+                    if sig:
+                        display += " " + "".join(sig)
+                        ws.cell(row=start_row, column=2 + i, value=display).font = SIG_FONT
+                    else:
+                        ws.cell(row=start_row, column=2 + i, value=display).font = PCT_FONT
+                ws.cell(row=start_row, column=2 + i).alignment = CENTER
+            for c in range(1, last_col + 1):
+                ws.cell(row=start_row, column=c).border = THIN_BORDER
+            start_row += 1
+
+    return start_row + 1

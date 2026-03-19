@@ -176,6 +176,65 @@ def test_tabulate_mrs(client, auth_headers, test_sav_bytes_with_mrs):
     assert "Brand Awareness" in wb.sheetnames
 
 
+def test_tabulate_total_first_column(client, auth_headers, test_sav_bytes):
+    """T2-5: Total appears as first column before banners."""
+    spec = json.dumps({
+        "banner": "gender",
+        "stubs": ["satisfaction"],
+        "include_total_column": True,
+    })
+    resp = client.post(
+        "/v1/tabulate",
+        headers=auth_headers,
+        files={"file": ("test.sav", test_sav_bytes, "application/octet-stream")},
+        data={"spec": spec},
+    )
+    assert resp.status_code == 200
+    wb = load_workbook(io.BytesIO(resp.content))
+    ws = wb["satisfaction"]
+    # First data column (B) should be "Total"
+    # Find the column value labels row
+    for r in range(3, 8):
+        val = ws.cell(row=r, column=2).value
+        if val == "Total":
+            break
+    else:
+        assert False, "Total not found as first column"
+
+
+def test_tabulate_single_sheet(client, auth_headers, test_sav_bytes):
+    """Single-sheet mode: all stubs stacked in one sheet."""
+    spec = json.dumps({
+        "banner": "gender",
+        "stubs": ["satisfaction", "age_group"],
+        "output_mode": "single_sheet",
+    })
+    resp = client.post(
+        "/v1/tabulate",
+        headers=auth_headers,
+        files={"file": ("test.sav", test_sav_bytes, "application/octet-stream")},
+        data={"spec": spec},
+    )
+    assert resp.status_code == 200
+    wb = load_workbook(io.BytesIO(resp.content))
+    assert "Tabulation" in wb.sheetnames
+    # Should NOT have individual sheets for each stub
+    assert "satisfaction" not in wb.sheetnames
+    assert "age_group" not in wb.sheetnames
+    # The Tabulation sheet should contain both stubs
+    ws = wb["Tabulation"]
+    found_sat = False
+    found_age = False
+    for row in ws.iter_rows(min_col=1, max_col=1):
+        val = str(row[0].value or "")
+        if "satisfaction" in val.lower():
+            found_sat = True
+        if "age_group" in val.lower():
+            found_age = True
+    assert found_sat, "satisfaction stub not found in single sheet"
+    assert found_age, "age_group stub not found in single sheet"
+
+
 def test_tabulate_grid_summary(client, auth_headers, test_sav_bytes):
     """Grid/Battery summary: T2B + Mean for multiple scale variables in one sheet."""
     spec = json.dumps({

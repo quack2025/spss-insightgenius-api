@@ -195,6 +195,18 @@
         </div>
         <p class="text-xs text-gray-400 mt-2">T2B/B2B and Means auto-apply to scale variables (Likert 4-11 pt). Sig letters show which columns differ.</p>
       </div>
+      <div class="mt-4 pt-4 border-t border-gray-100">
+        <label class="block text-sm font-medium text-gray-700 mb-3">Output format</label>
+        <div class="flex flex-wrap gap-4">
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="radio" name="output-mode" value="multi_sheet" checked class="text-blue-600"> One sheet per question
+          </label>
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="radio" name="output-mode" value="single_sheet" class="text-blue-600"> All questions in one sheet
+          </label>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">Single sheet is ideal for scrolling, copy-paste to PPT, or comparing questions side by side.</p>
+      </div>
     </section>
 
     <!-- Step 5: Custom Groups -->
@@ -717,10 +729,13 @@ async function generate() {
     if (stubs.length === 0) stubs = ['_all_'];
   }
 
+  const outputMode = document.querySelector('input[name="output-mode"]:checked')?.value || 'multi_sheet';
   const spec = {
     stubs,
     significance_level: parseFloat(document.getElementById('sig-select').value),
     include_means: document.getElementById('opt-means').checked,
+    include_total_column: true,
+    output_mode: outputMode,
     title: document.getElementById('title-input').value || undefined,
   };
 

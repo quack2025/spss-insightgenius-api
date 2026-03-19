@@ -100,6 +100,8 @@ async def tabulate(
         mrs_groups=spec_dict.get("mrs_groups"),
         grid_groups=spec_dict.get("grid_groups"),
         include_means=spec_dict.get("include_means", False),
+        include_total_column=spec_dict.get("include_total_column", True),
+        output_mode=spec_dict.get("output_mode", "multi_sheet"),
         show_counts=spec_dict.get("show_counts", True),
         show_percentages=spec_dict.get("show_percentages", True),
         title=spec_dict.get("title", ""),
