@@ -85,12 +85,14 @@ async def tabulate(
 
     banner = spec_dict.get("banner", "")
     banners = spec_dict.get("banners")
-    if not banner and not banners:
-        raise HTTPException(400, detail={"code": "INVALID_SPEC", "message": "spec.banner or spec.banners is required"})
+    custom_groups = spec_dict.get("custom_groups")
+    if not banner and not banners and not custom_groups:
+        raise HTTPException(400, detail={"code": "INVALID_SPEC", "message": "spec.banner, spec.banners, or spec.custom_groups is required"})
 
     tab_spec = TabulateSpec(
         banner=banner,
         banners=banners,
+        custom_groups=spec_dict.get("custom_groups"),
         stubs=spec_dict.get("stubs", ["_all_"]),
         weight=spec_dict.get("weight"),
         significance_level=spec_dict.get("significance_level", 0.95),

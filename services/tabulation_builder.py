@@ -52,28 +52,76 @@ LEFT = Alignment(horizontal="left", vertical="center")
 
 
 @dataclass
+class CustomGroup:
+    """A user-defined group (custom break / banner point).
+
+    Conditions are AND-ed: all must be true for a row to be in this group.
+    Example: {"name": "London Uber users", "conditions": [
+        {"variable": "region", "operator": "eq", "value": 1},
+        {"variable": "AWARE_UBER", "operator": "eq", "value": 1}
+    ]}
+    """
+    name: str
+    conditions: list[dict[str, Any]]  # [{"variable": str, "operator": str, "value": Any}]
+
+
+# Supported operators for custom group conditions
+_OPERATORS = {
+    "eq": lambda s, v: s == v,
+    "ne": lambda s, v: s != v,
+    "gt": lambda s, v: s > v,
+    "gte": lambda s, v: s >= v,
+    "lt": lambda s, v: s < v,
+    "lte": lambda s, v: s <= v,
+    "in": lambda s, v: s.isin(v if isinstance(v, list) else [v]),
+    "not_in": lambda s, v: ~s.isin(v if isinstance(v, list) else [v]),
+}
+
+
+def _apply_group_mask(df: pd.DataFrame, conditions: list[dict[str, Any]]) -> pd.Series:
+    """Build a boolean mask from AND-ed conditions."""
+    mask = pd.Series(True, index=df.index)
+    for cond in conditions:
+        var = cond.get("variable", "")
+        op = cond.get("operator", "eq")
+        val = cond.get("value")
+        if var not in df.columns:
+            continue
+        op_fn = _OPERATORS.get(op, _OPERATORS["eq"])
+        mask = mask & op_fn(df[var], val)
+    return mask
+
+
+@dataclass
 class TabulateSpec:
     """Specification for a full tabulation run."""
     banner: str = ""  # Single banner (backwards compat)
     banners: list[str] | None = None  # Multiple banners (T1-2)
+    custom_groups: list[dict[str, Any]] | None = None  # Custom breaks
     stubs: list[str] = field(default_factory=lambda: ["_all_"])
     weight: str | None = None
     significance_level: float = 0.95
     nets: dict[str, dict[str, list[Any]]] | None = None
-    mrs_groups: dict[str, list[str]] | None = None  # T1-3: {"Q5_awareness": ["Q5_1","Q5_2",...]}
-    include_means: bool = False  # T1-1
+    mrs_groups: dict[str, list[str]] | None = None
+    include_means: bool = False
     show_counts: bool = True
     show_percentages: bool = True
     title: str = ""
 
     @property
     def resolved_banners(self) -> list[str]:
-        """Return list of banners (supports single or multi)."""
         if self.banners:
             return self.banners
         if self.banner:
             return [self.banner]
         return []
+
+    @property
+    def parsed_custom_groups(self) -> list[CustomGroup]:
+        if not self.custom_groups:
+            return []
+        return [CustomGroup(name=g.get("name", f"Group {i+1}"), conditions=g.get("conditions", []))
+                for i, g in enumerate(self.custom_groups)]
 
 
 @dataclass
@@ -130,7 +178,6 @@ def build_tabulation(engine_cls: Any, data: Any, spec: TabulateSpec) -> Tabulati
         if banner_var not in df.columns:
             continue
         vl = getattr(meta, "variable_value_labels", {}).get(banner_var, {})
-        # Get sorted unique values
         col_values = sorted(df[banner_var].dropna().unique())
         for cv in col_values:
             banner_columns.append(BannerColumn(
@@ -142,6 +189,45 @@ def build_tabulation(engine_cls: Any, data: Any, spec: TabulateSpec) -> Tabulati
                 banner_index=b_idx,
             ))
             letter_idx += 1
+
+    # ── Custom groups as virtual banner columns ──
+    custom_groups = spec.parsed_custom_groups
+    custom_col_name = "_custom_group_"
+    has_custom = len(custom_groups) > 0
+
+    if has_custom:
+        # Create a synthetic column in df where each custom group gets an integer code
+        # Rows that match NO group get NaN (excluded from crosstab)
+        custom_series = pd.Series(np.nan, index=df.index)
+        custom_vl = {}
+        for gi, cg in enumerate(custom_groups):
+            mask = _apply_group_mask(df, cg.conditions)
+            # Assign group code (1-based). Later groups overwrite earlier if overlapping.
+            custom_series = custom_series.where(~mask, float(gi + 1))
+            custom_vl[float(gi + 1)] = cg.name
+
+        df[custom_col_name] = custom_series
+        banners = list(banners) + [custom_col_name]
+
+        cg_b_idx = len(banners) - 1
+        for gi, cg in enumerate(custom_groups):
+            banner_columns.append(BannerColumn(
+                banner_var=custom_col_name,
+                banner_label="Custom Groups",
+                value=str(float(gi + 1)),
+                value_label=cg.name,
+                letter=all_letters[letter_idx],
+                banner_index=cg_b_idx,
+            ))
+            letter_idx += 1
+
+        # Patch meta so crosstab can find value labels
+        if not hasattr(meta, "_custom_vl_patched"):
+            vvl = getattr(meta, "variable_value_labels", {})
+            vvl[custom_col_name] = custom_vl
+            meta._custom_vl_patched = True
+            cnl = getattr(meta, "column_names_to_labels", {})
+            cnl[custom_col_name] = "Custom Groups"
 
     # ── Resolve stubs ──
     if spec.stubs == ["_all_"] or not spec.stubs:

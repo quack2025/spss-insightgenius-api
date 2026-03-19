@@ -160,6 +160,35 @@
       </div>
     </section>
 
+    <!-- Step 5: Custom Groups -->
+    <section id="custom-groups-section" class="hidden bg-white rounded-xl border border-gray-200 p-6 fade-in">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="section-badge bg-purple-600 text-white">5</span>
+        <h2 class="text-lg font-semibold text-gray-900">Custom Groups <span class="text-sm font-normal text-gray-400">(optional)</span></h2>
+      </div>
+      <p class="text-xs text-gray-500 mb-4">Define custom banner columns by combining conditions. Example: "London + Uber users" = region is London AND aware of Uber. Each group becomes a column with significance testing.</p>
+
+      <div id="custom-groups-list" class="space-y-2 mb-3"></div>
+
+      <div id="cg-builder" class="hidden p-4 bg-gray-50 rounded-lg border border-gray-200 fade-in">
+        <div class="mb-3">
+          <label class="block text-xs font-medium text-gray-600 mb-1">Group name</label>
+          <input type="text" id="cg-name" placeholder="e.g. London Uber Users" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+        </div>
+
+        <label class="block text-xs font-medium text-gray-600 mb-1">Conditions <span class="text-gray-400">(all must be true &mdash; AND logic)</span></label>
+        <div id="cg-conditions" class="space-y-2 mb-3"></div>
+        <button onclick="addConditionRow()" class="text-xs text-blue-600 hover:text-blue-800 font-medium mb-3">+ Add condition</button>
+
+        <div class="flex gap-2 pt-2 border-t border-gray-200">
+          <button onclick="saveCustomGroup()" class="px-4 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700">Save group</button>
+          <button onclick="cancelCustomGroup()" class="px-4 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300">Cancel</button>
+        </div>
+      </div>
+
+      <button id="cg-add-btn" onclick="openCustomGroupBuilder()" class="text-sm text-purple-600 hover:text-purple-800 font-medium">+ Add custom group</button>
+    </section>
+
     <!-- Generate -->
     <section id="generate-section" class="hidden fade-in">
       <!-- Summary bar -->
@@ -284,7 +313,7 @@ async function loadMetadata() {
     infoText.textContent = `${metadata.file_name} \u2014 ${metadata.n_cases.toLocaleString()} cases \u00d7 ${metadata.n_variables} variables`;
     selectedBanners = []; mrsGroups = {};
     populateUI();
-    ['banners-section','stubs-section','options-section','generate-section'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+    ['banners-section','stubs-section','options-section','custom-groups-section','generate-section'].forEach(id => document.getElementById(id).classList.remove('hidden'));
   } catch (e) {
     infoText.textContent = `Error: ${e.message}`; info.className = 'mt-4 p-3 bg-red-50 rounded-lg';
   }
@@ -405,15 +434,143 @@ function renderMrsGroups() {
   ).join('');
 }
 
+// ── Custom Groups ──
+let customGroups = [];  // [{name: "...", conditions: [{variable, operator, value}]}]
+
+function openCustomGroupBuilder() {
+  document.getElementById('cg-builder').classList.remove('hidden');
+  document.getElementById('cg-add-btn').classList.add('hidden');
+  document.getElementById('cg-name').value = '';
+  document.getElementById('cg-conditions').innerHTML = '';
+  addConditionRow();
+}
+
+function cancelCustomGroup() {
+  document.getElementById('cg-builder').classList.add('hidden');
+  document.getElementById('cg-add-btn').classList.remove('hidden');
+}
+
+function addConditionRow() {
+  const container = document.getElementById('cg-conditions');
+  const row = document.createElement('div');
+  row.className = 'flex gap-2 items-center';
+
+  // Variable select
+  let varOpts = '<option value="">-- Variable --</option>';
+  for (const v of metadata.variables) {
+    const label = v.label ? `${v.name} - ${v.label}` : v.name;
+    varOpts += `<option value="${v.name}">${label}</option>`;
+  }
+
+  row.innerHTML = `
+    <select class="cg-var flex-1 border border-gray-300 rounded px-2 py-1.5 text-xs" onchange="onCgVarChange(this)">${varOpts}</select>
+    <select class="cg-op w-20 border border-gray-300 rounded px-2 py-1.5 text-xs">
+      <option value="eq">=</option>
+      <option value="ne">!=</option>
+      <option value="gt">&gt;</option>
+      <option value="gte">&gt;=</option>
+      <option value="lt">&lt;</option>
+      <option value="lte">&lt;=</option>
+      <option value="in">in</option>
+    </select>
+    <select class="cg-val flex-1 border border-gray-300 rounded px-2 py-1.5 text-xs">
+      <option value="">-- Select variable first --</option>
+    </select>
+    <button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>
+  `;
+  container.appendChild(row);
+}
+
+function onCgVarChange(selectEl) {
+  const varName = selectEl.value;
+  const row = selectEl.parentElement;
+  const valSelect = row.querySelector('.cg-val');
+  valSelect.innerHTML = '';
+
+  if (!varName) { valSelect.innerHTML = '<option value="">--</option>'; return; }
+
+  const v = metadata.variables.find(x => x.name === varName);
+  if (v && v.value_labels) {
+    for (const [code, label] of Object.entries(v.value_labels)) {
+      const opt = document.createElement('option');
+      opt.value = code;
+      opt.textContent = `${label} (${code})`;
+      valSelect.appendChild(opt);
+    }
+  } else {
+    // Numeric input fallback
+    valSelect.outerHTML = `<input type="number" step="any" class="cg-val flex-1 border border-gray-300 rounded px-2 py-1.5 text-xs" placeholder="Value">`;
+  }
+}
+
+function saveCustomGroup() {
+  const name = document.getElementById('cg-name').value.trim();
+  if (!name) { alert('Enter a group name'); return; }
+
+  const rows = document.querySelectorAll('#cg-conditions > div');
+  const conditions = [];
+  for (const row of rows) {
+    const varSel = row.querySelector('.cg-var');
+    const opSel = row.querySelector('.cg-op');
+    const valEl = row.querySelector('.cg-val');
+    if (!varSel?.value) continue;
+
+    let value = valEl?.value;
+    // Try to parse as number
+    const num = parseFloat(value);
+    if (!isNaN(num)) value = num;
+
+    conditions.push({ variable: varSel.value, operator: opSel.value, value });
+  }
+
+  if (conditions.length === 0) { alert('Add at least one condition'); return; }
+
+  customGroups.push({ name, conditions });
+  renderCustomGroups();
+  cancelCustomGroup();
+  updateSummary();
+}
+
+function removeCustomGroup(idx) { customGroups.splice(idx, 1); renderCustomGroups(); updateSummary(); }
+
+function renderCustomGroups() {
+  const el = document.getElementById('custom-groups-list');
+  if (customGroups.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = customGroups.map((g, i) => {
+    const condStr = g.conditions.map(c => {
+      const v = metadata.variables.find(x => x.name === c.variable);
+      const varLabel = v?.label || c.variable;
+      let valLabel = c.value;
+      if (v?.value_labels) {
+        const vl = v.value_labels[String(c.value)];
+        if (vl) valLabel = vl;
+      }
+      const opLabels = {eq:'=', ne:'!=', gt:'>', gte:'>=', lt:'<', lte:'<=', 'in':'in'};
+      return `${varLabel} ${opLabels[c.operator]||c.operator} ${valLabel}`;
+    }).join(' AND ');
+    return `<div class="flex items-start gap-2 p-2 bg-purple-50 rounded-lg border border-purple-200">
+      <div class="flex-1">
+        <span class="text-sm font-medium text-purple-900">${g.name}</span>
+        <p class="text-xs text-purple-600 mt-0.5">${condStr}</p>
+      </div>
+      <button onclick="removeCustomGroup(${i})" class="text-purple-400 hover:text-purple-700 text-lg leading-none mt-0.5">&times;</button>
+    </div>`;
+  }).join('');
+}
+
 // ── Summary bar ──
 function updateSummary() {
   const el = document.getElementById('spec-summary');
-  if (!metadata || selectedBanners.length === 0) { el.textContent = 'Select at least one banner to continue'; return; }
+  if (!metadata || (selectedBanners.length === 0 && customGroups.length === 0)) { el.textContent = 'Select at least one banner or create a custom group to continue'; return; }
   const stubMode = document.querySelector('input[name="stub-mode"]:checked')?.value || 'all';
   const nStubs = stubMode === 'all' ? 'all' : document.getElementById('stubs-select').selectedOptions.length || 'all';
   const nMrs = Object.keys(mrsGroups).length;
-  const parts = [`Banners: ${selectedBanners.join(' + ')}`, `Stubs: ${nStubs}`];
-  if (nMrs > 0) parts.push(`MRS: ${nMrs} group(s)`);
+  const nCg = customGroups.length;
+  const parts = [];
+  if (selectedBanners.length > 0) parts.push(`Banners: ${selectedBanners.join(' + ')}`);
+  parts.push(`Stubs: ${nStubs}`);
+  if (nMrs > 0) parts.push(`MRS: ${nMrs}`);
+  if (nCg > 0) parts.push(`Custom groups: ${nCg}`);
   el.textContent = parts.join(' | ');
 }
 
@@ -431,7 +588,7 @@ function detectScaleVars() {
 
 // ── Generate ──
 async function generate() {
-  if (selectedBanners.length === 0) { alert('Select at least one banner'); return; }
+  if (selectedBanners.length === 0 && customGroups.length === 0) { alert('Select at least one banner or create a custom group'); return; }
 
   const btn = document.getElementById('generate-btn');
   const progress = document.getElementById('progress'), progressText = document.getElementById('progress-text');
@@ -449,12 +606,14 @@ async function generate() {
   }
 
   const spec = {
-    banners: selectedBanners,
     stubs,
     significance_level: parseFloat(document.getElementById('sig-select').value),
     include_means: document.getElementById('opt-means').checked,
     title: document.getElementById('title-input').value || undefined,
   };
+
+  if (selectedBanners.length > 0) spec.banners = selectedBanners;
+  if (customGroups.length > 0) spec.custom_groups = customGroups;
 
   const weight = document.getElementById('weight-select').value;
   if (weight) spec.weight = weight;

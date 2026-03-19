@@ -176,6 +176,67 @@ def test_tabulate_mrs(client, auth_headers, test_sav_bytes_with_mrs):
     assert "Brand Awareness" in wb.sheetnames
 
 
+def test_tabulate_custom_groups(client, auth_headers, test_sav_bytes):
+    """Custom groups: virtual banner columns defined by conditions."""
+    spec = json.dumps({
+        "banner": "gender",
+        "stubs": ["satisfaction"],
+        "custom_groups": [
+            {"name": "Young Males", "conditions": [
+                {"variable": "gender", "operator": "eq", "value": 1.0},
+                {"variable": "age_group", "operator": "eq", "value": 1.0}
+            ]},
+            {"name": "Young Females", "conditions": [
+                {"variable": "gender", "operator": "eq", "value": 2.0},
+                {"variable": "age_group", "operator": "eq", "value": 1.0}
+            ]},
+        ],
+    })
+    resp = client.post(
+        "/v1/tabulate",
+        headers=auth_headers,
+        files={"file": ("test.sav", test_sav_bytes, "application/octet-stream")},
+        data={"spec": spec},
+    )
+    assert resp.status_code == 200
+    wb = load_workbook(io.BytesIO(resp.content))
+    ws = wb["satisfaction"]
+    # Find "Young Males" in header rows
+    found_custom = False
+    for row in ws.iter_rows(min_row=1, max_row=8, min_col=2, max_col=10):
+        for cell in row:
+            if cell.value and "Young Males" in str(cell.value):
+                found_custom = True
+                break
+    assert found_custom, "Custom group 'Young Males' not found in Excel headers"
+
+
+def test_tabulate_custom_groups_only(client, auth_headers, test_sav_bytes):
+    """Custom groups without regular banners."""
+    spec = json.dumps({
+        "stubs": ["satisfaction"],
+        "custom_groups": [
+            {"name": "Satisfied (4-5)", "conditions": [
+                {"variable": "satisfaction", "operator": "gte", "value": 4.0}
+            ]},
+            {"name": "Neutral (3)", "conditions": [
+                {"variable": "satisfaction", "operator": "eq", "value": 3.0}
+            ]},
+            {"name": "Dissatisfied (1-2)", "conditions": [
+                {"variable": "satisfaction", "operator": "lte", "value": 2.0}
+            ]},
+        ],
+    })
+    resp = client.post(
+        "/v1/tabulate",
+        headers=auth_headers,
+        files={"file": ("test.sav", test_sav_bytes, "application/octet-stream")},
+        data={"spec": spec},
+    )
+    assert resp.status_code == 200
+    assert int(resp.headers["X-Stubs-Success"]) >= 1
+
+
 def test_tabulate_missing_banner(client, auth_headers, test_sav_bytes):
     spec = json.dumps({"stubs": ["satisfaction"]})
     resp = client.post(
