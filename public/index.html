@@ -306,8 +306,10 @@ function populateUI() {
     // Banner chips: variables with 2-15 categories
     if (vl >= 2 && vl <= 15) {
       const chip = document.createElement('button');
-      chip.className = 'chip'; chip.textContent = `${v.name} (${vl})`;
-      chip.title = label;
+      chip.className = 'chip';
+      const shortLabel = v.label || v.name;
+      chip.innerHTML = `<span class="font-medium">${shortLabel}</span> <span class="text-gray-400 text-xs">(${vl})</span>`;
+      chip.title = `${v.name}: ${v.label || ''} — ${vl} categories`;
       chip.dataset.varname = v.name;
       chip.addEventListener('click', () => toggleBanner(v.name, chip));
       chipsEl.appendChild(chip);
@@ -360,7 +362,7 @@ function renderSelectedBanners() {
     const v = metadata.variables.find(v => v.name === b);
     const label = v?.label || b;
     const nCats = v?.value_labels ? Object.keys(v.value_labels).length : '?';
-    return `<span class="pill pill-blue">${b} (${nCats}) <span class="remove" onclick="removeBanner('${b}')">&times;</span></span>`;
+    return `<span class="pill pill-blue">${label} <span class="text-blue-400 text-xs">(${nCats})</span> <span class="remove" onclick="removeBanner('${b}')">&times;</span></span>`;
   }).join('');
 }
 
