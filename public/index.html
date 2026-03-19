@@ -15,172 +15,206 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     .spinner { border: 3px solid #e5e7eb; border-top: 3px solid #2563eb; border-radius: 50%; width: 20px; height: 20px; animation: spin 0.8s linear infinite; display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    select[multiple] { min-height: 120px; }
-    .tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 12px; background: #dbeafe; color: #1e40af; }
+    select[multiple] { min-height: 100px; }
+    .pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; cursor: default; }
+    .pill-blue { background: #dbeafe; color: #1e40af; }
+    .pill-green { background: #dcfce7; color: #166534; }
+    .pill-purple { background: #f3e8ff; color: #6b21a8; }
+    .pill .remove { cursor: pointer; opacity: 0.6; font-size: 14px; }
+    .pill .remove:hover { opacity: 1; }
+    .chip { padding: 6px 12px; border-radius: 8px; border: 1.5px solid #e5e7eb; font-size: 13px; cursor: pointer; transition: all 0.15s; user-select: none; }
+    .chip:hover { border-color: #93c5fd; background: #eff6ff; }
+    .chip.selected { border-color: #2563eb; background: #dbeafe; color: #1e40af; font-weight: 500; }
+    .section-badge { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 12px; font-weight: 700; }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
 
-  <!-- Header -->
   <header class="bg-white border-b border-gray-200">
-    <div class="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
       <div>
         <h1 class="text-xl font-bold text-gray-900">SPSS InsightGenius</h1>
-        <p class="text-sm text-gray-500">Upload SPSS &rarr; Get professional crosstab Excel</p>
+        <p class="text-sm text-gray-500">Upload SPSS &rarr; Professional crosstabs with significance testing</p>
       </div>
-      <div class="flex items-center gap-3">
-        <a href="/docs" target="_blank" class="text-sm text-blue-600 hover:text-blue-800 font-medium">API Docs &rarr;</a>
-      </div>
+      <a href="/docs" target="_blank" class="text-sm text-blue-600 hover:text-blue-800 font-medium">API Docs &rarr;</a>
     </div>
   </header>
 
-  <main class="max-w-4xl mx-auto px-6 py-8">
+  <main class="max-w-5xl mx-auto px-6 py-8 space-y-6">
 
     <!-- Step 1: Upload -->
-    <section class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-      <h2 class="text-lg font-semibold text-gray-900 mb-4">1. Upload files</h2>
+    <section class="bg-white rounded-xl border border-gray-200 p-6">
+      <div class="flex items-center gap-2 mb-4">
+        <span class="section-badge bg-blue-600 text-white">1</span>
+        <h2 class="text-lg font-semibold text-gray-900">Upload files</h2>
+      </div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- SAV upload -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">SPSS file (.sav) <span class="text-red-500">*</span></label>
-          <div id="sav-drop" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400">
-            <div id="sav-icon" class="text-3xl mb-2">📊</div>
+          <div id="sav-drop" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400">
+            <div id="sav-icon" class="text-3xl mb-2">&#128202;</div>
             <p id="sav-label" class="text-sm text-gray-500">Drop .sav file here or click to browse</p>
             <input type="file" id="sav-input" accept=".sav,.por,.zsav" class="hidden">
           </div>
         </div>
-        <!-- DOCX upload -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Reporting Ticket (.docx) <span class="text-gray-400">optional</span></label>
-          <div id="docx-drop" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400">
-            <div id="docx-icon" class="text-3xl mb-2">📋</div>
+          <div id="docx-drop" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400">
+            <div id="docx-icon" class="text-3xl mb-2">&#128203;</div>
             <p id="docx-label" class="text-sm text-gray-500">Drop .docx ticket here or click to browse</p>
             <input type="file" id="docx-input" accept=".docx" class="hidden">
           </div>
         </div>
       </div>
-      <!-- File info -->
       <div id="file-info" class="hidden mt-4 p-3 bg-blue-50 rounded-lg fade-in">
         <p class="text-sm font-medium text-blue-900" id="file-info-text"></p>
       </div>
     </section>
 
-    <!-- Step 2: Configure (hidden until .sav loaded) -->
-    <section id="config-section" class="hidden bg-white rounded-lg border border-gray-200 p-6 mb-6 fade-in">
-      <h2 class="text-lg font-semibold text-gray-900 mb-4">2. Configure tabulation</h2>
+    <!-- Step 2: Banners -->
+    <section id="banners-section" class="hidden bg-white rounded-xl border border-gray-200 p-6 fade-in">
+      <div class="flex items-center gap-2 mb-4">
+        <span class="section-badge bg-blue-600 text-white">2</span>
+        <h2 class="text-lg font-semibold text-gray-900">Select banners <span class="text-sm font-normal text-gray-400">(demographics to cross by)</span></h2>
+      </div>
+      <p class="text-xs text-gray-500 mb-3">Click to add banners. Columns appear side-by-side with continuous letter assignment (A/B + C/D/E + ...).</p>
+      <div id="banner-chips" class="flex flex-wrap gap-2 mb-3"></div>
+      <div id="selected-banners" class="flex flex-wrap gap-2 min-h-[32px]"></div>
+    </section>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Banner -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Banner variable (demographic)</label>
-          <select id="banner-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-            <option value="">-- Select banner --</option>
-          </select>
-          <p class="text-xs text-gray-400 mt-1">The demographic to cross all questions by</p>
+    <!-- Step 3: Stubs + MRS -->
+    <section id="stubs-section" class="hidden bg-white rounded-xl border border-gray-200 p-6 fade-in">
+      <div class="flex items-center gap-2 mb-4">
+        <span class="section-badge bg-blue-600 text-white">3</span>
+        <h2 class="text-lg font-semibold text-gray-900">Select stubs <span class="text-sm font-normal text-gray-400">(questions to tabulate)</span></h2>
+      </div>
+      <div class="flex items-center gap-3 mb-3">
+        <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+          <input type="radio" name="stub-mode" value="all" checked class="text-blue-600"> All variables
+        </label>
+        <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+          <input type="radio" name="stub-mode" value="select" class="text-blue-600"> Select specific
+        </label>
+      </div>
+      <select id="stubs-select" multiple class="hidden w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"></select>
+
+      <!-- MRS Groups -->
+      <div class="mt-4 pt-4 border-t border-gray-100">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-sm font-medium text-gray-700">Multiple Response Sets (MRS)</label>
+          <button onclick="toggleMrsPanel()" class="text-xs text-blue-600 hover:text-blue-800 font-medium">+ Add MRS group</button>
         </div>
-
-        <!-- Stubs -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Stub variables (questions)</label>
-          <div class="flex items-center gap-2 mb-2">
-            <label class="flex items-center gap-1 text-sm">
-              <input type="radio" name="stub-mode" value="all" checked class="text-blue-600"> All variables
-            </label>
-            <label class="flex items-center gap-1 text-sm">
-              <input type="radio" name="stub-mode" value="select" class="text-blue-600"> Select specific
-            </label>
+        <p class="text-xs text-gray-400 mb-2">Group binary variables (e.g., Q5_1, Q5_2, Q5_3) as "select all that apply". Percentages can exceed 100%.</p>
+        <div id="mrs-groups" class="space-y-2"></div>
+        <div id="mrs-panel" class="hidden mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200 fade-in">
+          <div class="flex gap-2 mb-2">
+            <input type="text" id="mrs-name" placeholder="Group name (e.g. Brand Awareness)" class="flex-1 border border-gray-300 rounded px-2 py-1.5 text-sm">
           </div>
-          <select id="stubs-select" multiple class="hidden w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
-          </select>
+          <select id="mrs-members" multiple class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" style="min-height:80px"></select>
+          <p class="text-xs text-gray-400 mt-1">Hold Ctrl/Cmd to select multiple binary variables</p>
+          <div class="flex gap-2 mt-2">
+            <button onclick="addMrsGroup()" class="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700">Add group</button>
+            <button onclick="toggleMrsPanel()" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded text-xs font-medium hover:bg-gray-300">Cancel</button>
+          </div>
         </div>
+      </div>
+    </section>
 
-        <!-- Weight -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Weight variable</label>
-          <select id="weight-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
-            <option value="">None (unweighted)</option>
-          </select>
-        </div>
-
-        <!-- Significance -->
+    <!-- Step 4: Options -->
+    <section id="options-section" class="hidden bg-white rounded-xl border border-gray-200 p-6 fade-in">
+      <div class="flex items-center gap-2 mb-4">
+        <span class="section-badge bg-blue-600 text-white">4</span>
+        <h2 class="text-lg font-semibold text-gray-900">Options</h2>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Significance level</label>
-          <select id="sig-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+          <select id="sig-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
             <option value="0.90">90%</option>
             <option value="0.95" selected>95%</option>
             <option value="0.99">99%</option>
           </select>
         </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Weight variable</label>
+          <select id="weight-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            <option value="">None (unweighted)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Report title</label>
+          <input type="text" id="title-input" placeholder="e.g. NPS Study Q1 2026" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        </div>
       </div>
-
-      <!-- Options -->
-      <div class="mt-6 pt-4 border-t border-gray-100">
+      <div class="mt-4 pt-4 border-t border-gray-100">
         <label class="block text-sm font-medium text-gray-700 mb-3">Include in output</label>
-        <div class="flex flex-wrap gap-4">
-          <label class="flex items-center gap-2 text-sm">
-            <input type="checkbox" id="opt-t2b" checked class="rounded text-blue-600"> Top 2 Box / Bottom 2 Box
+        <div class="flex flex-wrap gap-5">
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" id="opt-t2b" checked class="rounded text-blue-600 w-4 h-4"> Top 2 Box / Bottom 2 Box
           </label>
-          <label class="flex items-center gap-2 text-sm">
-            <input type="checkbox" id="opt-means" class="rounded text-blue-600"> Means
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" id="opt-means" checked class="rounded text-blue-600 w-4 h-4"> Means with T-test
           </label>
         </div>
-        <p class="text-xs text-gray-400 mt-2">T2B/B2B and Means are auto-detected for scale variables (Likert 5/7pt)</p>
-      </div>
-
-      <!-- Title -->
-      <div class="mt-4">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Report title <span class="text-gray-400">(optional)</span></label>
-        <input type="text" id="title-input" placeholder="e.g. Uber NPS UK - Tabulation by Region" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+        <p class="text-xs text-gray-400 mt-2">T2B/B2B and Means auto-apply to scale variables (Likert 4-11 pt). Sig letters show which columns differ.</p>
       </div>
     </section>
 
-    <!-- Step 3: Generate -->
+    <!-- Generate -->
     <section id="generate-section" class="hidden fade-in">
-      <button id="generate-btn" onclick="generate()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg text-base transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+      <!-- Summary bar -->
+      <div id="spec-summary" class="mb-3 p-3 bg-gray-100 rounded-lg text-xs text-gray-600 font-mono"></div>
+
+      <button id="generate-btn" onclick="generate()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 px-6 rounded-xl text-base transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
         Generate Excel
       </button>
 
-      <!-- Progress -->
-      <div id="progress" class="hidden mt-4 p-4 bg-white rounded-lg border border-gray-200 fade-in">
+      <div id="progress" class="hidden mt-4 p-4 bg-white rounded-xl border border-gray-200 fade-in">
         <div class="flex items-center gap-3">
           <div class="spinner"></div>
           <p id="progress-text" class="text-sm text-gray-600">Processing...</p>
         </div>
       </div>
 
-      <!-- Result -->
-      <div id="result" class="hidden mt-4 p-4 bg-green-50 rounded-lg border border-green-200 fade-in">
+      <div id="result" class="hidden mt-4 p-4 bg-green-50 rounded-xl border border-green-200 fade-in">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-semibold text-green-800" id="result-text"></p>
             <p class="text-xs text-green-600 mt-1" id="result-meta"></p>
           </div>
-          <button id="download-btn" onclick="downloadResult()" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg text-sm transition-colors">
+          <button onclick="downloadResult()" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-5 rounded-lg text-sm transition-colors flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
             Download .xlsx
           </button>
         </div>
       </div>
 
-      <!-- Error -->
-      <div id="error" class="hidden mt-4 p-4 bg-red-50 rounded-lg border border-red-200 fade-in">
+      <div id="error" class="hidden mt-4 p-4 bg-red-50 rounded-xl border border-red-200 fade-in">
         <p class="text-sm font-semibold text-red-800" id="error-text"></p>
       </div>
     </section>
 
-    <!-- API Reference (collapsed) -->
-    <details class="mt-8 bg-white rounded-lg border border-gray-200">
+    <!-- API Reference -->
+    <details class="bg-white rounded-xl border border-gray-200">
       <summary class="px-6 py-4 cursor-pointer text-sm font-semibold text-gray-700 hover:text-gray-900">
-        API Reference &mdash; use via curl / Python / Node
+        API Reference &mdash; curl / Python / Node
       </summary>
       <div class="px-6 pb-6 text-sm">
-        <h3 class="font-semibold text-gray-800 mt-2 mb-2">curl example</h3>
+        <h3 class="font-semibold text-gray-800 mt-2 mb-2">curl &mdash; multiple banners + means + MRS</h3>
         <pre class="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-xs"><code>curl -X POST https://spss.insightgenius.io/v1/tabulate \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -F "file=@survey.sav" \
-  -F 'spec={"banner":"region","stubs":["_all_"],"significance_level":0.95}' \
-  -o tabulation.xlsx</code></pre>
+  -F 'spec={
+    "banners": ["gender", "region", "age_group"],
+    "stubs": ["_all_"],
+    "significance_level": 0.95,
+    "include_means": true,
+    "nets": {"sat_overall": {"Top 2 Box": [4,5], "Bottom 2 Box": [1,2]}},
+    "mrs_groups": {"Brand_Awareness": ["AWARE_A","AWARE_B","AWARE_C"]}
+  }' -o tabulation.xlsx</code></pre>
 
-        <h3 class="font-semibold text-gray-800 mt-4 mb-2">Python example</h3>
+        <h3 class="font-semibold text-gray-800 mt-4 mb-2">Python</h3>
         <pre class="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-xs"><code>import requests, json
 
 resp = requests.post(
@@ -188,319 +222,294 @@ resp = requests.post(
     headers={"Authorization": "Bearer YOUR_API_KEY"},
     files={"file": open("survey.sav", "rb")},
     data={"spec": json.dumps({
-        "banner": "region",
+        "banners": ["gender", "region"],
         "stubs": ["_all_"],
+        "include_means": True,
         "significance_level": 0.95,
-        "nets": {"sat_overall": {"Top 2 Box": [4, 5], "Bottom 2 Box": [1, 2]}}
     })}
 )
 with open("tabulation.xlsx", "wb") as f:
     f.write(resp.content)
-print(f"Done: {resp.headers['X-Stubs-Success']} tables generated")</code></pre>
+print(f"{resp.headers['X-Stubs-Success']} tables generated")</code></pre>
 
-        <h3 class="font-semibold text-gray-800 mt-4 mb-2">Available endpoints</h3>
-        <table class="w-full text-xs">
-          <thead><tr class="text-left border-b"><th class="py-1 pr-4">Method</th><th class="py-1 pr-4">Endpoint</th><th class="py-1">Description</th></tr></thead>
-          <tbody>
-            <tr class="border-b border-gray-100"><td class="py-1 pr-4 font-mono text-blue-600">POST</td><td class="py-1 pr-4 font-mono">/v1/tabulate</td><td class="py-1">Full tabulation &rarr; Excel with sig letters</td></tr>
-            <tr class="border-b border-gray-100"><td class="py-1 pr-4 font-mono text-blue-600">POST</td><td class="py-1 pr-4 font-mono">/v1/metadata</td><td class="py-1">Extract variable metadata from .sav</td></tr>
-            <tr class="border-b border-gray-100"><td class="py-1 pr-4 font-mono text-blue-600">POST</td><td class="py-1 pr-4 font-mono">/v1/frequency</td><td class="py-1">Frequency table for one variable</td></tr>
-            <tr class="border-b border-gray-100"><td class="py-1 pr-4 font-mono text-blue-600">POST</td><td class="py-1 pr-4 font-mono">/v1/crosstab</td><td class="py-1">Single crosstab with significance</td></tr>
-            <tr class="border-b border-gray-100"><td class="py-1 pr-4 font-mono text-blue-600">POST</td><td class="py-1 pr-4 font-mono">/v1/process</td><td class="py-1">Full pipeline (auto-detect + multi-analysis)</td></tr>
-            <tr class="border-b border-gray-100"><td class="py-1 pr-4 font-mono text-blue-600">POST</td><td class="py-1 pr-4 font-mono">/v1/convert</td><td class="py-1">Convert .sav to xlsx/csv/parquet/dta</td></tr>
-            <tr><td class="py-1 pr-4 font-mono text-blue-600">POST</td><td class="py-1 pr-4 font-mono">/v1/parse-ticket</td><td class="py-1">Parse Reporting Ticket .docx via AI</td></tr>
-          </tbody>
-        </table>
-        <p class="mt-3 text-xs text-gray-500">Full interactive docs: <a href="/docs" target="_blank" class="text-blue-600 hover:underline">/docs</a> &bull; <a href="/redoc" target="_blank" class="text-blue-600 hover:underline">/redoc</a></p>
+        <p class="mt-4 text-xs text-gray-500">Full interactive docs: <a href="/docs" target="_blank" class="text-blue-600 hover:underline">/docs</a> | <a href="/redoc" target="_blank" class="text-blue-600 hover:underline">/redoc</a></p>
       </div>
     </details>
-
   </main>
 
-  <footer class="max-w-4xl mx-auto px-6 py-6 text-center text-xs text-gray-400">
+  <footer class="max-w-5xl mx-auto px-6 py-6 text-center text-xs text-gray-400">
     Powered by QuantipyMRX &bull; Built by Genius Labs
   </footer>
 
 <script>
 // ── State ──
-let savFile = null;
-let docxFile = null;
-let metadata = null;
-let resultBlob = null;
-let resultFilename = '';
+let savFile = null, docxFile = null, metadata = null, resultBlob = null, resultFilename = '';
+let selectedBanners = [];
+let mrsGroups = {};  // { "Brand Awareness": ["AWARE_A","AWARE_B"] }
 
 const API_KEY = 'sk_test_2a441a40c84ba0afe73efd47d6bb1066aac82ad5453360f3';
 const API_BASE = window.location.origin;
 
 // ── Drop zones ──
-function setupDropZone(dropId, inputId, labelId, iconId, accept, onFile) {
-  const drop = document.getElementById(dropId);
-  const input = document.getElementById(inputId);
-  const label = document.getElementById(labelId);
-  const icon = document.getElementById(iconId);
-
+function setupDropZone(dropId, inputId, labelId, iconId, onFile) {
+  const drop = document.getElementById(dropId), input = document.getElementById(inputId);
+  const label = document.getElementById(labelId), icon = document.getElementById(iconId);
   drop.addEventListener('click', () => input.click());
-  input.addEventListener('change', (e) => {
-    if (e.target.files[0]) onFile(e.target.files[0], label, icon);
-  });
-  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('dragover'); });
+  input.addEventListener('change', e => { if (e.target.files[0]) onFile(e.target.files[0], label, icon); });
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
   drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
-  drop.addEventListener('drop', (e) => {
-    e.preventDefault();
-    drop.classList.remove('dragover');
-    const f = e.dataTransfer.files[0];
-    if (f) onFile(f, label, icon);
-  });
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('dragover'); if (e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0], label, icon); });
 }
-
-setupDropZone('sav-drop', 'sav-input', 'sav-label', 'sav-icon', '.sav', async (f, label, icon) => {
-  savFile = f;
-  icon.textContent = '✅';
-  label.textContent = `${f.name} (${(f.size / 1024).toFixed(0)} KB)`;
-  label.classList.remove('text-gray-500');
-  label.classList.add('text-blue-700', 'font-medium');
+setupDropZone('sav-drop', 'sav-input', 'sav-label', 'sav-icon', async (f, label, icon) => {
+  savFile = f; icon.textContent = '\u2705';
+  label.textContent = `${f.name} (${(f.size/1024).toFixed(0)} KB)`;
+  label.className = 'text-sm text-blue-700 font-medium';
   await loadMetadata();
 });
-
-setupDropZone('docx-drop', 'docx-input', 'docx-label', 'docx-icon', '.docx', (f, label, icon) => {
-  docxFile = f;
-  icon.textContent = '✅';
-  label.textContent = `${f.name} (${(f.size / 1024).toFixed(0)} KB)`;
-  label.classList.remove('text-gray-500');
-  label.classList.add('text-blue-700', 'font-medium');
+setupDropZone('docx-drop', 'docx-input', 'docx-label', 'docx-icon', (f, label, icon) => {
+  docxFile = f; icon.textContent = '\u2705';
+  label.textContent = `${f.name} (${(f.size/1024).toFixed(0)} KB)`;
+  label.className = 'text-sm text-blue-700 font-medium';
 });
 
-// ── Load metadata on .sav upload ──
+// ── Load metadata ──
 async function loadMetadata() {
-  const info = document.getElementById('file-info');
-  const infoText = document.getElementById('file-info-text');
-  info.classList.remove('hidden');
-  infoText.textContent = 'Loading metadata...';
-
-  const form = new FormData();
-  form.append('file', savFile);
-
+  const info = document.getElementById('file-info'), infoText = document.getElementById('file-info-text');
+  info.classList.remove('hidden'); infoText.textContent = 'Loading metadata...';
+  const form = new FormData(); form.append('file', savFile);
   try {
-    const resp = await fetch(`${API_BASE}/v1/metadata`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${API_KEY}` },
-      body: form,
-    });
+    const resp = await fetch(`${API_BASE}/v1/metadata`, { method: 'POST', headers: {'Authorization': `Bearer ${API_KEY}`}, body: form });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
-    metadata = data.data;
-    infoText.textContent = `${metadata.file_name} — ${metadata.n_cases} cases × ${metadata.n_variables} variables`;
-    populateSelects();
-    document.getElementById('config-section').classList.remove('hidden');
-    document.getElementById('generate-section').classList.remove('hidden');
+    metadata = (await resp.json()).data;
+    infoText.textContent = `${metadata.file_name} \u2014 ${metadata.n_cases.toLocaleString()} cases \u00d7 ${metadata.n_variables} variables`;
+    selectedBanners = []; mrsGroups = {};
+    populateUI();
+    ['banners-section','stubs-section','options-section','generate-section'].forEach(id => document.getElementById(id).classList.remove('hidden'));
   } catch (e) {
-    infoText.textContent = `Error loading metadata: ${e.message}`;
-    info.classList.remove('bg-blue-50');
-    info.classList.add('bg-red-50');
+    infoText.textContent = `Error: ${e.message}`; info.className = 'mt-4 p-3 bg-red-50 rounded-lg';
   }
 }
 
-// ── Populate dropdowns from metadata ──
-function populateSelects() {
-  const bannerSel = document.getElementById('banner-select');
+// ── Populate UI from metadata ──
+function populateUI() {
+  const chipsEl = document.getElementById('banner-chips');
   const stubsSel = document.getElementById('stubs-select');
   const weightSel = document.getElementById('weight-select');
-
-  // Clear
-  bannerSel.innerHTML = '<option value="">-- Select banner --</option>';
-  stubsSel.innerHTML = '';
+  const mrsSel = document.getElementById('mrs-members');
+  chipsEl.innerHTML = ''; stubsSel.innerHTML = ''; mrsSel.innerHTML = '';
   weightSel.innerHTML = '<option value="">None (unweighted)</option>';
 
-  // Classify variables
-  const varsWithLabels = [];
-  const allVars = [];
-  const weightCandidates = [];
-
   for (const v of metadata.variables) {
-    const opt = document.createElement('option');
-    opt.value = v.name;
-    const labelText = v.label ? `${v.name} — ${v.label}` : v.name;
+    const label = v.label ? `${v.name} \u2014 ${v.label}` : v.name;
+    const vl = v.value_labels ? Object.keys(v.value_labels).length : 0;
 
-    if (v.value_labels && Object.keys(v.value_labels).length >= 2) {
-      const nLabels = Object.keys(v.value_labels).length;
-      // Demographics: few categories (2-15)
-      if (nLabels <= 15) {
-        const bOpt = opt.cloneNode();
-        bOpt.textContent = `${labelText} (${nLabels} categories)`;
-        bannerSel.appendChild(bOpt);
-      }
-      // All labeled vars as stubs
-      const sOpt = opt.cloneNode();
-      sOpt.textContent = labelText;
-      stubsSel.appendChild(sOpt);
-      varsWithLabels.push(v);
+    // Banner chips: variables with 2-15 categories
+    if (vl >= 2 && vl <= 15) {
+      const chip = document.createElement('button');
+      chip.className = 'chip'; chip.textContent = `${v.name} (${vl})`;
+      chip.title = label;
+      chip.dataset.varname = v.name;
+      chip.addEventListener('click', () => toggleBanner(v.name, chip));
+      chipsEl.appendChild(chip);
     }
 
-    // Weight candidates
-    const lower = v.name.toLowerCase();
-    if (lower.includes('weight') || lower.includes('wt') || lower.includes('pond')) {
-      const wOpt = document.createElement('option');
-      wOpt.value = v.name;
-      wOpt.textContent = labelText;
-      weightSel.appendChild(wOpt);
+    // Stubs: all labeled variables
+    if (vl >= 2) {
+      const opt = document.createElement('option'); opt.value = v.name; opt.textContent = label;
+      stubsSel.appendChild(opt);
     }
 
-    allVars.push(v);
+    // MRS candidates: binary variables (2 labels, typically Yes/No or 0/1)
+    if (vl === 2) {
+      const opt = document.createElement('option'); opt.value = v.name; opt.textContent = label;
+      mrsSel.appendChild(opt);
+    }
+
+    // Weight
+    const lo = v.name.toLowerCase();
+    if (lo.includes('weight') || lo.includes('wt') || lo.includes('pond')) {
+      const opt = document.createElement('option'); opt.value = v.name; opt.textContent = label;
+      weightSel.appendChild(opt);
+    }
   }
 
-  // Auto-select best banner (first demographic-like variable)
-  if (bannerSel.options.length > 1) {
-    bannerSel.selectedIndex = 1;
-  }
+  // Auto-select first banner
+  const firstChip = chipsEl.querySelector('.chip');
+  if (firstChip) { toggleBanner(firstChip.dataset.varname, firstChip); }
+  updateSummary();
 }
 
-// ── Stub mode toggle ──
-document.querySelectorAll('input[name="stub-mode"]').forEach(radio => {
-  radio.addEventListener('change', (e) => {
-    document.getElementById('stubs-select').classList.toggle('hidden', e.target.value === 'all');
-  });
+// ── Banner selection ──
+function toggleBanner(varName, chipEl) {
+  const idx = selectedBanners.indexOf(varName);
+  if (idx >= 0) {
+    selectedBanners.splice(idx, 1);
+    chipEl.classList.remove('selected');
+  } else {
+    selectedBanners.push(varName);
+    chipEl.classList.add('selected');
+  }
+  renderSelectedBanners();
+  updateSummary();
+}
+
+function renderSelectedBanners() {
+  const el = document.getElementById('selected-banners');
+  if (selectedBanners.length === 0) { el.innerHTML = '<span class="text-xs text-gray-400">No banners selected</span>'; return; }
+  el.innerHTML = selectedBanners.map((b, i) => {
+    const v = metadata.variables.find(v => v.name === b);
+    const label = v?.label || b;
+    const nCats = v?.value_labels ? Object.keys(v.value_labels).length : '?';
+    return `<span class="pill pill-blue">${b} (${nCats}) <span class="remove" onclick="removeBanner('${b}')">&times;</span></span>`;
+  }).join('');
+}
+
+function removeBanner(varName) {
+  selectedBanners = selectedBanners.filter(b => b !== varName);
+  document.querySelectorAll('.chip').forEach(c => { if (c.dataset.varname === varName) c.classList.remove('selected'); });
+  renderSelectedBanners(); updateSummary();
+}
+
+// ── Stub mode ──
+document.querySelectorAll('input[name="stub-mode"]').forEach(r => {
+  r.addEventListener('change', e => { document.getElementById('stubs-select').classList.toggle('hidden', e.target.value === 'all'); updateSummary(); });
 });
 
-// ── Detect scale variables for auto T2B/nets ──
+// ── MRS groups ──
+function toggleMrsPanel() { document.getElementById('mrs-panel').classList.toggle('hidden'); }
+
+function addMrsGroup() {
+  const name = document.getElementById('mrs-name').value.trim();
+  const sel = document.getElementById('mrs-members');
+  const members = Array.from(sel.selectedOptions).map(o => o.value);
+  if (!name) { alert('Enter a group name'); return; }
+  if (members.length < 2) { alert('Select at least 2 variables'); return; }
+  mrsGroups[name] = members;
+  renderMrsGroups();
+  document.getElementById('mrs-name').value = '';
+  sel.selectedIndex = -1;
+  toggleMrsPanel();
+  updateSummary();
+}
+
+function removeMrsGroup(name) { delete mrsGroups[name]; renderMrsGroups(); updateSummary(); }
+
+function renderMrsGroups() {
+  const el = document.getElementById('mrs-groups');
+  const entries = Object.entries(mrsGroups);
+  if (entries.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = entries.map(([name, members]) =>
+    `<div class="flex items-center gap-2"><span class="pill pill-purple">${name} (${members.length} vars) <span class="remove" onclick="removeMrsGroup('${name}')">&times;</span></span></div>`
+  ).join('');
+}
+
+// ── Summary bar ──
+function updateSummary() {
+  const el = document.getElementById('spec-summary');
+  if (!metadata || selectedBanners.length === 0) { el.textContent = 'Select at least one banner to continue'; return; }
+  const stubMode = document.querySelector('input[name="stub-mode"]:checked')?.value || 'all';
+  const nStubs = stubMode === 'all' ? 'all' : document.getElementById('stubs-select').selectedOptions.length || 'all';
+  const nMrs = Object.keys(mrsGroups).length;
+  const parts = [`Banners: ${selectedBanners.join(' + ')}`, `Stubs: ${nStubs}`];
+  if (nMrs > 0) parts.push(`MRS: ${nMrs} group(s)`);
+  el.textContent = parts.join(' | ');
+}
+
+// ── Scale detection ──
 function detectScaleVars() {
   if (!metadata) return [];
-  const scales = [];
-  for (const v of metadata.variables) {
-    if (!v.value_labels) continue;
-    const nLabels = Object.keys(v.value_labels).length;
-    if (nLabels >= 4 && nLabels <= 11) {
-      const values = Object.keys(v.value_labels).map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b);
-      if (values.length >= 4) {
-        scales.push({ name: v.name, values, nLabels });
-      }
-    }
-  }
-  return scales;
+  return metadata.variables.filter(v => {
+    if (!v.value_labels) return false;
+    const n = Object.keys(v.value_labels).length;
+    if (n < 4 || n > 11) return false;
+    const vals = Object.keys(v.value_labels).map(Number).filter(x => !isNaN(x)).sort((a,b) => a-b);
+    return vals.length >= 4;
+  }).map(v => ({ name: v.name, values: Object.keys(v.value_labels).map(Number).filter(x => !isNaN(x)).sort((a,b) => a-b) }));
 }
 
 // ── Generate ──
 async function generate() {
-  const banner = document.getElementById('banner-select').value;
-  if (!banner) { alert('Please select a banner variable'); return; }
+  if (selectedBanners.length === 0) { alert('Select at least one banner'); return; }
 
   const btn = document.getElementById('generate-btn');
-  const progress = document.getElementById('progress');
-  const progressText = document.getElementById('progress-text');
-  const result = document.getElementById('result');
-  const error = document.getElementById('error');
+  const progress = document.getElementById('progress'), progressText = document.getElementById('progress-text');
+  const result = document.getElementById('result'), error = document.getElementById('error');
 
-  btn.disabled = true;
-  btn.textContent = 'Processing...';
-  progress.classList.remove('hidden');
-  result.classList.add('hidden');
-  error.classList.add('hidden');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Processing...';
+  progress.classList.remove('hidden'); result.classList.add('hidden'); error.classList.add('hidden');
   progressText.textContent = 'Uploading file and running crosstabs...';
 
-  // Build spec
   const stubMode = document.querySelector('input[name="stub-mode"]:checked').value;
   let stubs = ['_all_'];
   if (stubMode === 'select') {
-    const sel = document.getElementById('stubs-select');
-    stubs = Array.from(sel.selectedOptions).map(o => o.value);
+    stubs = Array.from(document.getElementById('stubs-select').selectedOptions).map(o => o.value);
     if (stubs.length === 0) stubs = ['_all_'];
   }
 
   const spec = {
-    banner,
+    banners: selectedBanners,
     stubs,
     significance_level: parseFloat(document.getElementById('sig-select').value),
+    include_means: document.getElementById('opt-means').checked,
     title: document.getElementById('title-input').value || undefined,
   };
 
-  // Weight
   const weight = document.getElementById('weight-select').value;
   if (weight) spec.weight = weight;
 
-  // Nets: auto T2B/B2B for scale variables
+  // Auto T2B/B2B
   if (document.getElementById('opt-t2b').checked) {
     const scales = detectScaleVars();
     if (scales.length > 0) {
       spec.nets = {};
+      const bannerSet = new Set(selectedBanners);
       for (const s of scales) {
-        if (s.name === banner) continue;
-        const vals = s.values;
-        const top2 = vals.slice(-2);
-        const bot2 = vals.slice(0, 2);
-        spec.nets[s.name] = {
-          'Top 2 Box': top2,
-          'Bottom 2 Box': bot2,
-        };
+        if (bannerSet.has(s.name)) continue;
+        spec.nets[s.name] = { 'Top 2 Box': s.values.slice(-2), 'Bottom 2 Box': s.values.slice(0, 2) };
       }
     }
   }
 
-  // Include means — extend the spec
-  if (document.getElementById('opt-means').checked) {
-    spec.include_means = true;
-  }
+  // MRS
+  if (Object.keys(mrsGroups).length > 0) spec.mrs_groups = mrsGroups;
 
   const form = new FormData();
   form.append('file', savFile);
   form.append('spec', JSON.stringify(spec));
-
-  if (docxFile) {
-    form.append('ticket', docxFile);
-  }
+  if (docxFile) form.append('ticket', docxFile);
 
   try {
     const start = performance.now();
-    const resp = await fetch(`${API_BASE}/v1/tabulate`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${API_KEY}` },
-      body: form,
-    });
-
+    const resp = await fetch(`${API_BASE}/v1/tabulate`, { method: 'POST', headers: {'Authorization': `Bearer ${API_KEY}`}, body: form });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({ detail: { message: `HTTP ${resp.status}` } }));
       throw new Error(err.detail?.message || err.detail || `HTTP ${resp.status}`);
     }
-
     const elapsed = Math.round(performance.now() - start);
     resultBlob = await resp.blob();
-
-    // Parse headers
-    const totalStubs = resp.headers.get('X-Stubs-Total') || '?';
-    const successStubs = resp.headers.get('X-Stubs-Success') || '?';
-    const failedStubs = resp.headers.get('X-Stubs-Failed') || '0';
-    const serverTime = resp.headers.get('X-Processing-Time-Ms') || '?';
-
-    // Extract filename from Content-Disposition
+    const total = resp.headers.get('X-Stubs-Total') || '?';
+    const success = resp.headers.get('X-Stubs-Success') || '?';
+    const failed = resp.headers.get('X-Stubs-Failed') || '0';
+    const serverMs = resp.headers.get('X-Processing-Time-Ms') || '?';
     const cd = resp.headers.get('Content-Disposition') || '';
-    const fnMatch = cd.match(/filename="([^"]+)"/);
-    resultFilename = fnMatch ? fnMatch[1] : `tabulation_${banner}.xlsx`;
+    const fn = cd.match(/filename="([^"]+)"/);
+    resultFilename = fn ? fn[1] : `tabulation.xlsx`;
 
-    progress.classList.add('hidden');
-    result.classList.remove('hidden');
-    document.getElementById('result-text').textContent =
-      `${successStubs}/${totalStubs} tables generated successfully` +
-      (parseInt(failedStubs) > 0 ? ` (${failedStubs} failed)` : '');
-    document.getElementById('result-meta').textContent =
-      `${(resultBlob.size / 1024).toFixed(0)} KB — processed in ${serverTime}ms (server) / ${elapsed}ms (total)`;
-
+    progress.classList.add('hidden'); result.classList.remove('hidden');
+    document.getElementById('result-text').textContent = `${success}/${total} tables generated` + (parseInt(failed) > 0 ? ` (${failed} failed)` : '');
+    document.getElementById('result-meta').textContent = `${(resultBlob.size/1024).toFixed(0)} KB \u2014 ${serverMs}ms server / ${elapsed}ms total \u2014 ${selectedBanners.length} banner(s)`;
   } catch (e) {
-    progress.classList.add('hidden');
-    error.classList.remove('hidden');
+    progress.classList.add('hidden'); error.classList.remove('hidden');
     document.getElementById('error-text').textContent = `Error: ${e.message}`;
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Generate Excel';
+    btn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg> Generate Excel';
   }
 }
 
-// ── Download ──
 function downloadResult() {
   if (!resultBlob) return;
-  const url = URL.createObjectURL(resultBlob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = resultFilename;
-  a.click();
-  URL.revokeObjectURL(url);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(resultBlob); a.download = resultFilename; a.click(); URL.revokeObjectURL(a.href);
 }
 </script>
 </body>
