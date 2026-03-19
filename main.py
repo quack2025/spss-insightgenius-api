@@ -105,6 +105,7 @@ def create_application() -> FastAPI:
     from routers.convert import router as convert_router
     from routers.parse_ticket import router as parse_ticket_router
     from routers.process import router as process_router
+    from routers.tabulate import router as tabulate_router
 
     app.include_router(health_router)
     app.include_router(metadata_router)
@@ -113,6 +114,7 @@ def create_application() -> FastAPI:
     app.include_router(convert_router)
     app.include_router(parse_ticket_router)
     app.include_router(process_router)
+    app.include_router(tabulate_router)
 
     # Root redirect to docs
     @app.get("/", include_in_schema=False)
