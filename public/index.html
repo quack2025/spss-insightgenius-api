@@ -106,15 +106,20 @@
         </div>
         <p class="text-xs text-gray-400 mb-2">Group binary variables (e.g., Q5_1, Q5_2, Q5_3) as "select all that apply". Percentages can exceed 100%.</p>
         <div id="mrs-groups" class="space-y-2"></div>
-        <div id="mrs-panel" class="hidden mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200 fade-in">
-          <div class="flex gap-2 mb-2">
-            <input type="text" id="mrs-name" placeholder="Group name (e.g. Brand Awareness)" class="flex-1 border border-gray-300 rounded px-2 py-1.5 text-sm">
+        <div id="mrs-panel" class="hidden mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200 fade-in">
+          <div class="mb-3">
+            <label class="block text-xs font-medium text-gray-600 mb-1">Group name</label>
+            <input type="text" id="mrs-name" placeholder="e.g. Brand Awareness" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
           </div>
-          <select id="mrs-members" multiple class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" style="min-height:80px"></select>
-          <p class="text-xs text-gray-400 mt-1">Hold Ctrl/Cmd to select multiple binary variables</p>
-          <div class="flex gap-2 mt-2">
-            <button onclick="addMrsGroup()" class="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700">Add group</button>
-            <button onclick="toggleMrsPanel()" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded text-xs font-medium hover:bg-gray-300">Cancel</button>
+          <div class="mb-1">
+            <label class="block text-xs font-medium text-gray-600 mb-1">Select member variables <span id="mrs-count" class="text-gray-400">(0 selected)</span></label>
+            <input type="text" id="mrs-filter" placeholder="Type to filter variables..." class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs mb-1" oninput="filterMrsMembers()">
+          </div>
+          <select id="mrs-members" multiple class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" style="min-height:140px" onchange="updateMrsCount()"></select>
+          <p class="text-xs text-gray-400 mt-1">Hold Ctrl/Cmd to select multiple. Tip: filter by prefix (e.g. "AWARE" or "Q5")</p>
+          <div class="flex gap-2 mt-3">
+            <button onclick="addMrsGroup()" class="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Add group</button>
+            <button onclick="toggleMrsPanel()" class="px-4 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300">Cancel</button>
           </div>
         </div>
       </div>
@@ -350,8 +355,8 @@ function populateUI() {
       stubsSel.appendChild(opt);
     }
 
-    // MRS candidates: binary variables (2 labels, typically Yes/No or 0/1)
-    if (vl === 2) {
+    // MRS candidates: all variables (user picks which ones form a group)
+    {
       const opt = document.createElement('option'); opt.value = v.name; opt.textContent = label;
       mrsSel.appendChild(opt);
     }
@@ -424,6 +429,20 @@ function addMrsGroup() {
 }
 
 function removeMrsGroup(name) { delete mrsGroups[name]; renderMrsGroups(); updateSummary(); }
+
+function filterMrsMembers() {
+  const q = document.getElementById('mrs-filter').value.toLowerCase();
+  const sel = document.getElementById('mrs-members');
+  for (const opt of sel.options) {
+    opt.hidden = q && !opt.textContent.toLowerCase().includes(q) && !opt.value.toLowerCase().includes(q);
+  }
+}
+
+function updateMrsCount() {
+  const sel = document.getElementById('mrs-members');
+  const n = sel.selectedOptions.length;
+  document.getElementById('mrs-count').textContent = `(${n} selected)`;
+}
 
 function renderMrsGroups() {
   const el = document.getElementById('mrs-groups');
