@@ -3,9 +3,12 @@
 import logging
 from contextlib import asynccontextmanager
 
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from auth import init_key_registry
 from config import get_settings
@@ -116,15 +119,18 @@ def create_application() -> FastAPI:
     app.include_router(process_router)
     app.include_router(tabulate_router)
 
-    # Root redirect to docs
-    @app.get("/", include_in_schema=False)
-    async def root():
-        return {
-            "name": settings.app_name,
-            "version": settings.app_version,
-            "docs": "/docs",
-            "health": "/v1/health",
-        }
+    # Serve frontend
+    public_dir = Path(__file__).parent / "public"
+    if public_dir.exists():
+        @app.get("/", include_in_schema=False)
+        async def root():
+            return FileResponse(public_dir / "index.html")
+
+        app.mount("/static", StaticFiles(directory=str(public_dir)), name="static")
+    else:
+        @app.get("/", include_in_schema=False)
+        async def root():
+            return {"name": settings.app_name, "version": settings.app_version, "docs": "/docs"}
 
     return app
 

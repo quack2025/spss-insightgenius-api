@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPSS InsightGenius</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .drop-zone { transition: all 0.2s; }
+    .drop-zone.dragover { border-color: #2563eb; background: #eff6ff; }
+    .fade-in { animation: fadeIn 0.3s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .spinner { border: 3px solid #e5e7eb; border-top: 3px solid #2563eb; border-radius: 50%; width: 20px; height: 20px; animation: spin 0.8s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    select[multiple] { min-height: 120px; }
+    .tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 12px; background: #dbeafe; color: #1e40af; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200">
+    <div class="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-bold text-gray-900">SPSS InsightGenius</h1>
+        <p class="text-sm text-gray-500">Upload SPSS &rarr; Get professional crosstab Excel</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="/docs" target="_blank" class="text-sm text-blue-600 hover:text-blue-800 font-medium">API Docs &rarr;</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-6 py-8">
+
+    <!-- Step 1: Upload -->
+    <section class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">1. Upload files</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- SAV upload -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">SPSS file (.sav) <span class="text-red-500">*</span></label>
+          <div id="sav-drop" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400">
+            <div id="sav-icon" class="text-3xl mb-2">📊</div>
+            <p id="sav-label" class="text-sm text-gray-500">Drop .sav file here or click to browse</p>
+            <input type="file" id="sav-input" accept=".sav,.por,.zsav" class="hidden">
+          </div>
+        </div>
+        <!-- DOCX upload -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Reporting Ticket (.docx) <span class="text-gray-400">optional</span></label>
+          <div id="docx-drop" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400">
+            <div id="docx-icon" class="text-3xl mb-2">📋</div>
+            <p id="docx-label" class="text-sm text-gray-500">Drop .docx ticket here or click to browse</p>
+            <input type="file" id="docx-input" accept=".docx" class="hidden">
+          </div>
+        </div>
+      </div>
+      <!-- File info -->
+      <div id="file-info" class="hidden mt-4 p-3 bg-blue-50 rounded-lg fade-in">
+        <p class="text-sm font-medium text-blue-900" id="file-info-text"></p>
+      </div>
+    </section>
+
+    <!-- Step 2: Configure (hidden until .sav loaded) -->
+    <section id="config-section" class="hidden bg-white rounded-lg border border-gray-200 p-6 mb-6 fade-in">
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">2. Configure tabulation</h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Banner -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Banner variable (demographic)</label>
+          <select id="banner-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <option value="">-- Select banner --</option>
+          </select>
+          <p class="text-xs text-gray-400 mt-1">The demographic to cross all questions by</p>
+        </div>
+
+        <!-- Stubs -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Stub variables (questions)</label>
+          <div class="flex items-center gap-2 mb-2">
+            <label class="flex items-center gap-1 text-sm">
+              <input type="radio" name="stub-mode" value="all" checked class="text-blue-600"> All variables
+            </label>
+            <label class="flex items-center gap-1 text-sm">
+              <input type="radio" name="stub-mode" value="select" class="text-blue-600"> Select specific
+            </label>
+          </div>
+          <select id="stubs-select" multiple class="hidden w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+          </select>
+        </div>
+
+        <!-- Weight -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Weight variable</label>
+          <select id="weight-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+            <option value="">None (unweighted)</option>
+          </select>
+        </div>
+
+        <!-- Significance -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Significance level</label>
+          <select id="sig-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+            <option value="0.90">90%</option>
+            <option value="0.95" selected>95%</option>
+            <option value="0.99">99%</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Options -->
+      <div class="mt-6 pt-4 border-t border-gray-100">
+        <label class="block text-sm font-medium text-gray-700 mb-3">Include in output</label>
+        <div class="flex flex-wrap gap-4">
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" id="opt-t2b" checked class="rounded text-blue-600"> Top 2 Box / Bottom 2 Box
+          </label>
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" id="opt-means" class="rounded text-blue-600"> Means
+          </label>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">T2B/B2B and Means are auto-detected for scale variables (Likert 5/7pt)</p>
+      </div>
+
+      <!-- Title -->
+      <div class="mt-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Report title <span class="text-gray-400">(optional)</span></label>
+        <input type="text" id="title-input" placeholder="e.g. Uber NPS UK - Tabulation by Region" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+      </div>
+    </section>
+
+    <!-- Step 3: Generate -->
+    <section id="generate-section" class="hidden fade-in">
+      <button id="generate-btn" onclick="generate()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg text-base transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+        Generate Excel
+      </button>
+
+      <!-- Progress -->
+      <div id="progress" class="hidden mt-4 p-4 bg-white rounded-lg border border-gray-200 fade-in">
+        <div class="flex items-center gap-3">
+          <div class="spinner"></div>
+          <p id="progress-text" class="text-sm text-gray-600">Processing...</p>
+        </div>
+      </div>
+
+      <!-- Result -->
+      <div id="result" class="hidden mt-4 p-4 bg-green-50 rounded-lg border border-green-200 fade-in">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-semibold text-green-800" id="result-text"></p>
+            <p class="text-xs text-green-600 mt-1" id="result-meta"></p>
+          </div>
+          <button id="download-btn" onclick="downloadResult()" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg text-sm transition-colors">
+            Download .xlsx
+          </button>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div id="error" class="hidden mt-4 p-4 bg-red-50 rounded-lg border border-red-200 fade-in">
+        <p class="text-sm font-semibold text-red-800" id="error-text"></p>
+      </div>
+    </section>
+
+    <!-- API Reference (collapsed) -->
+    <details class="mt-8 bg-white rounded-lg border border-gray-200">
+      <summary class="px-6 py-4 cursor-pointer text-sm font-semibold text-gray-700 hover:text-gray-900">
+        API Reference &mdash; use via curl / Python / Node
+      </summary>
+      <div class="px-6 pb-6 text-sm">
+        <h3 class="font-semibold text-gray-800 mt-2 mb-2">curl example</h3>
+        <pre class="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-xs"><code>curl -X POST https://spss.insightgenius.io/v1/tabulate \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -F "file=@survey.sav" \
+  -F 'spec={"banner":"region","stubs":["_all_"],"significance_level":0.95}' \
+  -o tabulation.xlsx</code></pre>
+
+        <h3 class="font-semibold text-gray-800 mt-4 mb-2">Python example</h3>
+        <pre class="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-xs"><code>import requests, json
+
+resp = requests.post(
+    "https://spss.insightgenius.io/v1/tabulate",
+    headers={"Authorization": "Bearer YOUR_API_KEY"},
+    files={"file": open("survey.sav", "rb")},
+    data={"spec": json.dumps({
+        "banner": "region",
+        "stubs": ["_all_"],
+        "significance_level": 0.95,
+        "nets": {"sat_overall": {"Top 2 Box": [4, 5], "Bottom 2 Box": [1, 2]}}
+    })}
+)
+with open("tabulation.xlsx", "wb") as f:
+    f.write(resp.content)
+print(f"Done: {resp.headers['X-Stubs-Success']} tables generated")</code></pre>
+
+        <h3 class="font-semibold text-gray-800 mt-4 mb-2">Available endpoints</h3>
+        <table class="w-full text-xs">
+          <thead><tr class="text-left border-b"><th class="py-1 pr-4">Method</th><th class="py-1 pr-4">Endpoint</th><th class="py-1">Description</th></tr></thead>
+          <tbody>
+            <tr class="border-b border-gray-100"><td class="py-1 pr-4 font-mono text-blue-600">POST</td><td class="py-1 pr-4 font-mono">/v1/tabulate</td><td class="py-1">Full tabulation &rarr; Excel with sig letters</td></tr>
+            <tr class="border-b border-gray-100"><td class="py-1 pr-4 font-mono text-blue-600">POST</td><td class="py-1 pr-4 font-mono">/v1/metadata</td><td class="py-1">Extract variable metadata from .sav</td></tr>
+            <tr class="border-b border-gray-100"><td class="py-1 pr-4 font-mono text-blue-600">POST</td><td class="py-1 pr-4 font-mono">/v1/frequency</td><td class="py-1">Frequency table for one variable</td></tr>
+            <tr class="border-b border-gray-100"><td class="py-1 pr-4 font-mono text-blue-600">POST</td><td class="py-1 pr-4 font-mono">/v1/crosstab</td><td class="py-1">Single crosstab with significance</td></tr>
+            <tr class="border-b border-gray-100"><td class="py-1 pr-4 font-mono text-blue-600">POST</td><td class="py-1 pr-4 font-mono">/v1/process</td><td class="py-1">Full pipeline (auto-detect + multi-analysis)</td></tr>
+            <tr class="border-b border-gray-100"><td class="py-1 pr-4 font-mono text-blue-600">POST</td><td class="py-1 pr-4 font-mono">/v1/convert</td><td class="py-1">Convert .sav to xlsx/csv/parquet/dta</td></tr>
+            <tr><td class="py-1 pr-4 font-mono text-blue-600">POST</td><td class="py-1 pr-4 font-mono">/v1/parse-ticket</td><td class="py-1">Parse Reporting Ticket .docx via AI</td></tr>
+          </tbody>
+        </table>
+        <p class="mt-3 text-xs text-gray-500">Full interactive docs: <a href="/docs" target="_blank" class="text-blue-600 hover:underline">/docs</a> &bull; <a href="/redoc" target="_blank" class="text-blue-600 hover:underline">/redoc</a></p>
+      </div>
+    </details>
+
+  </main>
+
+  <footer class="max-w-4xl mx-auto px-6 py-6 text-center text-xs text-gray-400">
+    Powered by QuantipyMRX &bull; Built by Genius Labs
+  </footer>
+
+<script>
+// ── State ──
+let savFile = null;
+let docxFile = null;
+let metadata = null;
+let resultBlob = null;
+let resultFilename = '';
+
+const API_KEY = 'sk_test_2a441a40c84ba0afe73efd47d6bb1066aac82ad5453360f3';
+const API_BASE = window.location.origin;
+
+// ── Drop zones ──
+function setupDropZone(dropId, inputId, labelId, iconId, accept, onFile) {
+  const drop = document.getElementById(dropId);
+  const input = document.getElementById(inputId);
+  const label = document.getElementById(labelId);
+  const icon = document.getElementById(iconId);
+
+  drop.addEventListener('click', () => input.click());
+  input.addEventListener('change', (e) => {
+    if (e.target.files[0]) onFile(e.target.files[0], label, icon);
+  });
+  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('dragover'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
+  drop.addEventListener('drop', (e) => {
+    e.preventDefault();
+    drop.classList.remove('dragover');
+    const f = e.dataTransfer.files[0];
+    if (f) onFile(f, label, icon);
+  });
+}
+
+setupDropZone('sav-drop', 'sav-input', 'sav-label', 'sav-icon', '.sav', async (f, label, icon) => {
+  savFile = f;
+  icon.textContent = '✅';
+  label.textContent = `${f.name} (${(f.size / 1024).toFixed(0)} KB)`;
+  label.classList.remove('text-gray-500');
+  label.classList.add('text-blue-700', 'font-medium');
+  await loadMetadata();
+});
+
+setupDropZone('docx-drop', 'docx-input', 'docx-label', 'docx-icon', '.docx', (f, label, icon) => {
+  docxFile = f;
+  icon.textContent = '✅';
+  label.textContent = `${f.name} (${(f.size / 1024).toFixed(0)} KB)`;
+  label.classList.remove('text-gray-500');
+  label.classList.add('text-blue-700', 'font-medium');
+});
+
+// ── Load metadata on .sav upload ──
+async function loadMetadata() {
+  const info = document.getElementById('file-info');
+  const infoText = document.getElementById('file-info-text');
+  info.classList.remove('hidden');
+  infoText.textContent = 'Loading metadata...';
+
+  const form = new FormData();
+  form.append('file', savFile);
+
+  try {
+    const resp = await fetch(`${API_BASE}/v1/metadata`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${API_KEY}` },
+      body: form,
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    metadata = data.data;
+    infoText.textContent = `${metadata.file_name} — ${metadata.n_cases} cases × ${metadata.n_variables} variables`;
+    populateSelects();
+    document.getElementById('config-section').classList.remove('hidden');
+    document.getElementById('generate-section').classList.remove('hidden');
+  } catch (e) {
+    infoText.textContent = `Error loading metadata: ${e.message}`;
+    info.classList.remove('bg-blue-50');
+    info.classList.add('bg-red-50');
+  }
+}
+
+// ── Populate dropdowns from metadata ──
+function populateSelects() {
+  const bannerSel = document.getElementById('banner-select');
+  const stubsSel = document.getElementById('stubs-select');
+  const weightSel = document.getElementById('weight-select');
+
+  // Clear
+  bannerSel.innerHTML = '<option value="">-- Select banner --</option>';
+  stubsSel.innerHTML = '';
+  weightSel.innerHTML = '<option value="">None (unweighted)</option>';
+
+  // Classify variables
+  const varsWithLabels = [];
+  const allVars = [];
+  const weightCandidates = [];
+
+  for (const v of metadata.variables) {
+    const opt = document.createElement('option');
+    opt.value = v.name;
+    const labelText = v.label ? `${v.name} — ${v.label}` : v.name;
+
+    if (v.value_labels && Object.keys(v.value_labels).length >= 2) {
+      const nLabels = Object.keys(v.value_labels).length;
+      // Demographics: few categories (2-15)
+      if (nLabels <= 15) {
+        const bOpt = opt.cloneNode();
+        bOpt.textContent = `${labelText} (${nLabels} categories)`;
+        bannerSel.appendChild(bOpt);
+      }
+      // All labeled vars as stubs
+      const sOpt = opt.cloneNode();
+      sOpt.textContent = labelText;
+      stubsSel.appendChild(sOpt);
+      varsWithLabels.push(v);
+    }
+
+    // Weight candidates
+    const lower = v.name.toLowerCase();
+    if (lower.includes('weight') || lower.includes('wt') || lower.includes('pond')) {
+      const wOpt = document.createElement('option');
+      wOpt.value = v.name;
+      wOpt.textContent = labelText;
+      weightSel.appendChild(wOpt);
+    }
+
+    allVars.push(v);
+  }
+
+  // Auto-select best banner (first demographic-like variable)
+  if (bannerSel.options.length > 1) {
+    bannerSel.selectedIndex = 1;
+  }
+}
+
+// ── Stub mode toggle ──
+document.querySelectorAll('input[name="stub-mode"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    document.getElementById('stubs-select').classList.toggle('hidden', e.target.value === 'all');
+  });
+});
+
+// ── Detect scale variables for auto T2B/nets ──
+function detectScaleVars() {
+  if (!metadata) return [];
+  const scales = [];
+  for (const v of metadata.variables) {
+    if (!v.value_labels) continue;
+    const nLabels = Object.keys(v.value_labels).length;
+    if (nLabels >= 4 && nLabels <= 11) {
+      const values = Object.keys(v.value_labels).map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b);
+      if (values.length >= 4) {
+        scales.push({ name: v.name, values, nLabels });
+      }
+    }
+  }
+  return scales;
+}
+
+// ── Generate ──
+async function generate() {
+  const banner = document.getElementById('banner-select').value;
+  if (!banner) { alert('Please select a banner variable'); return; }
+
+  const btn = document.getElementById('generate-btn');
+  const progress = document.getElementById('progress');
+  const progressText = document.getElementById('progress-text');
+  const result = document.getElementById('result');
+  const error = document.getElementById('error');
+
+  btn.disabled = true;
+  btn.textContent = 'Processing...';
+  progress.classList.remove('hidden');
+  result.classList.add('hidden');
+  error.classList.add('hidden');
+  progressText.textContent = 'Uploading file and running crosstabs...';
+
+  // Build spec
+  const stubMode = document.querySelector('input[name="stub-mode"]:checked').value;
+  let stubs = ['_all_'];
+  if (stubMode === 'select') {
+    const sel = document.getElementById('stubs-select');
+    stubs = Array.from(sel.selectedOptions).map(o => o.value);
+    if (stubs.length === 0) stubs = ['_all_'];
+  }
+
+  const spec = {
+    banner,
+    stubs,
+    significance_level: parseFloat(document.getElementById('sig-select').value),
+    title: document.getElementById('title-input').value || undefined,
+  };
+
+  // Weight
+  const weight = document.getElementById('weight-select').value;
+  if (weight) spec.weight = weight;
+
+  // Nets: auto T2B/B2B for scale variables
+  if (document.getElementById('opt-t2b').checked) {
+    const scales = detectScaleVars();
+    if (scales.length > 0) {
+      spec.nets = {};
+      for (const s of scales) {
+        if (s.name === banner) continue;
+        const vals = s.values;
+        const top2 = vals.slice(-2);
+        const bot2 = vals.slice(0, 2);
+        spec.nets[s.name] = {
+          'Top 2 Box': top2,
+          'Bottom 2 Box': bot2,
+        };
+      }
+    }
+  }
+
+  // Include means — extend the spec
+  if (document.getElementById('opt-means').checked) {
+    spec.include_means = true;
+  }
+
+  const form = new FormData();
+  form.append('file', savFile);
+  form.append('spec', JSON.stringify(spec));
+
+  if (docxFile) {
+    form.append('ticket', docxFile);
+  }
+
+  try {
+    const start = performance.now();
+    const resp = await fetch(`${API_BASE}/v1/tabulate`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${API_KEY}` },
+      body: form,
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: { message: `HTTP ${resp.status}` } }));
+      throw new Error(err.detail?.message || err.detail || `HTTP ${resp.status}`);
+    }
+
+    const elapsed = Math.round(performance.now() - start);
+    resultBlob = await resp.blob();
+
+    // Parse headers
+    const totalStubs = resp.headers.get('X-Stubs-Total') || '?';
+    const successStubs = resp.headers.get('X-Stubs-Success') || '?';
+    const failedStubs = resp.headers.get('X-Stubs-Failed') || '0';
+    const serverTime = resp.headers.get('X-Processing-Time-Ms') || '?';
+
+    // Extract filename from Content-Disposition
+    const cd = resp.headers.get('Content-Disposition') || '';
+    const fnMatch = cd.match(/filename="([^"]+)"/);
+    resultFilename = fnMatch ? fnMatch[1] : `tabulation_${banner}.xlsx`;
+
+    progress.classList.add('hidden');
+    result.classList.remove('hidden');
+    document.getElementById('result-text').textContent =
+      `${successStubs}/${totalStubs} tables generated successfully` +
+      (parseInt(failedStubs) > 0 ? ` (${failedStubs} failed)` : '');
+    document.getElementById('result-meta').textContent =
+      `${(resultBlob.size / 1024).toFixed(0)} KB — processed in ${serverTime}ms (server) / ${elapsed}ms (total)`;
+
+  } catch (e) {
+    progress.classList.add('hidden');
+    error.classList.remove('hidden');
+    document.getElementById('error-text').textContent = `Error: ${e.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate Excel';
+  }
+}
+
+// ── Download ──
+function downloadResult() {
+  if (!resultBlob) return;
+  const url = URL.createObjectURL(resultBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = resultFilename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
