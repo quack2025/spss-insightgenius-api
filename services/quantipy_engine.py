@@ -25,7 +25,9 @@ logger = logging.getLogger(__name__)
 try:
     from quantipymrx import DataSet
     from quantipymrx.analysis.auto_detect import auto_detect as mrx_auto_detect
-    from quantipymrx.analysis import crosstab as mrx_crosstab
+    from quantipymrx.analysis.crosstab import crosstab as mrx_crosstab
+    from quantipymrx.analysis.significance import z_test_proportions as mrx_z_test, t_test_means as mrx_t_test
+    from quantipymrx.analysis.mrx import calculate_nps as mrx_nps
 
     QUANTIPYMRX_AVAILABLE = True
     logger.info("QuantipyMRX loaded successfully")
@@ -99,6 +101,124 @@ def _strip_common_label_prefix(labels: list[str]) -> list[str]:
         suffix = lbl[len(prefix):].lstrip(":;-–—/ \t")
         cleaned.append(suffix if len(suffix) >= 2 else lbl)
     return cleaned
+
+
+def _frequency_via_mrx(data: "SPSSData", variable: str, weight: str | None) -> dict[str, Any] | None:
+    """Delegate frequency to MRX and add mean/std/median."""
+    from quantipymrx.analysis.frequency import frequency as mrx_frequency
+
+    fr = mrx_frequency(data.mrx_dataset, variable, weight=weight)
+
+    meta = data.meta
+    col_labels = getattr(meta, "column_names_to_labels", {})
+    value_labels_map = getattr(meta, "variable_value_labels", {}).get(variable, {})
+
+    frequencies = []
+    for val, row in fr.table.iterrows():
+        if pd.isna(val):
+            continue
+        label = value_labels_map.get(val, str(val))
+        frequencies.append({
+            "value": _sanitize_value(val),
+            "label": str(label),
+            "count": int(row.get("count", 0)) if not weight else round(float(row.get("weighted_count", row.get("count", 0))), 1),
+            "percentage": round(float(row.get("col_pct", row.get("percentage", 0))), 1),
+        })
+
+    frequencies.sort(key=lambda x: x["count"], reverse=True)
+
+    result: dict[str, Any] = {
+        "variable": variable,
+        "label": col_labels.get(variable),
+        "base": fr.base if hasattr(fr, "base") else int(fr.table["count"].sum()),
+        "total_missing": getattr(fr, "missing", 0),
+        "pct_missing": round(getattr(fr, "pct_missing", 0), 1),
+        "frequencies": frequencies,
+    }
+
+    # NEW fields from MRX
+    if hasattr(fr, "mean") and fr.mean is not None:
+        result["mean"] = round(float(fr.mean), 2)
+    if hasattr(fr, "std") and fr.std is not None:
+        result["std"] = round(float(fr.std), 2)
+    if hasattr(fr, "median") and fr.median is not None:
+        result["median"] = round(float(fr.median), 2)
+    result["is_weighted"] = weight is not None
+
+    return result
+
+
+def _crosstab_via_mrx(
+    data: "SPSSData", row: str, col: str, weight: str | None, significance_level: float,
+) -> dict[str, Any] | None:
+    """Delegate crosstab to MRX native function and convert to API response shape."""
+    alpha = 1 - significance_level
+    sig_level_for_mrx = alpha  # MRX expects alpha (0.05), not confidence (0.95)
+
+    ct = mrx_crosstab(
+        data.mrx_dataset, x=row, y=col,
+        weight=weight,
+        sig_level=sig_level_for_mrx,
+        test_significance=True,
+        include_totals=True,
+    )
+
+    # Convert CrosstabResult to API response shape
+    meta = data.meta
+    row_value_labels = getattr(meta, "variable_value_labels", {}).get(row, {})
+    col_value_labels = getattr(meta, "variable_value_labels", {}).get(col, {})
+
+    col_values = sorted(ct.col_pct.columns.tolist())
+    letters = list(string.ascii_uppercase[:len(col_values)])
+    col_letter_map = {str(val): letters[i] for i, val in enumerate(col_values)}
+
+    table = []
+    for row_val in ct.col_pct.index:
+        row_data: dict[str, Any] = {
+            "row_value": _sanitize_value(row_val),
+            "row_label": row_value_labels.get(row_val, str(row_val)),
+        }
+        for i, cv in enumerate(col_values):
+            count = float(ct.counts.loc[row_val, cv]) if cv in ct.counts.columns else 0
+            pct = float(ct.col_pct.loc[row_val, cv]) if cv in ct.col_pct.columns else 0
+
+            # Get sig letters from MRX significance matrix
+            sig_letters: list[str] = []
+            if ct.significance is not None and cv in ct.significance.columns and row_val in ct.significance.index:
+                sig_cell = ct.significance.loc[row_val, cv]
+                if isinstance(sig_cell, str) and sig_cell:
+                    # MRX returns sig letters directly as string like "AB"
+                    sig_letters = list(sig_cell)
+
+            row_data[str(cv)] = {
+                "count": round(count, 1) if weight else int(count),
+                "percentage": round(pct, 1),
+                "column_letter": letters[i],
+                "significance_letters": sorted(set(sig_letters)),
+            }
+        table.append(row_data)
+
+    col_vl_map = {str(v): col_value_labels.get(v, str(v)) for v in col_values}
+    total = int(ct.total_base) if ct.total_base else int(ct.counts.sum().sum())
+
+    response: dict[str, Any] = {
+        "row_variable": row,
+        "col_variable": col,
+        "total_responses": total,
+        "table": table,
+        "col_labels": col_letter_map,
+        "col_value_labels": col_vl_map,
+        "significance_level": significance_level,
+        "significant_pairs": [],  # Not computed in MRX path (pairs are expensive and rarely used)
+    }
+
+    # Add chi-square (NEW — free from MRX)
+    if ct.chi2 is not None:
+        response["chi2"] = round(float(ct.chi2), 4)
+        response["chi2_pvalue"] = round(float(ct.chi2_pvalue), 6) if ct.chi2_pvalue is not None else None
+        response["chi2_warning"] = ct.chi2_warning
+
+    return response
 
 
 class QuantiProEngine:
@@ -242,12 +362,21 @@ class QuantiProEngine:
         variable: str,
         weight: str | None = None,
     ) -> dict[str, Any]:
-        """Frequency table for a single variable. Always uses pandas (not MRX)."""
+        """Frequency table for a single variable. Delegates to MRX when available."""
         df = data.df
         meta = data.meta
 
         if variable not in df.columns:
             raise ValueError(f"Variable '{variable}' not found in dataset")
+
+        # Try MRX native frequency
+        if data.mrx_dataset is not None:
+            try:
+                result = _frequency_via_mrx(data, variable, weight)
+                if result is not None:
+                    return result
+            except Exception as e:
+                logger.warning("MRX frequency failed for %s, falling back: %s", variable, e)
 
         user_missing = _get_user_missing(variable, meta)
         col_labels = getattr(meta, "column_names_to_labels", {})
@@ -353,6 +482,15 @@ class QuantiProEngine:
             raise ValueError(f"Row variable '{row}' not found in dataset")
         if col not in df.columns:
             raise ValueError(f"Column variable '{col}' not found in dataset")
+
+        # Try MRX native crosstab first
+        if data.mrx_dataset is not None:
+            try:
+                result = _crosstab_via_mrx(data, row, col, weight, significance_level)
+                if result is not None:
+                    return result
+            except Exception as e:
+                logger.warning("MRX crosstab failed for %s x %s, falling back to pandas: %s", row, col, e)
 
         w = df[weight] if weight and weight in df.columns else None
 
@@ -525,8 +663,26 @@ class QuantiProEngine:
         if variable not in df.columns:
             raise ValueError(f"Variable '{variable}' not found in dataset")
 
-        series = df[variable].dropna()
         col_labels = getattr(data.meta, "column_names_to_labels", {})
+
+        # Try MRX native NPS
+        if data.mrx_dataset is not None:
+            try:
+                series = df[variable].dropna()
+                nps_result = mrx_nps(series, scale="0-10")
+                return {
+                    "variable": variable,
+                    "label": col_labels.get(variable),
+                    "nps_score": round(float(nps_result.nps), 1),
+                    "base": nps_result.base,
+                    "promoters": {"count": nps_result.promoters_count, "percentage": round(nps_result.promoters_pct, 1)},
+                    "passives": {"count": nps_result.passives_count, "percentage": round(nps_result.passives_pct, 1)},
+                    "detractors": {"count": nps_result.detractors_count, "percentage": round(nps_result.detractors_pct, 1)},
+                }
+            except Exception as e:
+                logger.warning("MRX NPS failed for %s, falling back: %s", variable, e)
+
+        series = df[variable].dropna()
         base = len(series)
         if base == 0:
             raise ValueError(f"No valid data for variable '{variable}'")
