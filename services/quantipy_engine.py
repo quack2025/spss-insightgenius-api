@@ -179,7 +179,12 @@ def _frequency_via_mrx(data: "SPSSData", variable: str, weight: str | None) -> d
 def _crosstab_via_mrx(
     data: "SPSSData", row: str, col: str, weight: str | None, significance_level: float,
 ) -> dict[str, Any] | None:
-    """Delegate crosstab to MRX native function and convert to API response shape."""
+    """Delegate crosstab to MRX native function and convert to API response shape.
+
+    IMPORTANT: MRX returns label-keyed DataFrames (e.g., column "Entre 18 y 24 años")
+    while the tabulation builder expects value-keyed dicts (e.g., key "1.0").
+    We must map MRX labels back to numeric values for compatibility.
+    """
     alpha = 1 - significance_level
     sig_level_for_mrx = alpha  # MRX expects alpha (0.05), not confidence (0.95)
 
@@ -193,29 +198,56 @@ def _crosstab_via_mrx(
 
     # Convert CrosstabResult to API response shape
     meta = data.meta
-    row_value_labels = getattr(meta, "variable_value_labels", {}).get(row, {})
-    col_value_labels = getattr(meta, "variable_value_labels", {}).get(col, {})
+    row_vl = getattr(meta, "variable_value_labels", {}).get(row, {})
+    col_vl = getattr(meta, "variable_value_labels", {}).get(col, {})
 
-    col_values = sorted(ct.col_pct.columns.tolist())
+    # Build reverse maps: label → numeric value
+    row_label_to_val = {str(v): k for k, v in row_vl.items()}
+    col_label_to_val = {str(v): k for k, v in col_vl.items()}
+
+    # MRX columns may be labels (str) or numeric values — detect which
+    mrx_col_values = ct.col_pct.columns.tolist()
+    mrx_uses_labels = len(mrx_col_values) > 0 and isinstance(mrx_col_values[0], str) and mrx_col_values[0] in col_label_to_val
+
+    # Map MRX columns back to numeric values (for compat with tabulation builder)
+    if mrx_uses_labels:
+        col_values = sorted([col_label_to_val.get(str(c), c) for c in mrx_col_values])
+        mrx_col_map = {col_label_to_val.get(str(c), c): c for c in mrx_col_values}  # numeric → mrx_label
+    else:
+        col_values = sorted(mrx_col_values)
+        mrx_col_map = {c: c for c in mrx_col_values}
+
     letters = list(string.ascii_uppercase[:len(col_values)])
     col_letter_map = {str(val): letters[i] for i, val in enumerate(col_values)}
 
+    # Same for rows
+    mrx_row_values = ct.col_pct.index.tolist()
+    mrx_row_uses_labels = len(mrx_row_values) > 0 and isinstance(mrx_row_values[0], str) and mrx_row_values[0] in row_label_to_val
+
     table = []
-    for row_val in ct.col_pct.index:
+    for mrx_rv in mrx_row_values:
+        if mrx_row_uses_labels:
+            numeric_rv = row_label_to_val.get(str(mrx_rv), mrx_rv)
+            row_label = str(mrx_rv)
+        else:
+            numeric_rv = mrx_rv
+            row_label = row_vl.get(mrx_rv, str(mrx_rv))
+
         row_data: dict[str, Any] = {
-            "row_value": _sanitize_value(row_val),
-            "row_label": row_value_labels.get(row_val, str(row_val)),
+            "row_value": _sanitize_value(numeric_rv),
+            "row_label": row_label,
         }
         for i, cv in enumerate(col_values):
-            raw_count = ct.counts.loc[row_val, cv] if cv in ct.counts.columns else 0
-            raw_pct = ct.col_pct.loc[row_val, cv] if cv in ct.col_pct.columns else 0
+            mrx_cv = mrx_col_map.get(cv, cv)  # Get the MRX column key
+            raw_count = ct.counts.loc[mrx_rv, mrx_cv] if mrx_cv in ct.counts.columns else 0
+            raw_pct = ct.col_pct.loc[mrx_rv, mrx_cv] if mrx_cv in ct.col_pct.columns else 0
             count = _sanitize_value(raw_count) or 0
             pct = _sanitize_value(raw_pct) or 0
 
             # Get sig letters from MRX significance matrix
             sig_letters: list[str] = []
-            if ct.significance is not None and cv in ct.significance.columns and row_val in ct.significance.index:
-                sig_cell = ct.significance.loc[row_val, cv]
+            if ct.significance is not None and mrx_cv in ct.significance.columns and mrx_rv in ct.significance.index:
+                sig_cell = ct.significance.loc[mrx_rv, mrx_cv]
                 if isinstance(sig_cell, str) and sig_cell:
                     sig_letters = list(sig_cell)
 
@@ -227,7 +259,7 @@ def _crosstab_via_mrx(
             }
         table.append(row_data)
 
-    col_vl_map = {str(v): col_value_labels.get(v, str(v)) for v in col_values}
+    col_vl_map = {str(v): col_vl.get(v, str(v)) for v in col_values}
     raw_total = ct.total_base if ct.total_base else ct.counts.sum().sum()
     total = _sanitize_value(raw_total) or 0
 
