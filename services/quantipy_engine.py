@@ -117,36 +117,60 @@ def _frequency_via_mrx(data: "SPSSData", variable: str, weight: str | None) -> d
     col_labels = getattr(meta, "column_names_to_labels", {})
     value_labels_map = getattr(meta, "variable_value_labels", {}).get(variable, {})
 
+    # MRX FrequencyResult.table columns vary — detect dynamically
+    tbl = fr.table
+    tbl_cols = list(tbl.columns)
+    count_col = next((c for c in tbl_cols if "count" in str(c).lower()), tbl_cols[0] if tbl_cols else None)
+    pct_col = next((c for c in tbl_cols if "pct" in str(c).lower() or "percent" in str(c).lower()), None)
+
     frequencies = []
-    for val, row in fr.table.iterrows():
+    for val, row in tbl.iterrows():
         if pd.isna(val):
             continue
         label = value_labels_map.get(val, str(val))
+        raw_count = row.iloc[0] if count_col is None else row.get(count_col, 0)
+        raw_pct = row.get(pct_col, 0) if pct_col else 0
+        count = _sanitize_value(raw_count)
+        pct = _sanitize_value(raw_pct)
+        if count is None:
+            count = 0
+        if pct is None:
+            pct = 0
         frequencies.append({
             "value": _sanitize_value(val),
             "label": str(label),
-            "count": int(row.get("count", 0)) if not weight else round(float(row.get("weighted_count", row.get("count", 0))), 1),
-            "percentage": round(float(row.get("col_pct", row.get("percentage", 0))), 1),
+            "count": int(count) if not weight else round(float(count), 1),
+            "percentage": round(float(pct), 1),
         })
 
+    # If MRX didn't return percentages, compute them
+    total_count = sum(f["count"] for f in frequencies)
+    if total_count > 0 and all(f["percentage"] == 0 for f in frequencies):
+        for f in frequencies:
+            f["percentage"] = round(f["count"] / total_count * 100, 1)
+
     frequencies.sort(key=lambda x: x["count"], reverse=True)
+
+    base = getattr(fr, "base", None)
+    if base is None:
+        base = total_count
 
     result: dict[str, Any] = {
         "variable": variable,
         "label": col_labels.get(variable),
-        "base": fr.base if hasattr(fr, "base") else int(fr.table["count"].sum()),
-        "total_missing": getattr(fr, "missing", 0),
-        "pct_missing": round(getattr(fr, "pct_missing", 0), 1),
+        "base": _sanitize_value(base) or 0,
+        "total_missing": _sanitize_value(getattr(fr, "missing", 0)) or 0,
+        "pct_missing": round(float(getattr(fr, "pct_missing", 0) or 0), 1),
         "frequencies": frequencies,
     }
 
-    # NEW fields from MRX
-    if hasattr(fr, "mean") and fr.mean is not None:
-        result["mean"] = round(float(fr.mean), 2)
-    if hasattr(fr, "std") and fr.std is not None:
-        result["std"] = round(float(fr.std), 2)
-    if hasattr(fr, "median") and fr.median is not None:
-        result["median"] = round(float(fr.median), 2)
+    # NEW fields from MRX — only for numeric variables
+    for attr in ("mean", "std", "median"):
+        val = getattr(fr, attr, None)
+        if val is not None:
+            val = _sanitize_value(val)
+            if val is not None:
+                result[attr] = round(float(val), 2)
     result["is_weighted"] = weight is not None
 
     return result
@@ -183,43 +207,49 @@ def _crosstab_via_mrx(
             "row_label": row_value_labels.get(row_val, str(row_val)),
         }
         for i, cv in enumerate(col_values):
-            count = float(ct.counts.loc[row_val, cv]) if cv in ct.counts.columns else 0
-            pct = float(ct.col_pct.loc[row_val, cv]) if cv in ct.col_pct.columns else 0
+            raw_count = ct.counts.loc[row_val, cv] if cv in ct.counts.columns else 0
+            raw_pct = ct.col_pct.loc[row_val, cv] if cv in ct.col_pct.columns else 0
+            count = _sanitize_value(raw_count) or 0
+            pct = _sanitize_value(raw_pct) or 0
 
             # Get sig letters from MRX significance matrix
             sig_letters: list[str] = []
             if ct.significance is not None and cv in ct.significance.columns and row_val in ct.significance.index:
                 sig_cell = ct.significance.loc[row_val, cv]
                 if isinstance(sig_cell, str) and sig_cell:
-                    # MRX returns sig letters directly as string like "AB"
                     sig_letters = list(sig_cell)
 
             row_data[str(cv)] = {
-                "count": round(count, 1) if weight else int(count),
-                "percentage": round(pct, 1),
+                "count": round(float(count), 1) if weight else int(count),
+                "percentage": round(float(pct), 1),
                 "column_letter": letters[i],
                 "significance_letters": sorted(set(sig_letters)),
             }
         table.append(row_data)
 
     col_vl_map = {str(v): col_value_labels.get(v, str(v)) for v in col_values}
-    total = int(ct.total_base) if ct.total_base else int(ct.counts.sum().sum())
+    raw_total = ct.total_base if ct.total_base else ct.counts.sum().sum()
+    total = _sanitize_value(raw_total) or 0
 
     response: dict[str, Any] = {
         "row_variable": row,
         "col_variable": col,
-        "total_responses": total,
+        "total_responses": int(total),
         "table": table,
         "col_labels": col_letter_map,
         "col_value_labels": col_vl_map,
         "significance_level": significance_level,
-        "significant_pairs": [],  # Not computed in MRX path (pairs are expensive and rarely used)
+        "significant_pairs": [],
     }
 
     # Add chi-square (NEW — free from MRX)
     if ct.chi2 is not None:
-        response["chi2"] = round(float(ct.chi2), 4)
-        response["chi2_pvalue"] = round(float(ct.chi2_pvalue), 6) if ct.chi2_pvalue is not None else None
+        chi2_val = _sanitize_value(ct.chi2)
+        chi2_p = _sanitize_value(ct.chi2_pvalue)
+        if chi2_val is not None:
+            response["chi2"] = round(float(chi2_val), 4)
+        if chi2_p is not None:
+            response["chi2_pvalue"] = round(float(chi2_p), 6)
         response["chi2_warning"] = ct.chi2_warning
 
     return response
