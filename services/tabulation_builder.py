@@ -28,6 +28,13 @@ from scipy import stats
 
 logger = logging.getLogger(__name__)
 
+# Excel sheet names cannot contain: \ / * ? : [ ]
+_SHEET_NAME_BAD_CHARS = str.maketrans({':': '-', '/': '-', '\\': '-', '*': '', '?': '', '[': '(', ']': ')'})
+
+def _sanitize_sheet_name(name: str) -> str:
+    """Clean a string for use as an Excel sheet name (max 31 chars, no illegal chars)."""
+    return name.translate(_SHEET_NAME_BAD_CHARS).strip()[:31]
+
 # ── Styling ──────────────────────────────────────────────────────────────────
 
 TITLE_FONT = Font(bold=True, size=12, color="1F2937")
@@ -665,7 +672,7 @@ def _build_excel(result: TabulationResult, spec: TabulateSpec, data: Any) -> byt
         for sheet_result in result.sheets:
             if sheet_result.status != "success":
                 continue
-            sheet_name = sheet_result.variable[:31]
+            sheet_name = _sanitize_sheet_name(sheet_result.variable)
             existing = [ws.title for ws in wb.worksheets]
             if sheet_name in existing:
                 sheet_name = sheet_name[:28] + "_" + str(existing.count(sheet_name))
