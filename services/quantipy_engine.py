@@ -24,7 +24,11 @@ logger = logging.getLogger(__name__)
 # QuantipyMRX — graceful fallback
 try:
     from quantipymrx import DataSet
-    from quantipymrx.analysis.auto_detect import auto_detect as mrx_auto_detect
+    from quantipymrx.analysis.auto_detect import (
+        auto_detect as mrx_auto_detect,
+        suggest_banners as mrx_suggest_banners,
+        detect_groups as mrx_detect_groups,
+    )
     from quantipymrx.analysis.crosstab import crosstab as mrx_crosstab
     from quantipymrx.analysis.significance import z_test_proportions as mrx_z_test, t_test_means as mrx_t_test
     from quantipymrx.analysis.mrx import calculate_nps as mrx_nps
@@ -317,11 +321,75 @@ class QuantiProEngine:
 
         # Auto-detect via MRX
         auto_detect_result = None
+        suggested_banners = None
+        detected_groups = None
+        preset_nets = None
+
         if data.mrx_dataset is not None:
             try:
                 auto_detect_result = QuantiProEngine.auto_detect(data)
             except Exception as e:
                 logger.warning("auto_detect failed: %s", e)
+
+            # Suggest banners (Sprint B — from MRX)
+            try:
+                raw_banners = mrx_suggest_banners(data.mrx_dataset, max_banners=5)
+                suggested_banners = [
+                    {
+                        "variable": getattr(b, "variable", str(b)),
+                        "label": col_labels.get(getattr(b, "variable", str(b)), ""),
+                        "n_categories": getattr(b, "n_categories", None),
+                        "confidence": getattr(b, "confidence", None),
+                        "reason": getattr(b, "reason", None),
+                    }
+                    for b in raw_banners
+                ] if raw_banners else None
+            except Exception as e:
+                logger.warning("suggest_banners failed: %s", e)
+
+            # Detect groups: grids, MRS, top-of-mind (Sprint B — from MRX)
+            try:
+                raw_groups = mrx_detect_groups(data.mrx_dataset)
+                detected_groups = [
+                    {
+                        "name": getattr(g, "name", ""),
+                        "display_name": getattr(g, "display_name", getattr(g, "name", "")),
+                        "question_type": getattr(g, "question_type", "unknown"),
+                        "variables": getattr(g, "variables", []),
+                        "confidence": getattr(g, "confidence", None),
+                    }
+                    for g in raw_groups
+                ] if raw_groups else None
+            except Exception as e:
+                logger.warning("detect_groups failed: %s", e)
+
+        # Preset nets based on detected scale ranges
+        preset_nets = {}
+        for var_info in variables:
+            vl = var_info.get("value_labels")
+            if not vl or var_info["type"] != "numeric":
+                continue
+            try:
+                keys = sorted([float(k) for k in vl.keys()])
+            except (ValueError, TypeError):
+                continue
+            n = len(keys)
+            if n == 5:
+                preset_nets[var_info["name"]] = {
+                    "Top 2 Box": [int(keys[-2]), int(keys[-1])],
+                    "Bottom 2 Box": [int(keys[0]), int(keys[1])],
+                }
+            elif n == 7:
+                preset_nets[var_info["name"]] = {
+                    "Top 2 Box": [int(keys[-2]), int(keys[-1])],
+                    "Bottom 2 Box": [int(keys[0]), int(keys[1])],
+                }
+            elif n == 11 and keys[0] == 0 and keys[-1] == 10:
+                preset_nets[var_info["name"]] = {
+                    "Promoters (9-10)": [9, 10],
+                    "Passives (7-8)": [7, 8],
+                    "Detractors (0-6)": [0, 1, 2, 3, 4, 5, 6],
+                }
 
         return {
             "file_name": data.file_name,
@@ -330,6 +398,9 @@ class QuantiProEngine:
             "variables": variables,
             "detected_weights": weight_candidates,
             "auto_detect": auto_detect_result,
+            "suggested_banners": suggested_banners,
+            "detected_groups": detected_groups,
+            "preset_nets": preset_nets if preset_nets else None,
             "file_label": getattr(meta, "file_label", None),
         }
 
