@@ -378,21 +378,36 @@ function populateUI() {
   chipsEl.innerHTML = ''; stubsSel.innerHTML = ''; mrsSel.innerHTML = ''; gridSel.innerHTML = '';
   weightSel.innerHTML = '<option value="">None (unweighted)</option>';
 
+  // ── Smart banners: show suggested first, then separator, then rest ──
+  const suggestedVars = new Set((metadata.suggested_banners || []).map(b => b.variable));
+  const bannerVars = metadata.variables.filter(v => {
+    const vl = v.value_labels ? Object.keys(v.value_labels).length : 0;
+    return vl >= 2 && vl <= 15;
+  });
+  const suggested = bannerVars.filter(v => suggestedVars.has(v.name));
+  const rest = bannerVars.filter(v => !suggestedVars.has(v.name));
+
+  if (suggested.length > 0) {
+    const label = document.createElement('div');
+    label.className = 'w-full text-xs font-semibold text-green-700 mb-1';
+    label.textContent = 'Recommended banners';
+    chipsEl.appendChild(label);
+    for (const v of suggested) { chipsEl.appendChild(_makeBannerChip(v, true)); }
+    if (rest.length > 0) {
+      const sep = document.createElement('div');
+      sep.className = 'w-full border-t border-gray-200 my-2';
+      chipsEl.appendChild(sep);
+      const lbl2 = document.createElement('div');
+      lbl2.className = 'w-full text-xs text-gray-400 mb-1';
+      lbl2.textContent = 'Other variables';
+      chipsEl.appendChild(lbl2);
+    }
+  }
+  for (const v of rest) { chipsEl.appendChild(_makeBannerChip(v, false)); }
+
   for (const v of metadata.variables) {
     const label = v.label ? `${v.name} \u2014 ${v.label}` : v.name;
     const vl = v.value_labels ? Object.keys(v.value_labels).length : 0;
-
-    // Banner chips: variables with 2-15 categories
-    if (vl >= 2 && vl <= 15) {
-      const chip = document.createElement('button');
-      chip.className = 'chip';
-      const shortLabel = v.label || v.name;
-      chip.innerHTML = `<span class="font-medium">${shortLabel}</span> <span class="text-gray-400 text-xs">(${vl})</span>`;
-      chip.title = `${v.name}: ${v.label || ''} — ${vl} categories`;
-      chip.dataset.varname = v.name;
-      chip.addEventListener('click', () => toggleBanner(v.name, chip));
-      chipsEl.appendChild(chip);
-    }
 
     // Stubs: all labeled variables
     if (vl >= 2) {
@@ -400,7 +415,7 @@ function populateUI() {
       stubsSel.appendChild(opt);
     }
 
-    // MRS candidates: binary variables (2 labels like Yes/No, or numeric with only 0/1 values)
+    // MRS candidates: binary variables
     if (vl === 2 || (v.type === 'numeric' && vl <= 2)) {
       const opt = document.createElement('option'); opt.value = v.name; opt.textContent = label;
       mrsSel.appendChild(opt);
@@ -411,19 +426,81 @@ function populateUI() {
       const opt = document.createElement('option'); opt.value = v.name; opt.textContent = label;
       gridSel.appendChild(opt);
     }
+  }
 
-    // Weight
+  // ── Auto-detect weights from backend ──
+  const detectedWeights = metadata.detected_weights || [];
+  for (const v of metadata.variables) {
+    const label = v.label ? `${v.name} \u2014 ${v.label}` : v.name;
     const lo = v.name.toLowerCase();
-    if (lo.includes('weight') || lo.includes('wt') || lo.includes('pond')) {
+    if (lo.includes('weight') || lo.includes('wt') || lo.includes('pond') || detectedWeights.includes(v.name)) {
       const opt = document.createElement('option'); opt.value = v.name; opt.textContent = label;
       weightSel.appendChild(opt);
     }
   }
+  // Auto-select first detected weight
+  if (detectedWeights.length > 0) {
+    weightSel.value = detectedWeights[0];
+  }
 
-  // Auto-select first banner
-  const firstChip = chipsEl.querySelector('.chip');
-  if (firstChip) { toggleBanner(firstChip.dataset.varname, firstChip); }
+  // ── Auto-populate MRS from detected_groups (awareness type) — user can remove ──
+  const detectedGroups = metadata.detected_groups || [];
+  const awarenessGroups = detectedGroups.filter(g => g.question_type === 'awareness');
+  if (awarenessGroups.length > 0) {
+    for (const g of awarenessGroups) {
+      const name = g.display_name || g.name || 'MRS Group';
+      const vars = g.variables || [];
+      if (vars.length >= 2) {
+        mrsGroups[name] = vars;
+      }
+    }
+    renderMrsGroups();
+    _showAutoDetectBadge('mrs-groups', `${awarenessGroups.length} MRS group(s) auto-detected`);
+  }
+
+  // ── Auto-populate Grids from detected_groups (scale type) — user can remove ──
+  const scaleGroups = detectedGroups.filter(g => g.question_type === 'scale');
+  if (scaleGroups.length > 0) {
+    for (const g of scaleGroups) {
+      const name = g.display_name || g.name || 'Grid';
+      const vars = g.variables || [];
+      if (vars.length >= 2) {
+        gridGroups[name] = { variables: vars, show: ['t2b', 'b2b', 'mean'] };
+      }
+    }
+    renderGridGroups();
+    _showAutoDetectBadge('grid-groups', `${scaleGroups.length} grid(s) auto-detected`);
+  }
+
+  // ── Auto-select first suggested banner (or first available) ──
+  const firstSuggested = suggested.length > 0 ? suggested[0] : (rest.length > 0 ? rest[0] : null);
+  if (firstSuggested) {
+    const chip = chipsEl.querySelector(`.chip[data-varname="${firstSuggested.name}"]`);
+    if (chip) toggleBanner(firstSuggested.name, chip);
+  }
   updateSummary();
+}
+
+function _makeBannerChip(v, isSuggested) {
+  const vl = v.value_labels ? Object.keys(v.value_labels).length : 0;
+  const chip = document.createElement('button');
+  chip.className = 'chip';
+  const shortLabel = v.label || v.name;
+  const badge = isSuggested ? '<span class="ml-1 px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-semibold">AI</span>' : '';
+  chip.innerHTML = `<span class="font-medium">${shortLabel}</span> <span class="text-gray-400 text-xs">(${vl})</span>${badge}`;
+  chip.title = `${v.name}: ${v.label || ''} \u2014 ${vl} categories${isSuggested ? ' (recommended by AI)' : ''}`;
+  chip.dataset.varname = v.name;
+  chip.addEventListener('click', () => toggleBanner(v.name, chip));
+  return chip;
+}
+
+function _showAutoDetectBadge(containerId, text) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const badge = document.createElement('div');
+  badge.className = 'text-xs text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5 flex items-center gap-1.5 mb-2 fade-in';
+  badge.innerHTML = `<span class="font-semibold">Auto-detected:</span> ${text}. You can edit or remove these.`;
+  container.parentNode.insertBefore(badge, container);
 }
 
 // ── Banner selection ──
@@ -746,17 +823,25 @@ async function generate() {
   const weight = document.getElementById('weight-select').value;
   if (weight) spec.weight = weight;
 
-  // Auto T2B/B2B
+  // Auto T2B/B2B — use preset_nets from backend when available, else local detection
   if (document.getElementById('opt-t2b').checked) {
+    spec.nets = {};
+    const bannerSet = new Set(selectedBanners);
+    const presetNets = metadata.preset_nets || {};
+    if (Object.keys(presetNets).length > 0) {
+      // Use backend-detected nets (Likert-5, Likert-7, NPS scales)
+      for (const [varName, nets] of Object.entries(presetNets)) {
+        if (!bannerSet.has(varName)) spec.nets[varName] = nets;
+      }
+    }
+    // Also add any scales not covered by presets (local fallback)
     const scales = detectScaleVars();
-    if (scales.length > 0) {
-      spec.nets = {};
-      const bannerSet = new Set(selectedBanners);
-      for (const s of scales) {
-        if (bannerSet.has(s.name)) continue;
+    for (const s of scales) {
+      if (!spec.nets[s.name] && !bannerSet.has(s.name)) {
         spec.nets[s.name] = { 'Top 2 Box': s.values.slice(-2), 'Bottom 2 Box': s.values.slice(0, 2) };
       }
     }
+    if (Object.keys(spec.nets).length === 0) delete spec.nets;
   }
 
   // MRS
