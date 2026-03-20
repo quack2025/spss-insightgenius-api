@@ -616,12 +616,25 @@ class QuantiProEngine:
         if col not in df.columns:
             raise ValueError(f"Column variable '{col}' not found in dataset")
 
-        # Try MRX native crosstab first
+        # Try MRX native crosstab first — validate result before using
         if data.mrx_dataset is not None:
             try:
                 result = _crosstab_via_mrx(data, row, col, weight, significance_level)
                 if result is not None:
-                    return result
+                    # Sanity check: MRX result should have similar total to pandas
+                    pandas_total = len(df[[row, col]].dropna())
+                    mrx_total = result.get("total_responses", 0)
+                    # Also check that we have reasonable number of columns
+                    n_pandas_cols = len(df[col].dropna().unique())
+                    n_mrx_cols = len(result.get("col_labels", {}))
+                    if mrx_total > 0 and n_mrx_cols >= n_pandas_cols * 0.5:
+                        return result
+                    else:
+                        logger.warning(
+                            "MRX crosstab sanity check failed for %s x %s: "
+                            "mrx_total=%d vs pandas=%d, mrx_cols=%d vs pandas=%d. Falling back.",
+                            row, col, mrx_total, pandas_total, n_mrx_cols, n_pandas_cols,
+                        )
             except Exception as e:
                 logger.warning("MRX crosstab failed for %s x %s, falling back to pandas: %s", row, col, e)
 
