@@ -42,5 +42,7 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8000}/v1/health || exit 1
 
-# Single worker: CPU-bound SPSS processing is memory-heavy. Scale via Railway replicas.
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
+# Multi-worker: gunicorn manages worker processes, uvicorn handles async I/O.
+# WEB_CONCURRENCY env var overrides worker count (Railway can set this).
+# Default: 4 workers. Each handles ~50 concurrent light requests.
+CMD ["sh", "-c", "gunicorn main:app --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-4} --worker-class uvicorn.workers.UvicornWorker --timeout 120 --graceful-timeout 30 --keep-alive 5 --max-requests 1000 --max-requests-jitter 50"]

@@ -6,6 +6,7 @@ import time
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 
 from auth import require_scope, KeyConfig
+from middleware.processing import run_in_executor
 from services.quantipy_engine import QuantiProEngine, QUANTIPYMRX_AVAILABLE
 
 router = APIRouter(tags=["Metadata"])
@@ -33,8 +34,10 @@ async def metadata(
         raise HTTPException(400, detail={"code": "INVALID_FILE_FORMAT", "message": "Empty file"})
 
     try:
-        data = await asyncio.to_thread(QuantiProEngine.load_spss, file_bytes, file.filename or "upload.sav")
-        result = await asyncio.to_thread(QuantiProEngine.extract_metadata, data)
+        data = await run_in_executor(QuantiProEngine.load_spss, file_bytes, file.filename or "upload.sav")
+        result = await run_in_executor(QuantiProEngine.extract_metadata, data)
+    except (asyncio.TimeoutError, RuntimeError):
+        raise  # handled by global exception handlers (504 / 503)
     except Exception as e:
         raise HTTPException(500, detail={"code": "PROCESSING_FAILED", "message": str(e)})
 

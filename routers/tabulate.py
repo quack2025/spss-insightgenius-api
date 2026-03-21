@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import StreamingResponse
 
 from auth import KeyConfig, require_scope
+from middleware.processing import run_in_executor
 from services.quantipy_engine import QuantiProEngine
 from services.tabulation_builder import TabulateSpec, build_tabulation
 
@@ -109,9 +110,11 @@ async def tabulate(
 
     # ── Load SPSS ──
     try:
-        data = await asyncio.to_thread(
+        data = await run_in_executor(
             QuantiProEngine.load_spss, file_bytes, file.filename or "upload.sav"
         )
+    except (asyncio.TimeoutError, RuntimeError):
+        raise
     except Exception as e:
         raise HTTPException(400, detail={"code": "INVALID_FILE_FORMAT", "message": f"Failed to load SPSS file: {e}"})
 
@@ -143,9 +146,11 @@ async def tabulate(
 
     # ── Run tabulation ──
     try:
-        result = await asyncio.to_thread(
+        result = await run_in_executor(
             build_tabulation, QuantiProEngine, data, tab_spec,
         )
+    except (asyncio.TimeoutError, RuntimeError):
+        raise
     except Exception as e:
         logger.error("Tabulation failed [%s]: %s", request_id, e, exc_info=True)
         raise HTTPException(500, detail={"code": "PROCESSING_FAILED", "message": str(e)})

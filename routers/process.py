@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 
 from auth import require_scope, KeyConfig
 from config import get_settings
+from middleware.processing import run_in_executor
 from services.quantipy_engine import QuantiProEngine, QUANTIPYMRX_AVAILABLE
 
 logger = logging.getLogger(__name__)
@@ -33,27 +34,29 @@ async def _execute_operation(data, op: dict, op_id: str) -> dict:
 
     try:
         if op_type == "frequency":
-            result = await asyncio.to_thread(QuantiProEngine.frequency, data, variable, weight)
+            result = await run_in_executor(QuantiProEngine.frequency, data, variable, weight)
         elif op_type == "crosstab":
             cross_var = op.get("cross_variable", "")
             sig = params.get("significance_level", 0.95)
-            result = await asyncio.to_thread(
+            result = await run_in_executor(
                 QuantiProEngine.crosstab_with_significance, data, variable, cross_var, weight, sig
             )
         elif op_type == "nps":
-            result = await asyncio.to_thread(QuantiProEngine.nps, data, variable, weight)
+            result = await run_in_executor(QuantiProEngine.nps, data, variable, weight)
         elif op_type == "top_bottom_box":
             top_vals = params.get("top_values")
             bot_vals = params.get("bottom_values")
-            result = await asyncio.to_thread(QuantiProEngine.top_bottom_box, data, variable, top_vals, bot_vals)
+            result = await run_in_executor(QuantiProEngine.top_bottom_box, data, variable, top_vals, bot_vals)
         elif op_type == "nets":
             net_defs = params.get("net_definitions", {})
-            result = await asyncio.to_thread(QuantiProEngine.nets, data, variable, net_defs)
+            result = await run_in_executor(QuantiProEngine.nets, data, variable, net_defs)
         else:
             return {"operation_id": op_id, "type": op_type, "variable": variable, "status": "error", "data": None, "error": f"Unknown operation type: {op_type}"}
 
         return {"operation_id": op_id, "type": op_type, "variable": variable, "status": "success", "data": result, "error": None}
 
+    except (asyncio.TimeoutError, RuntimeError):
+        raise  # handled by global exception handlers (504 / 503)
     except Exception as e:
         return {"operation_id": op_id, "type": op_type, "variable": variable, "status": "error", "data": None, "error": str(e)}
 
@@ -76,12 +79,14 @@ async def process(
 
     # Load SPSS
     try:
-        data = await asyncio.to_thread(QuantiProEngine.load_spss, file_bytes, file.filename or "upload.sav")
+        data = await run_in_executor(QuantiProEngine.load_spss, file_bytes, file.filename or "upload.sav")
+    except (asyncio.TimeoutError, RuntimeError):
+        raise
     except Exception as e:
         raise HTTPException(500, detail={"code": "PROCESSING_FAILED", "message": f"Failed to load SPSS: {e}"})
 
     # Extract metadata
-    metadata = await asyncio.to_thread(QuantiProEngine.extract_metadata, data)
+    metadata = await run_in_executor(QuantiProEngine.extract_metadata, data)
 
     # Determine operations
     ops_list = []

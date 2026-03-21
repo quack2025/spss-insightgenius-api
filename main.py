@@ -1,5 +1,6 @@
 """QuantiPro API — SPSS processing microservice powered by QuantipyMRX + Haiku."""
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -82,6 +83,44 @@ def create_application() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Timeout handler — from run_in_executor
+    @app.exception_handler(asyncio.TimeoutError)
+    async def timeout_handler(request: Request, exc: asyncio.TimeoutError):
+        request_id = getattr(request.state, "request_id", "")
+        logger.warning("Processing timeout [%s]", request_id)
+        return JSONResponse(
+            status_code=504,
+            content={
+                "success": False,
+                "error": {
+                    "code": "PROCESSING_TIMEOUT",
+                    "message": f"Processing exceeded {settings.processing_timeout_seconds}s limit. Try a smaller file or fewer stubs.",
+                },
+                "request_id": request_id,
+            },
+        )
+
+    # Concurrency overload handler — from run_in_executor
+    @app.exception_handler(RuntimeError)
+    async def runtime_error_handler(request: Request, exc: RuntimeError):
+        request_id = getattr(request.state, "request_id", "")
+        if "too many files" in str(exc).lower():
+            logger.warning("Concurrency limit hit [%s]: %s", request_id, exc)
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "success": False,
+                    "error": {
+                        "code": "SERVER_BUSY",
+                        "message": str(exc),
+                    },
+                    "request_id": request_id,
+                },
+                headers={"Retry-After": "5"},
+            )
+        # Not a concurrency error — fall through to global handler
+        return await global_exception_handler(request, exc)
 
     # Global exception handler
     @app.exception_handler(Exception)
