@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 mcp = FastMCP(
     "SPSS InsightGenius",
-    description=(
+    instructions=(
         "MCP server for SPSS (.sav) file processing and market research analysis. "
         "Provides tools for metadata extraction, frequency tables, crosstabs with "
         "significance testing (A/B/C letters), and full tabulation to Excel.\n\n"
@@ -65,8 +65,9 @@ def _decode_spss(file_base64: str) -> bytes:
 
 
 # ── Tools ─────────────────────────────────────────────────────────────────────
+# Functions are defined as plain async callables so tests can import and call
+# them directly. MCP registration is done below via mcp.tool()(fn).
 
-@mcp.tool()
 async def get_spss_metadata(
     api_key: str,
     file_base64: str,
@@ -94,7 +95,6 @@ async def get_spss_metadata(
     return result
 
 
-@mcp.tool()
 async def get_variable_info(
     api_key: str,
     file_base64: str,
@@ -133,7 +133,6 @@ async def get_variable_info(
     return [var_map[v] for v in variables]
 
 
-@mcp.tool()
 async def analyze_frequencies(
     api_key: str,
     file_base64: str,
@@ -168,7 +167,6 @@ async def analyze_frequencies(
     return result
 
 
-@mcp.tool()
 async def analyze_crosstabs(
     api_key: str,
     file_base64: str,
@@ -214,7 +212,6 @@ async def analyze_crosstabs(
     return result
 
 
-@mcp.tool()
 async def export_data(
     api_key: str,
     file_base64: str,
@@ -265,7 +262,6 @@ async def export_data(
     }
 
 
-@mcp.tool()
 async def create_tabulation(
     api_key: str,
     file_base64: str,
@@ -339,7 +335,6 @@ async def create_tabulation(
     }
 
 
-@mcp.tool()
 async def list_files(api_key: str) -> dict[str, Any]:
     """Return API capabilities and connection info for the authenticated user.
 
@@ -389,6 +384,19 @@ async def list_files(api_key: str) -> dict[str, Any]:
     }
 
 
+# Register all functions as MCP tools (without overwriting the callable names)
+for _fn in [
+    get_spss_metadata,
+    get_variable_info,
+    analyze_frequencies,
+    analyze_crosstabs,
+    export_data,
+    create_tabulation,
+    list_files,
+]:
+    mcp.tool()(_fn)
+
+
 # ── ASGI app factory ──────────────────────────────────────────────────────────
 
 def get_mcp_asgi_app():
@@ -397,4 +405,4 @@ def get_mcp_asgi_app():
     SSE endpoint:  GET  /mcp/sse
     Post endpoint: POST /mcp/messages/
     """
-    return mcp.sse_app()
+    return mcp.http_app(transport="sse")
