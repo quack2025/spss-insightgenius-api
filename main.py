@@ -35,7 +35,13 @@ async def lifespan(app: FastAPI):
     if not settings.anthropic_api_key:
         logger.warning("ANTHROPIC_API_KEY not set — ticket parsing and smart labeling will be disabled")
 
+    # Start MCP Redis relay for cross-replica SSE session routing
+    from routers.mcp_server import start_redis_relay, stop_redis_relay
+    await start_redis_relay()
+
     yield
+
+    await stop_redis_relay()
     logger.info("Shutting down %s", settings.app_name)
 
 
