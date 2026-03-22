@@ -158,6 +158,10 @@ def create_application() -> FastAPI:
     app.include_router(process_router)
     app.include_router(tabulate_router)
 
+    # MCP server (SSE transport) — mounted at /mcp/
+    from routers.mcp_server import get_mcp_asgi_app
+    app.mount("/mcp", get_mcp_asgi_app())
+
     # Serve frontend
     public_dir = Path(__file__).parent / "public"
     if public_dir.exists():

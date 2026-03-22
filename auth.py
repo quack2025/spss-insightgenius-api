@@ -86,6 +86,28 @@ async def require_auth(request: Request) -> KeyConfig:
     return matched_config
 
 
+def get_key_config(raw_key: str) -> KeyConfig:
+    """Validate a raw API key and return its KeyConfig.
+
+    Unlike require_auth (FastAPI dependency), this is a plain function suitable
+    for use outside the request/response cycle (e.g., MCP tool handlers).
+
+    Raises:
+        ValueError: If the key is missing, malformed, or not found.
+    """
+    if not raw_key:
+        raise ValueError("API key is required")
+    if not raw_key.startswith(("sk_live_", "sk_test_")):
+        raise ValueError("Invalid API key format. Keys must start with sk_live_ or sk_test_")
+
+    key_hash = _hash_key(raw_key)
+    for stored_hash, config in _KEY_REGISTRY.items():
+        if hmac.compare_digest(key_hash, stored_hash):
+            return config
+
+    raise ValueError("Invalid API key")
+
+
 def require_scope(scope: str):
     """Factory: returns a dependency that checks the key has a specific scope."""
 
