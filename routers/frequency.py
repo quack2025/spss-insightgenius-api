@@ -6,6 +6,7 @@ import time
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
 from auth import require_scope, KeyConfig
+from middleware.processing import run_in_executor
 from services.quantipy_engine import QuantiProEngine, QUANTIPYMRX_AVAILABLE
 
 router = APIRouter(tags=["Analysis"])
@@ -35,12 +36,16 @@ async def frequency(
         raise HTTPException(400, detail={"code": "INVALID_FILE_FORMAT", "message": "Empty file"})
 
     try:
-        data = await asyncio.to_thread(QuantiProEngine.load_spss, file_bytes, file.filename or "upload.sav")
+        data = await run_in_executor(QuantiProEngine.load_spss, file_bytes, file.filename or "upload.sav")
+    except (asyncio.TimeoutError, RuntimeError):
+        raise
     except Exception as e:
         raise HTTPException(500, detail={"code": "PROCESSING_FAILED", "message": f"Failed to load SPSS: {e}"})
 
     try:
-        result = await asyncio.to_thread(QuantiProEngine.frequency, data, variable, weight)
+        result = await run_in_executor(QuantiProEngine.frequency, data, variable, weight)
+    except (asyncio.TimeoutError, RuntimeError):
+        raise
     except ValueError as e:
         raise HTTPException(400, detail={"code": "VARIABLE_NOT_FOUND", "message": str(e)})
     except Exception as e:

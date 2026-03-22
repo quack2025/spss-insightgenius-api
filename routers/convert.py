@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import Response
 
 from auth import require_scope, KeyConfig
+from middleware.processing import run_in_executor
 from services.quantipy_engine import QuantiProEngine
 from services.converter import FormatConverter
 
@@ -42,14 +43,18 @@ async def convert(
         raise HTTPException(400, detail={"code": "INVALID_FILE_FORMAT", "message": "Empty file"})
 
     try:
-        data = await asyncio.to_thread(QuantiProEngine.load_spss, file_bytes, file.filename or "upload.sav")
+        data = await run_in_executor(QuantiProEngine.load_spss, file_bytes, file.filename or "upload.sav")
+    except (asyncio.TimeoutError, RuntimeError):
+        raise
     except Exception as e:
         raise HTTPException(500, detail={"code": "PROCESSING_FAILED", "message": f"Failed to load SPSS: {e}"})
 
     try:
-        output_bytes, content_type, extension = await asyncio.to_thread(
+        output_bytes, content_type, extension = await run_in_executor(
             FormatConverter.convert, data.df, data.meta, target_format, apply_labels, include_metadata_sheet
         )
+    except (asyncio.TimeoutError, RuntimeError):
+        raise
     except Exception as e:
         raise HTTPException(500, detail={"code": "PROCESSING_FAILED", "message": str(e)})
 

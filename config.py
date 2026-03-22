@@ -35,6 +35,10 @@ class Settings(BaseSettings):
 
     # Processing
     processing_timeout_seconds: int = 120
+    max_concurrent_processing: int = 3  # max SPSS files processing per worker
+
+    # Redis (for distributed rate limiting — optional, falls back to in-memory)
+    redis_url: str = ""
 
     # CORS
     cors_origins: str = '["*"]'
