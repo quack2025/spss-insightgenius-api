@@ -40,8 +40,8 @@ def test_list_files_valid_key():
     result = run(list_files(api_key=TEST_KEY))
     assert result["key_name"] == "Test Key"
     assert result["plan"] == "pro"
-    assert "get_spss_metadata" in [t["name"] for t in result["available_tools"]]
-    assert result["stateless"] is True
+    assert "spss_get_metadata" in [t["name"] for t in result["available_tools"]]
+    assert result.get("file_sessions_enabled") is not None
 
 
 def test_list_files_invalid_key():
@@ -70,11 +70,16 @@ def test_get_spss_metadata(test_sav_bytes):
         file_base64=_b64(test_sav_bytes),
         filename="survey.sav",
     ))
-    assert result["n_cases"] == 100
-    assert result["n_variables"] == 5
-    var_names = [v["name"] for v in result["variables"]]
+    # v2 wraps in build_mcp_response envelope
+    assert result["tool"] == "spss_get_metadata"
+    data = result["results"]
+    assert data["n_cases"] == 100
+    assert data["n_variables"] == 5
+    var_names = [v["name"] for v in data["variables"]]
     assert "gender" in var_names
     assert "satisfaction" in var_names
+    assert "insight_summary" in result
+    assert "content_blocks" in result
 
 
 def test_get_spss_metadata_invalid_base64():
@@ -103,8 +108,11 @@ def test_get_variable_info(test_sav_bytes):
         file_base64=_b64(test_sav_bytes),
         variables=["gender", "satisfaction"],
     ))
-    assert len(result) == 2
-    names = [v["name"] for v in result]
+    # v2 wraps in build_mcp_response envelope
+    assert result["tool"] == "spss_describe_variable"
+    data = result["results"]
+    assert len(data["variables"]) == 2
+    names = [v["name"] for v in data["variables"]]
     assert "gender" in names
     assert "satisfaction" in names
 
@@ -206,7 +214,7 @@ def test_export_data_formats(test_sav_bytes, fmt):
 
 def test_export_data_invalid_format(test_sav_bytes):
     from fastmcp.exceptions import ToolError
-    with pytest.raises(ToolError, match="Invalid target_format"):
+    with pytest.raises(ToolError, match="Invalid format"):
         run(export_data(
             api_key=TEST_KEY,
             file_base64=_b64(test_sav_bytes),
@@ -224,10 +232,13 @@ def test_create_tabulation(test_sav_bytes):
         stubs=["satisfaction"],
         title="Test Tabulation",
     ))
-    assert "data_base64" in result
+    # v2 wraps in build_mcp_response envelope
+    assert result["tool"] == "spss_create_tabulation"
     assert result["filename"].endswith(".xlsx")
-    assert result["total_stubs"] >= 1
-    # Verify output is a valid (non-empty) Excel file
+    data = result["results"]
+    assert data["total_stubs"] >= 1
+    # base64 fallback when Redis is not available
+    assert "data_base64" in result
     excel_bytes = base64.b64decode(result["data_base64"])
     assert excel_bytes[:4] == b"PK\x03\x04"  # ZIP magic = valid xlsx
 
@@ -238,7 +249,9 @@ def test_create_tabulation_all_stubs(test_sav_bytes):
         file_base64=_b64(test_sav_bytes),
         banner="gender",
     ))
-    assert result["total_stubs"] >= 1
+    data = result["results"]
+    assert data["total_stubs"] >= 1
+    assert "data_base64" in result
     excel_bytes = base64.b64decode(result["data_base64"])
     assert excel_bytes[:4] == b"PK\x03\x04"
 
