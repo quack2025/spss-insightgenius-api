@@ -1,8 +1,8 @@
 # SPSS InsightGenius API
 
-**Professional SPSS processing API for market research.** Upload .sav files, get crosstabs with significance testing, auto-detected question types, and publication-ready Excel exports.
+**Professional SPSS processing API + MCP server for market research.** Upload .sav files, get crosstabs with significance testing, auto-detected question types, and publication-ready Excel exports. Includes AI-powered zero-config analysis.
 
-**Live**: [spss.insightgenius.io](https://spss.insightgenius.io) | **API Docs**: [spss.insightgenius.io/docs](https://spss.insightgenius.io/docs)
+**Live**: [spss.insightgenius.io](https://spss.insightgenius.io) | **API Docs**: [spss.insightgenius.io/docs](https://spss.insightgenius.io/docs) | **MCP**: `spss.insightgenius.io/mcp/sse`
 
 ---
 
@@ -12,21 +12,40 @@
 
 1. Open [spss.insightgenius.io](https://spss.insightgenius.io)
 2. Drag & drop your `.sav` file
-3. Select a banner variable (e.g., Gender, Region)
-4. Check Top 2 Box / Means options
-5. Click **Generate Excel** → download your tabulation
+3. Click **Auto-Analyze** for instant results, or configure manually:
+   - Select banner variables (demographics for columns)
+   - Choose stubs (questions for rows)
+   - Enable Top 2 Box / Means
+4. Click **Generate Excel** → download your tabulation
 
-### Option 2: curl
+### Option 2: Auto-Analyze (zero config)
+
+```bash
+curl -X POST https://spss.insightgenius.io/v1/auto-analyze \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -F "file=@survey.sav" \
+  -o auto_analysis.xlsx
+```
+
+AI auto-detects banners, groups variables into MRS/Grid, applies nets, and generates a complete Excel.
+
+### Option 3: Full Control
 
 ```bash
 curl -X POST https://spss.insightgenius.io/v1/tabulate \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -F "file=@survey.sav" \
-  -F 'spec={"banner":"region","stubs":["_all_"],"significance_level":0.95}' \
-  -o tabulation.xlsx
+  -F 'spec={
+    "banners": ["gender", "region", "age_group"],
+    "stubs": ["_all_"],
+    "significance_level": 0.95,
+    "include_means": true,
+    "nets": {"sat_overall": {"Top 2 Box": [4,5], "Bottom 2 Box": [1,2]}},
+    "mrs_groups": {"Brand_Awareness": ["AWARE_A","AWARE_B","AWARE_C"]}
+  }' -o tabulation.xlsx
 ```
 
-### Option 3: Python
+### Option 4: Python
 
 ```python
 import requests, json
@@ -36,91 +55,97 @@ resp = requests.post(
     headers={"Authorization": "Bearer YOUR_API_KEY"},
     files={"file": open("survey.sav", "rb")},
     data={"spec": json.dumps({
-        "banner": "region",
+        "banners": ["gender", "region"],
         "stubs": ["_all_"],
+        "include_means": True,
         "significance_level": 0.95,
-        "nets": {
-            "sat_overall": {"Top 2 Box": [4, 5], "Bottom 2 Box": [1, 2]}
-        }
     })}
 )
-
 with open("tabulation.xlsx", "wb") as f:
     f.write(resp.content)
 print(f"Done: {resp.headers['X-Stubs-Success']} tables generated")
 ```
 
+### Option 5: MCP (for AI agents)
+
+Connect to `https://spss.insightgenius.io/mcp/sse` and use any of the 12 tools. Files are passed as base64.
+
 ---
 
-## Endpoints
+## Endpoints (14)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| **POST** | `/v1/tabulate` | **Full tabulation → Excel** with sig letters, nets, bases |
-| POST | `/v1/metadata` | Variable names, labels, types, auto-detect |
-| POST | `/v1/frequency` | Frequency table (counts + %) |
-| POST | `/v1/crosstab` | Single crosstab with significance letters (A/B/C) |
+| **POST** | `/v1/auto-analyze` | **Zero-config** — upload .sav, get complete Excel (AI-detected banners, MRS, grids, nets) |
+| **POST** | `/v1/tabulate` | **Full tabulation → Excel** with sig letters, nets, means, MRS, grids, custom groups. Accepts optional .docx Reporting Ticket. |
+| POST | `/v1/metadata` | Variable metadata + suggested banners + detected groups + preset nets |
+| POST | `/v1/frequency` | Frequency table (counts, %, mean, std, median) |
+| POST | `/v1/crosstab` | Single crosstab with sig letters (A/B/C) + chi-square p-value |
+| POST | `/v1/correlation` | Correlation matrix (Pearson/Spearman/Kendall) with p-values |
+| POST | `/v1/anova` | One-way ANOVA with Tukey HSD post-hoc comparisons |
+| POST | `/v1/gap-analysis` | Importance-Performance gap analysis with quadrants |
+| POST | `/v1/satisfaction-summary` | Compact T2B/B2B/Mean for multiple scale variables |
 | POST | `/v1/process` | Multi-operation pipeline (auto-detect or manual) |
 | POST | `/v1/convert` | Convert .sav → xlsx, csv, parquet, dta |
-| POST | `/v1/parse-ticket` | Parse Reporting Ticket .docx → tab plan (AI) |
-| GET | `/v1/health` | Health check |
+| POST | `/v1/parse-ticket` | Parse Reporting Ticket .docx → tab plan (Haiku AI) |
+| GET | `/v1/health` | Health check + engine status |
 | GET | `/v1/usage` | Usage stats for your API key |
+
+## MCP Tools (12)
+
+| Tool | Description |
+|------|-------------|
+| `get_spss_metadata` | Variable metadata + auto-detect |
+| `get_variable_info` | Single variable detail |
+| `analyze_frequencies` | Frequency table |
+| `analyze_crosstabs` | Crosstab with sig letters |
+| `analyze_correlation` | Correlation matrix |
+| `analyze_anova` | ANOVA + Tukey HSD |
+| `analyze_gap` | Gap analysis with quadrants |
+| `summarize_satisfaction` | Satisfaction summary |
+| `create_tabulation` | Full tabulation → Excel (base64) |
+| `auto_analyze` | Zero-config → Excel (base64) |
+| `export_data` | Format conversion |
+| `list_files` | Available tools |
 
 ---
 
-## POST /v1/tabulate — Full Tabulation
-
-The core endpoint. Upload `.sav` + spec → professional Excel workbook.
-
-### Spec Fields
+## Tabulate Spec
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `banner` | string | *required* | Demographic to cross by |
-| `stubs` | string[] | `["_all_"]` | Questions to analyze (`_all_` = auto-select) |
+| `banners` | string[] | *required* | Demographics for columns (e.g., `["gender", "region"]`) |
+| `stubs` | string[] | `["_all_"]` | Questions for rows (`_all_` = auto-select all) |
 | `significance_level` | float | `0.95` | 0.90, 0.95, or 0.99 |
 | `weight` | string | `null` | Weight variable name |
-| `nets` | object | `null` | Per-variable net definitions (see below) |
+| `include_means` | bool | `false` | Add Mean row with T-test sig letters |
+| `include_total_column` | bool | `true` | Total as first column |
+| `output_mode` | string | `"multi_sheet"` | `"multi_sheet"` or `"single_sheet"` |
+| `nets` | object | `null` | Per-variable net definitions |
+| `mrs_groups` | object | `null` | MRS groups: `{"name": ["var1", "var2"]}` |
+| `grid_groups` | object | `null` | Grid groups: `{"name": {"variables": [...], "show": ["t2b","mean"]}}` |
+| `custom_groups` | array | `null` | Custom breaks with AND conditions |
 | `title` | string | `""` | Report title |
-
-### Nets
-
-```json
-{
-  "nets": {
-    "satisfaction": {
-      "Top 2 Box": [4, 5],
-      "Bottom 2 Box": [1, 2]
-    }
-  }
-}
-```
 
 ### Excel Output
 
 - **Summary sheet**: file info, column legend (A=London, B=South East...), stub index
-- **One sheet per stub**: headers → letters → base (N) → data with `pct% SIG_LETTERS` → nets
-- Significance letters in red (e.g., `60.0% C` = sig higher than column C)
-- Nets in green rows
-
-### Response Headers
-
-```
-X-Stubs-Total: 17
-X-Stubs-Success: 17
-X-Stubs-Failed: 0
-X-Processing-Time-Ms: 359
-```
+- **One sheet per stub**: headers → letters → base (N) → data with `pct% SIG_LETTERS` → nets → means
+- **MRS sheets**: one per group, percentages can exceed 100%
+- **Grid sheets**: compact T2B/B2B/Mean summary
+- Significance letters in red, nets in green rows
+- Freeze panes for scrolling
 
 ---
 
 ## Significance Testing
 
 Column proportion z-test with letter notation (A/B/C):
-- Each column gets a letter (A, B, C...)
+- Each banner category gets a letter (e.g., Male=A, Female=B, London=C, North=D)
 - Each cell tested vs every other column
-- Significantly higher → other column's letter appears
+- Significantly higher → other column's letter appears (e.g., `68.6% E` means sig higher than column E)
 - Supports weighted (Kish effective-n) and unweighted
+- Means tested with independent T-test
 - Confidence levels: 90%, 95%, 99%
 
 ---
@@ -131,11 +156,12 @@ All endpoints require: `Authorization: Bearer sk_live_...` or `sk_test_...`
 
 ### Rate Limits
 
-| Plan | Requests/min | Max file size |
-|------|-------------|---------------|
-| Free | 10 | 5 MB |
-| Pro | 60 | 50 MB |
-| Business | 200 | 200 MB |
+| Plan | Requests/min | Max file | Price |
+|------|-------------|----------|-------|
+| Free | 10 | 5 MB | $0 |
+| Growth | 60 | 50 MB | $29/mo |
+| Business | 200 | 200 MB | $99/mo |
+| Enterprise | Unlimited | 500 MB | Custom |
 
 ### Error Codes
 
@@ -148,6 +174,7 @@ All endpoints require: `Authorization: Bearer sk_live_...` or `sk_test_...`
 | `FILE_TOO_LARGE` | 413 | Exceeds plan limit |
 | `VARIABLE_NOT_FOUND` | 400 | Variable doesn't exist |
 | `PROCESSING_FAILED` | 500 | Engine error |
+| `PROCESSING_TIMEOUT` | 504 | Exceeded time limit |
 
 ---
 
@@ -159,7 +186,7 @@ cd spss-insightgenius-api
 pip install -r requirements.txt
 cp .env.example .env  # Edit with your API key hash
 python main.py        # → http://localhost:8000
-python -m pytest tests/ -v  # 29 tests
+python -m pytest tests/ -v  # 68 tests
 ```
 
 ## Stack
@@ -167,9 +194,11 @@ python -m pytest tests/ -v  # 29 tests
 | Layer | Technology |
 |-------|-----------|
 | API | FastAPI + Pydantic v2 |
-| Engine | QuantipyMRX (crosstab, sig testing, auto-detect) |
-| AI | Claude Haiku (ticket parsing, smart labels) |
+| Engine | QuantipyMRX (crosstab, sig testing, auto-detect, MRS, NPS) |
+| AI | Claude Haiku (ticket parsing, smart labels, executive summary) |
 | Auth | API keys (SHA256, no DB) |
-| Deploy | Railway (Docker, auto-deploy) |
+| Rate Limiting | Redis (fallback: in-memory) |
+| MCP | FastMCP with SSE transport |
+| Deploy | Railway (Docker, Gunicorn, 4 replicas, auto-deploy) |
 
 Built by [Genius Labs](https://github.com/quack2025).
