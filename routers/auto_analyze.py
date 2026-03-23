@@ -3,7 +3,10 @@
 import asyncio
 import io
 import json
+import logging
 import time
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
