@@ -26,7 +26,7 @@ def _run_auto_analyze(file_bytes: bytes, filename: str, options: dict):
     """
     # Step 1: Load and extract metadata
     data = QuantiProEngine.load_spss(file_bytes, filename)
-    meta = QuantiProEngine.extract_metadata(data, filename)
+    meta = QuantiProEngine.extract_metadata(data)
 
     # Step 2: Pick banners
     suggested = meta.get("suggested_banners", [])
