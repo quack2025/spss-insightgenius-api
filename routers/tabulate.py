@@ -60,6 +60,7 @@ async def tabulate(
     request: Request,
     file: UploadFile = File(..., description=".sav file to tabulate"),
     spec: str = Form(..., description="JSON tabulation specification"),
+    ticket: UploadFile | None = File(None, description="Optional .docx Reporting Ticket — Haiku parses it into a tab plan"),
     key: KeyConfig = Depends(require_scope("process")),
 ):
     start = time.perf_counter()
@@ -83,6 +84,47 @@ async def tabulate(
         spec_dict = json.loads(spec)
     except json.JSONDecodeError as e:
         raise HTTPException(400, detail={"code": "INVALID_SPEC", "message": f"Invalid JSON in spec: {e}"})
+
+    # ── Ticket parsing (Haiku) — overrides spec with extracted tab plan ──
+    if ticket and ticket.filename and ticket.filename.lower().endswith(".docx"):
+        try:
+            from services.ticket_parser import TicketParser
+            ticket_bytes = await ticket.read()
+            parser = TicketParser()
+
+            # Load SPSS first for variable list context
+            data_for_vars = await run_in_executor(
+                QuantiProEngine.load_spss, file_bytes, file.filename or "upload.sav"
+            )
+            var_info = [
+                {"name": c, "label": "", "type": str(data_for_vars.df[c].dtype)}
+                for c in data_for_vars.df.columns
+            ]
+            ticket_plan = await parser.parse(ticket_bytes, available_variables=var_info)
+
+            # Extract banner and stubs from ticket plan
+            if ticket_plan.get("operations"):
+                # Find cross_variables used (those are banners)
+                cross_vars = set()
+                stub_vars = []
+                for op in ticket_plan["operations"]:
+                    if op.get("cross_variable"):
+                        cross_vars.add(op["cross_variable"])
+                    if op.get("variable"):
+                        stub_vars.append(op["variable"])
+
+                if cross_vars and not spec_dict.get("banners") and not spec_dict.get("banner"):
+                    spec_dict["banners"] = list(cross_vars)
+                if stub_vars and spec_dict.get("stubs", ["_all_"]) == ["_all_"]:
+                    spec_dict["stubs"] = stub_vars
+                if ticket_plan.get("weight") and not spec_dict.get("weight"):
+                    spec_dict["weight"] = ticket_plan["weight"]
+
+            logger.info("[TICKET] Parsed ticket: %d operations, banners=%s", len(ticket_plan.get("operations", [])), spec_dict.get("banners"))
+        except ValueError as e:
+            logger.warning("Ticket parsing skipped (no API key?): %s", e)
+        except Exception as e:
+            logger.warning("Ticket parsing failed, continuing with manual spec: %s", e)
 
     banner = spec_dict.get("banner", "")
     banners = spec_dict.get("banners")
