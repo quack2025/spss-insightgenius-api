@@ -26,17 +26,15 @@ def _run_correlation(file_bytes: bytes, filename: str, spec: dict):
         raise ValueError("At least 2 variables required for correlation analysis")
 
     for v in variables:
-        if v not in data["df"].columns:
+        if v not in data.df.columns:
             raise ValueError(f"Variable '{v}' not found in dataset")
 
-    if not QUANTIPYMRX_AVAILABLE:
+    if not QUANTIPYMRX_AVAILABLE or data.mrx_dataset is None:
         raise RuntimeError("QuantipyMRX required for correlation analysis")
 
-    from quantipymrx import DataSet
     from quantipymrx.analysis.significance import correlation_matrix
 
-    ds = DataSet.from_spss(data["tmp_path"])
-    corr_df, pval_df = correlation_matrix(ds, variables=variables, method=method)
+    corr_df, pval_df = correlation_matrix(data.mrx_dataset, variables=variables, method=method)
 
     # Convert DataFrames to serializable dicts, handling NaN
     def _clean(val):
@@ -65,7 +63,7 @@ def _run_correlation(file_bytes: bytes, filename: str, spec: dict):
     return {
         "variables": variables,
         "method": method,
-        "n_cases": len(data["df"]),
+        "n_cases": len(data.df),
         "matrix": matrix,
         "p_values": p_values,
         "significant_pairs": significant_pairs,

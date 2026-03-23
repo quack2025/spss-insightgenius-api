@@ -23,7 +23,7 @@ def _clean(val):
 def _run_gap_analysis(file_bytes: bytes, filename: str, spec: dict):
     """Run gap analysis (blocking, executed in thread pool)."""
     data = QuantiProEngine.load_spss(file_bytes, filename)
-    df = data["df"]
+    df = data.df
 
     importance_vars = spec.get("importance_vars", [])
     performance_vars = spec.get("performance_vars", [])
@@ -84,7 +84,7 @@ def _run_gap_analysis(file_bytes: bytes, filename: str, spec: dict):
             })
 
     # Add labels from metadata
-    meta = data.get("meta")
+    meta = data.meta
     if meta:
         labels = meta.column_names_to_labels if hasattr(meta, 'column_names_to_labels') else {}
         for item in items:

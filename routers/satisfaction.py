@@ -37,7 +37,7 @@ def _detect_scale(values):
 def _run_satisfaction_summary(file_bytes: bytes, filename: str, spec: dict):
     """Run satisfaction summary (blocking, executed in thread pool)."""
     data = QuantiProEngine.load_spss(file_bytes, filename)
-    df = data["df"]
+    df = data.df
 
     variables = spec.get("variables", [])
     weight = spec.get("weight")
@@ -51,7 +51,7 @@ def _run_satisfaction_summary(file_bytes: bytes, filename: str, spec: dict):
             raise ValueError(f"Variable '{v}' not found in dataset")
 
     # Get labels from metadata
-    meta = data.get("meta")
+    meta = data.meta
     labels = {}
     if meta:
         if hasattr(meta, 'column_names_to_labels'):

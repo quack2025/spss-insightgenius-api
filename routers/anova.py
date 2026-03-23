@@ -23,7 +23,7 @@ def _clean(val):
 def _run_anova(file_bytes: bytes, filename: str, spec: dict):
     """Run ANOVA (blocking, executed in thread pool)."""
     data = QuantiProEngine.load_spss(file_bytes, filename)
-    df = data["df"]
+    df = data.df
 
     dependent = spec.get("dependent", "")
     factor = spec.get("factor", "")
@@ -36,13 +36,12 @@ def _run_anova(file_bytes: bytes, filename: str, spec: dict):
         if v not in df.columns:
             raise ValueError(f"Variable '{v}' not found in dataset")
 
-    if not QUANTIPYMRX_AVAILABLE:
+    if not QUANTIPYMRX_AVAILABLE or data.mrx_dataset is None:
         raise RuntimeError("QuantipyMRX required for ANOVA")
 
-    from quantipymrx import DataSet
     from quantipymrx.analysis.significance import anova_from_dataset
 
-    ds = DataSet.from_spss(data["tmp_path"])
+    ds = data.mrx_dataset
     result = anova_from_dataset(ds, variable=dependent, group_var=factor, weight=weight, sig_level=0.05)
 
     # Convert result to dict
@@ -82,8 +81,8 @@ def _run_anova(file_bytes: bytes, filename: str, spec: dict):
         response["post_hoc_tukey"] = []
 
     # Add value labels for groups
-    meta = data.get("meta")
-    if meta:
+    meta = data.meta
+    if meta is not None:
         vl = meta.variable_value_labels.get(factor, {})
         response["group_labels"] = {str(k): v for k, v in vl.items()} if vl else {}
 
