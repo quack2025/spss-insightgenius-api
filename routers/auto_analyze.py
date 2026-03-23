@@ -82,11 +82,11 @@ def _run_auto_analyze(file_bytes: bytes, filename: str, options: dict):
     )
 
     # Step 8: Build tabulation
-    result = build_tabulation(data, spec)
+    result = build_tabulation(QuantiProEngine, data, spec)
 
     return {
         "excel_bytes": result.excel_bytes,
-        "filename": result.filename,
+        "filename": f"auto_analysis_{filename.replace('.sav', '')}.xlsx",
         "summary": {
             "banners": banners,
             "banner_labels": [
@@ -94,12 +94,12 @@ def _run_auto_analyze(file_bytes: bytes, filename: str, options: dict):
                 for b in banners
             ],
             "total_stubs": result.total_stubs,
-            "stubs_success": result.stubs_success,
-            "stubs_failed": result.stubs_failed,
+            "stubs_success": result.successful,
+            "stubs_failed": result.failed,
             "mrs_groups": len(mrs_groups),
             "grid_groups": len(grid_groups),
             "nets_applied": len(nets),
-            "processing_time_ms": result.processing_time_ms,
+            "processing_time_ms": 0,
         },
     }
 
