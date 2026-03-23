@@ -154,6 +154,10 @@ def create_application() -> FastAPI:
     from routers.parse_ticket import router as parse_ticket_router
     from routers.process import router as process_router
     from routers.tabulate import router as tabulate_router
+    from routers.correlation import router as correlation_router
+    from routers.anova import router as anova_router
+    from routers.gap_analysis import router as gap_router
+    from routers.satisfaction import router as satisfaction_router
 
     app.include_router(health_router)
     app.include_router(metadata_router)
@@ -163,6 +167,10 @@ def create_application() -> FastAPI:
     app.include_router(parse_ticket_router)
     app.include_router(process_router)
     app.include_router(tabulate_router)
+    app.include_router(correlation_router)
+    app.include_router(anova_router)
+    app.include_router(gap_router)
+    app.include_router(satisfaction_router)
 
     # MCP server (SSE transport) — mounted at /mcp/
     from routers.mcp_server import get_mcp_asgi_app
