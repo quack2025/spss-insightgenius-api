@@ -131,6 +131,8 @@ async def auto_analyze(
     except ValueError as e:
         raise HTTPException(400, detail={"code": "PROCESSING_FAILED", "message": str(e)})
     except Exception as e:
+        import traceback
+        logger.error("Auto-analyze failed: %s\n%s", e, traceback.format_exc())
         raise HTTPException(500, detail={"code": "PROCESSING_FAILED", "message": str(e)})
 
     elapsed = int((time.perf_counter() - start) * 1000)
