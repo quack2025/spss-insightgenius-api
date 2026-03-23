@@ -76,9 +76,9 @@ def _run_auto_analyze(file_bytes: bytes, filename: str, options: dict):
         include_total_column=True,
         output_mode=options.get("output_mode", "multi_sheet"),
         title=options.get("title", f"Auto-Analysis: {filename}"),
-        nets=nets if nets else None,
-        mrs_groups=mrs_groups if mrs_groups else None,
-        grid_groups=grid_groups if grid_groups else None,
+        nets=nets or {},
+        mrs_groups=mrs_groups or {},
+        grid_groups=grid_groups or {},
     )
 
     # Step 8: Build tabulation
