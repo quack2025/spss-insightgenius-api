@@ -32,7 +32,7 @@ def _run_auto_analyze(file_bytes: bytes, filename: str, options: dict):
     meta = QuantiProEngine.extract_metadata(data)
 
     # Step 2: Pick banners
-    suggested = meta.get("suggested_banners", [])
+    suggested = meta.get("suggested_banners") or []
     max_banners = options.get("max_banners", 3)
     if suggested:
         banners = [b["variable"] for b in suggested[:max_banners]]
@@ -53,11 +53,11 @@ def _run_auto_analyze(file_bytes: bytes, filename: str, options: dict):
     stubs = ["_all_"]
 
     # Step 4: Auto-nets from preset_nets
-    nets = meta.get("preset_nets", {})
+    nets = meta.get("preset_nets") or {}
 
     # Step 5: Detect MRS groups
     mrs_groups = {}
-    detected_groups = meta.get("detected_groups", [])
+    detected_groups = meta.get("detected_groups") or []
     for g in detected_groups:
         if g.get("question_type") == "awareness" and len(g.get("variables", [])) >= 2:
             name = g.get("display_name") or g.get("name", "MRS")
