@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
     # App
-    app_name: str = "QuantiPro API"
+    app_name: str = "SPSS InsightGenius API"
     app_env: str = "development"
     app_version: str = "1.0.0"
     port: int = 8000

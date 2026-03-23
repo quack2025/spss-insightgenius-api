@@ -50,18 +50,20 @@
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">SPSS file (.sav) <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">SPSS file (.sav, .por, .zsav) <span class="text-red-500">*</span></label>
           <div id="sav-drop" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400">
             <div id="sav-icon" class="text-3xl mb-2">&#128202;</div>
-            <p id="sav-label" class="text-sm text-gray-500">Drop .sav file here or click to browse</p>
+            <p id="sav-label" class="text-sm text-gray-500">Drop .sav, .por, or .zsav file here or click to browse</p>
             <input type="file" id="sav-input" accept=".sav,.por,.zsav" class="hidden">
           </div>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Reporting Ticket (.docx) <span class="text-gray-400">optional</span></label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Reporting Ticket (.docx) <span class="text-gray-400">optional</span>
+            <span class="inline-block ml-1 w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold text-center leading-4 cursor-help" title="A Word document describing your reporting requirements (banners, stubs, sig level, nets). Our AI reads it and auto-configures your tables. If you don't have one, skip this and configure manually below.">?</span>
+          </label>
           <div id="docx-drop" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400">
             <div id="docx-icon" class="text-3xl mb-2">&#128203;</div>
-            <p id="docx-label" class="text-sm text-gray-500">Drop .docx ticket here or click to browse</p>
+            <p id="docx-label" class="text-sm text-gray-500">Drop .docx reporting ticket here or click to browse</p>
             <input type="file" id="docx-input" accept=".docx" class="hidden">
           </div>
         </div>
@@ -100,9 +102,9 @@
     <section id="banners-section" class="hidden bg-white rounded-xl border border-gray-200 p-6 fade-in">
       <div class="flex items-center gap-2 mb-4">
         <span class="section-badge bg-blue-600 text-white">2</span>
-        <h2 class="text-lg font-semibold text-gray-900">Select banners <span class="text-sm font-normal text-gray-400">(demographics to cross by)</span></h2>
+        <h2 class="text-lg font-semibold text-gray-900">Select banners <span class="text-sm font-normal text-gray-400">(columns in your crosstab)</span></h2>
       </div>
-      <p class="text-xs text-gray-500 mb-3">Click to add banners. Columns appear side-by-side with continuous letter assignment (A/B + C/D/E + ...).</p>
+      <p class="text-xs text-gray-500 mb-3">Banners are the demographic variables that appear as columns across the top of your table (e.g., Gender, Age, Region). Each banner category gets a letter for significance testing &mdash; e.g., Gender: Male (A), Female (B); Region: London (C), North (D), South (E).</p>
       <div id="banner-chips" class="flex flex-wrap gap-2 mb-3"></div>
       <div id="selected-banners" class="flex flex-wrap gap-2 min-h-[32px]"></div>
     </section>
@@ -111,8 +113,9 @@
     <section id="stubs-section" class="hidden bg-white rounded-xl border border-gray-200 p-6 fade-in">
       <div class="flex items-center gap-2 mb-4">
         <span class="section-badge bg-blue-600 text-white">3</span>
-        <h2 class="text-lg font-semibold text-gray-900">Select stubs <span class="text-sm font-normal text-gray-400">(questions to tabulate)</span></h2>
+        <h2 class="text-lg font-semibold text-gray-900">Select stubs <span class="text-sm font-normal text-gray-400">(rows in your crosstab)</span></h2>
       </div>
+      <p class="text-xs text-gray-500 mb-3">Stubs are the questions that appear as rows in your tables. Each stub generates one crosstab sheet (or one block in single-sheet mode).</p>
       <div class="flex items-center gap-3 mb-3">
         <label class="flex items-center gap-1.5 text-sm cursor-pointer">
           <input type="radio" name="stub-mode" value="all" checked class="text-blue-600"> All variables
@@ -129,7 +132,7 @@
           <label class="text-sm font-medium text-gray-700">Multiple Response Sets (MRS)</label>
           <button onclick="toggleMrsPanel()" class="text-xs text-blue-600 hover:text-blue-800 font-medium">+ Add MRS group</button>
         </div>
-        <p class="text-xs text-gray-400 mb-2">Group binary variables (e.g., Q5_1, Q5_2, Q5_3) as "select all that apply". Percentages can exceed 100%.</p>
+        <p class="text-xs text-gray-400 mb-2"><strong>MRS = "select all that apply" questions</strong> (binary yes/no per option, e.g., brand awareness). Group the individual binary variables into one table where percentages can exceed 100%.</p>
         <div id="mrs-groups" class="space-y-2"></div>
         <div id="mrs-panel" class="hidden mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200 fade-in">
           <div class="mb-3">
@@ -155,7 +158,7 @@
           <label class="text-sm font-medium text-gray-700">Grid / Battery Summary</label>
           <button onclick="toggleGridPanel()" class="text-xs text-orange-600 hover:text-orange-800 font-medium" id="grid-add-btn">+ Add grid group</button>
         </div>
-        <p class="text-xs text-gray-400 mb-2">Group scale variables with the same response scale (e.g., 7 satisfaction questions). Shows T2B%, B2B%, and Mean in a compact summary sheet.</p>
+        <p class="text-xs text-gray-400 mb-2"><strong>Grid = rating scale questions with the same scale</strong> (e.g., 7 satisfaction questions all on 1-5). Shows Top 2 Box %, Bottom 2 Box %, and Mean in one compact summary sheet.</p>
         <div id="grid-groups" class="space-y-2"></div>
         <div id="grid-panel" class="hidden mt-3 p-4 bg-orange-50 rounded-lg border border-orange-200 fade-in">
           <div class="mb-3">
@@ -218,7 +221,7 @@
             <input type="checkbox" id="opt-means" checked class="rounded text-blue-600 w-4 h-4"> Means with T-test
           </label>
         </div>
-        <p class="text-xs text-gray-400 mt-2">T2B/B2B and Means auto-apply to scale variables (Likert 4-11 pt). Sig letters show which columns differ.</p>
+        <p class="text-xs text-gray-400 mt-2">Top 2 Box / Bottom 2 Box (T2B/B2B) and Means auto-apply to scale variables (4-11 point scales). Significance letters (A, B, C...) show which columns are statistically different.</p>
       </div>
       <div class="mt-4 pt-4 border-t border-gray-100">
         <label class="block text-sm font-medium text-gray-700 mb-3">Output format</label>
@@ -266,7 +269,10 @@
     <!-- Generate -->
     <section id="generate-section" class="hidden fade-in">
       <!-- Summary bar -->
-      <div id="spec-summary" class="mb-3 p-3 bg-gray-100 rounded-lg text-xs text-gray-600 font-mono"></div>
+      <div class="mb-3 p-3 bg-gray-100 rounded-lg">
+        <p class="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-1">Current configuration</p>
+        <div id="spec-summary" class="text-xs text-gray-600 font-mono">No configuration set &mdash; select banners above to start</div>
+      </div>
 
       <button id="generate-btn" onclick="generate()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 px-6 rounded-xl text-base transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
@@ -294,7 +300,13 @@
       </div>
 
       <div id="error" class="hidden mt-4 p-4 bg-red-50 rounded-xl border border-red-200 fade-in">
-        <p class="text-sm font-semibold text-red-800" id="error-text"></p>
+        <div class="flex items-start gap-2">
+          <svg class="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <div>
+            <p class="text-sm font-semibold text-red-800" id="error-text"></p>
+            <p class="text-xs text-red-600 mt-1">Check that your .sav file is valid and not corrupted. If the problem persists, try with fewer stubs or a smaller file. <a href="/docs" target="_blank" class="underline">API docs</a></p>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -335,13 +347,34 @@ with open("tabulation.xlsx", "wb") as f:
     f.write(resp.content)
 print(f"{resp.headers['X-Stubs-Success']} tables generated")</code></pre>
 
+        <h3 class="font-semibold text-gray-800 mt-4 mb-2">Node.js</h3>
+        <pre class="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-xs"><code>const fs = require("fs");
+const FormData = require("form-data");
+
+const form = new FormData();
+form.append("file", fs.createReadStream("survey.sav"));
+form.append("spec", JSON.stringify({
+  banners: ["gender", "region"],
+  stubs: ["_all_"],
+  include_means: true,
+  significance_level: 0.95,
+}));
+
+const resp = await fetch("https://spss.insightgenius.io/v1/tabulate", {
+  method: "POST",
+  headers: { Authorization: "Bearer YOUR_API_KEY", ...form.getHeaders() },
+  body: form,
+});
+fs.writeFileSync("tabulation.xlsx", Buffer.from(await resp.arrayBuffer()));
+console.log(`${resp.headers.get("X-Stubs-Success")} tables generated`);</code></pre>
+
         <p class="mt-4 text-xs text-gray-500">Full interactive docs: <a href="/docs" target="_blank" class="text-blue-600 hover:underline">/docs</a> | <a href="/redoc" target="_blank" class="text-blue-600 hover:underline">/redoc</a></p>
       </div>
     </details>
   </main>
 
   <footer class="max-w-5xl mx-auto px-6 py-6 text-center text-xs text-gray-400">
-    Powered by QuantipyMRX &bull; Built by Genius Labs
+    SPSS InsightGenius &bull; Powered by QuantipyMRX &bull; Built by Genius Labs
   </footer>
 
 <script>

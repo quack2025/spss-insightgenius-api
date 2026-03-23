@@ -51,7 +51,7 @@ def create_application() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
         description=(
-            "**QuantiPro API** — REST API for processing SPSS (.sav) files.\n\n"
+            "**SPSS InsightGenius API** — REST API for processing SPSS (.sav) files.\n\n"
             "Powered by QuantipyMRX for market research analysis: crosstabs with significance testing, "
             "auto-detection of question types, NPS, Top/Bottom Box, nets, and AI-powered "
             "Reporting Ticket parsing via Claude Haiku.\n\n"
