@@ -23,9 +23,14 @@ def _run_auto_analyze(file_bytes: bytes, filename: str, options: dict):
     """Zero-config analysis pipeline:
     1. Load SPSS → extract metadata with auto-detect
     2. Pick best banner(s) from suggested_banners
-    3. Select all labeled variables as stubs
-    4. Auto-detect nets (T2B/B2B for Likert scales)
-    5. Build tabulation → return Excel bytes
+    3. Detect groups (MRS, Grid, Top-of-Mind) → exclude members from individual stubs
+    4. Remaining ungrouped variables → individual stubs
+    5. Auto-detect nets (T2B/B2B for Likert scales)
+    6. Build tabulation → return Excel bytes
+
+    Key insight: variables that belong to a detected group (MRS, Grid, Top-of-Mind)
+    are NOT exported as individual crosstabs. They're exported as their group type
+    (MRS sheet or Grid summary). Only ungrouped variables get individual sheets.
     """
     # Step 1: Load and extract metadata
     data = QuantiProEngine.load_spss(file_bytes, filename)
@@ -37,7 +42,6 @@ def _run_auto_analyze(file_bytes: bytes, filename: str, options: dict):
     if suggested:
         banners = [b["variable"] for b in suggested[:max_banners]]
     else:
-        # Fallback: find variables with 2-8 categories (likely demographics)
         banners = []
         for v in meta.get("variables", []):
             vl = v.get("value_labels")
@@ -49,31 +53,56 @@ def _run_auto_analyze(file_bytes: bytes, filename: str, options: dict):
     if not banners:
         raise ValueError("No suitable banner variables found in the dataset")
 
-    # Step 3: Auto-stubs
-    stubs = ["_all_"]
+    banner_set = set(banners)
 
-    # Step 4: Auto-nets from preset_nets
-    nets = meta.get("preset_nets") or {}
-
-    # Step 5: Detect MRS groups
+    # Step 3: Detect groups and collect grouped variables
     mrs_groups = {}
+    grid_groups = {}
+    grouped_vars = set()  # Track ALL variables that belong to a group
+
     detected_groups = meta.get("detected_groups") or []
     for g in detected_groups:
-        if g.get("question_type") == "awareness" and len(g.get("variables", [])) >= 2:
-            name = g.get("display_name") or g.get("name", "MRS")
-            mrs_groups[name] = g["variables"]
+        q_type = g.get("question_type", "")
+        members = g.get("variables") or []
+        if len(members) < 2:
+            continue
 
-    # Step 6: Detect grid groups
-    grid_groups = {}
-    for g in detected_groups:
-        if g.get("question_type") == "scale" and len(g.get("variables", [])) >= 2:
-            name = g.get("display_name") or g.get("name", "Grid")
-            grid_groups[name] = {"variables": g["variables"], "show": ["t2b", "b2b", "mean"]}
+        name = g.get("display_name") or g.get("name", f"Group_{len(grouped_vars)}")
 
-    # Step 7: Build spec
+        if q_type in ("awareness", "top_of_mind"):
+            # MRS: "select all that apply" — one sheet, members as rows, % can exceed 100%
+            mrs_groups[name] = members
+            grouped_vars.update(members)
+        elif q_type == "scale":
+            # Grid: same scale across variables — compact T2B/Mean summary
+            grid_groups[name] = {"variables": members, "show": ["t2b", "b2b", "mean"]}
+            grouped_vars.update(members)
+
+    # Step 4: Build stubs — only UNGROUPED variables with value labels
+    # Variables in groups are exported via MRS/Grid, not as individual crosstabs
+    stubs = []
+    for v in meta.get("variables") or []:
+        vname = v["name"]
+        vl = v.get("value_labels")
+        if not vl or len(vl) < 2:
+            continue
+        if vname in grouped_vars:
+            continue  # Skip — this variable is in an MRS or Grid group
+        if vname in banner_set:
+            continue  # Skip — this is a banner variable
+        stubs.append(vname)
+
+    if not stubs and not mrs_groups and not grid_groups:
+        stubs = ["_all_"]  # Fallback: export everything if nothing detected
+
+    # Step 5: Auto-nets from preset_nets (only for ungrouped stubs)
+    all_nets = meta.get("preset_nets") or {}
+    nets = {k: v for k, v in all_nets.items() if k in set(stubs)}
+
+    # Step 6: Build spec
     spec = TabulateSpec(
         banners=banners,
-        stubs=stubs,
+        stubs=stubs if stubs else ["_all_"],
         significance_level=options.get("significance_level", 0.95),
         include_means=True,
         include_total_column=True,
@@ -84,7 +113,14 @@ def _run_auto_analyze(file_bytes: bytes, filename: str, options: dict):
         grid_groups=grid_groups or {},
     )
 
-    # Step 8: Build tabulation
+    logger.info(
+        "[AUTO] banners=%s stubs=%d mrs=%d(%d vars) grids=%d(%d vars) nets=%d grouped_excluded=%d",
+        banners, len(stubs), len(mrs_groups), sum(len(v) for v in mrs_groups.values()),
+        len(grid_groups), sum(len(g["variables"]) for g in grid_groups.values()),
+        len(nets), len(grouped_vars),
+    )
+
+    # Step 7: Build tabulation
     result = build_tabulation(QuantiProEngine, data, spec)
 
     return {
