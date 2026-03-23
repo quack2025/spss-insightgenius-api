@@ -159,6 +159,7 @@ def create_application() -> FastAPI:
     from routers.gap_analysis import router as gap_router
     from routers.satisfaction import router as satisfaction_router
     from routers.auto_analyze import router as auto_analyze_router
+    from routers.downloads import router as downloads_router
 
     app.include_router(health_router)
     app.include_router(metadata_router)
@@ -173,6 +174,7 @@ def create_application() -> FastAPI:
     app.include_router(gap_router)
     app.include_router(satisfaction_router)
     app.include_router(auto_analyze_router)
+    app.include_router(downloads_router)
 
     # MCP server (SSE transport) — mounted at /mcp/
     from routers.mcp_server import get_mcp_asgi_app

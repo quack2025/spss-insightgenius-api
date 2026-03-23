@@ -37,8 +37,15 @@ class Settings(BaseSettings):
     processing_timeout_seconds: int = 120
     max_concurrent_processing: int = 3  # max SPSS files processing per worker
 
-    # Redis (for distributed rate limiting — optional, falls back to in-memory)
+    # Redis (for distributed rate limiting + MCP file sessions — optional)
     redis_url: str = ""
+
+    # MCP file sessions
+    spss_session_ttl_seconds: int = 1800  # 30 minutes sliding window
+    redis_max_file_size_mb: int = 100
+
+    # Base URL for download links
+    base_url: str = "https://spss.insightgenius.io"
 
     # CORS
     cors_origins: str = '["*"]'
