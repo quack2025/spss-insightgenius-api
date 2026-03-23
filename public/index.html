@@ -69,6 +69,31 @@
       <div id="file-info" class="hidden mt-4 p-3 bg-blue-50 rounded-lg fade-in">
         <p class="text-sm font-medium text-blue-900" id="file-info-text"></p>
       </div>
+      <!-- Auto-Analyze quick action -->
+      <div id="auto-analyze-bar" class="hidden mt-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-200 fade-in">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-semibold text-indigo-900">One-click analysis</p>
+            <p class="text-xs text-indigo-600">AI auto-detects banners, nets, MRS groups and generates a complete Excel — zero config needed.</p>
+          </div>
+          <button id="auto-analyze-btn" onclick="autoAnalyze()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-5 rounded-lg text-sm transition-colors whitespace-nowrap flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            Auto-Analyze
+          </button>
+        </div>
+        <div id="auto-progress" class="hidden mt-3">
+          <div class="flex items-center gap-2">
+            <div class="spinner"></div>
+            <p class="text-xs text-indigo-600" id="auto-progress-text">Running auto-analysis...</p>
+          </div>
+        </div>
+        <div id="auto-result" class="hidden mt-3 p-3 bg-white rounded-lg border border-green-200">
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-medium text-green-800" id="auto-result-text"></p>
+            <button onclick="downloadAutoResult()" class="bg-green-600 hover:bg-green-700 text-white font-medium py-1.5 px-4 rounded-lg text-xs">Download .xlsx</button>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- Step 2: Banners -->
@@ -362,6 +387,7 @@ async function loadMetadata() {
     infoText.textContent = `${metadata.file_name} \u2014 ${metadata.n_cases.toLocaleString()} cases \u00d7 ${metadata.n_variables} variables`;
     selectedBanners = []; mrsGroups = {}; gridGroups = {}; customGroups = [];
     populateUI();
+    document.getElementById('auto-analyze-bar').classList.remove('hidden');
     ['banners-section','stubs-section','options-section','custom-groups-section','generate-section'].forEach(id => document.getElementById(id).classList.remove('hidden'));
   } catch (e) {
     infoText.textContent = `Error: ${e.message}`; info.className = 'mt-4 p-3 bg-red-50 rounded-lg';
@@ -884,6 +910,59 @@ async function generate() {
 function downloadResult() {
   if (!resultBlob) return;
   const a = document.createElement('a'); a.href = URL.createObjectURL(resultBlob); a.download = resultFilename; a.click(); URL.revokeObjectURL(a.href);
+}
+
+// ── Auto-Analyze ──
+let autoResultBlob = null, autoResultFilename = '';
+
+async function autoAnalyze() {
+  if (!savFile) { alert('Upload a .sav file first'); return; }
+  const btn = document.getElementById('auto-analyze-btn');
+  const prog = document.getElementById('auto-progress');
+  const progText = document.getElementById('auto-progress-text');
+  const res = document.getElementById('auto-result');
+
+  btn.disabled = true; btn.textContent = 'Processing...';
+  prog.classList.remove('hidden'); res.classList.add('hidden');
+  progText.textContent = 'AI is detecting banners, groups, nets and building your Excel...';
+
+  const form = new FormData();
+  form.append('file', savFile);
+  form.append('options', JSON.stringify({ output_mode: 'multi_sheet', significance_level: 0.95 }));
+
+  try {
+    const start = performance.now();
+    const resp = await fetch(`${API_BASE}/v1/auto-analyze`, { method: 'POST', headers: {'Authorization': `Bearer ${API_KEY}`}, body: form });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: { message: `HTTP ${resp.status}` } }));
+      throw new Error(err.detail?.message || err.detail || `HTTP ${resp.status}`);
+    }
+    const elapsed = Math.round(performance.now() - start);
+    autoResultBlob = await resp.blob();
+    const total = resp.headers.get('X-Stubs-Total') || '?';
+    const success = resp.headers.get('X-Stubs-Success') || '?';
+    const banners = resp.headers.get('X-Banners') || '?';
+    const mrs = resp.headers.get('X-MRS-Groups') || '0';
+    const grids = resp.headers.get('X-Grid-Groups') || '0';
+    const cd = resp.headers.get('Content-Disposition') || '';
+    const fn = cd.match(/filename="([^"]+)"/);
+    autoResultFilename = fn ? fn[1] : 'auto_analysis.xlsx';
+
+    prog.classList.add('hidden'); res.classList.remove('hidden');
+    document.getElementById('auto-result-text').textContent =
+      `${success}/${total} tables | Banners: ${banners} | MRS: ${mrs} | Grids: ${grids} | ${(autoResultBlob.size/1024).toFixed(0)}KB | ${elapsed}ms`;
+  } catch (e) {
+    prog.classList.add('hidden');
+    alert(`Auto-analyze error: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Auto-Analyze';
+  }
+}
+
+function downloadAutoResult() {
+  if (!autoResultBlob) return;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(autoResultBlob); a.download = autoResultFilename; a.click(); URL.revokeObjectURL(a.href);
 }
 </script>
 </body>

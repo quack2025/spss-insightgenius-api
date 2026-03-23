@@ -41,6 +41,11 @@ from starlette.routing import Mount, Route
 from auth import get_key_config
 from config import get_settings
 from middleware.processing import run_in_executor
+from routers.anova import _run_anova
+from routers.auto_analyze import _run_auto_analyze
+from routers.correlation import _run_correlation
+from routers.gap_analysis import _run_gap_analysis
+from routers.satisfaction import _run_satisfaction_summary
 from services.converter import FormatConverter
 from services.quantipy_engine import QuantiProEngine
 from services.tabulation_builder import TabulateSpec, build_tabulation
@@ -398,7 +403,207 @@ async def list_files(api_key: str) -> dict[str, Any]:
                 "name": "create_tabulation",
                 "description": "Full tabulation Excel workbook (multi-sheet, sig letters, nets)",
             },
+            {
+                "name": "analyze_correlation",
+                "description": "Correlation matrix with p-values and significant pairs",
+            },
+            {
+                "name": "analyze_anova",
+                "description": "One-way ANOVA with optional Tukey HSD post-hoc tests",
+            },
+            {
+                "name": "analyze_gap",
+                "description": "Importance vs. performance gap analysis",
+            },
+            {
+                "name": "summarize_satisfaction",
+                "description": "Satisfaction summary (mean, T2B, B2B, distribution)",
+            },
+            {
+                "name": "auto_analyze",
+                "description": "Zero-config analysis — auto-selects banners/stubs → Excel (base64)",
+            },
         ],
+    }
+
+
+async def analyze_correlation(
+    api_key: str,
+    file_base64: str,
+    variables: list[str],
+    method: str = "pearson",
+    filename: str = "upload.sav",
+) -> dict[str, Any]:
+    """Run correlation analysis on selected variables in an SPSS file.
+
+    Returns a correlation matrix, p-values, and significant pairs (p < 0.05).
+
+    Args:
+        api_key:     Your API key (sk_test_... or sk_live_...).
+        file_base64: Base64-encoded content of the .sav file.
+        variables:   List of variable names to correlate (minimum 2).
+        method:      Correlation method — "pearson" (default), "spearman", or "kendall".
+        filename:    Original filename (default: upload.sav).
+    """
+    _auth(api_key)
+    file_bytes = _decode_spss(file_base64)
+    try:
+        result = await run_in_executor(
+            _run_correlation, file_bytes, filename,
+            {"variables": variables, "method": method},
+        )
+    except (ValueError, RuntimeError) as e:
+        raise ToolError(str(e))
+    except Exception as e:
+        raise ToolError(f"Correlation analysis failed: {e}")
+    return result
+
+
+async def analyze_anova(
+    api_key: str,
+    file_base64: str,
+    dependent: str,
+    factor: str,
+    weight: str | None = None,
+    post_hoc: bool = True,
+    filename: str = "upload.sav",
+) -> dict[str, Any]:
+    """Run one-way ANOVA with optional post-hoc tests on an SPSS file.
+
+    Tests whether the mean of `dependent` differs significantly across
+    levels of `factor`. Optionally includes Tukey HSD post-hoc comparisons.
+
+    Args:
+        api_key:     Your API key (sk_test_... or sk_live_...).
+        file_base64: Base64-encoded content of the .sav file.
+        dependent:   Dependent (continuous) variable name.
+        factor:      Factor (grouping) variable name.
+        weight:      Optional weight variable name.
+        post_hoc:    Run Tukey HSD post-hoc tests (default True).
+        filename:    Original filename (default: upload.sav).
+    """
+    _auth(api_key)
+    file_bytes = _decode_spss(file_base64)
+    try:
+        result = await run_in_executor(
+            _run_anova, file_bytes, filename,
+            {"dependent": dependent, "factor": factor, "weight": weight, "post_hoc": post_hoc},
+        )
+    except (ValueError, RuntimeError) as e:
+        raise ToolError(str(e))
+    except Exception as e:
+        raise ToolError(f"ANOVA analysis failed: {e}")
+    return result
+
+
+async def analyze_gap(
+    api_key: str,
+    file_base64: str,
+    importance_vars: list[str],
+    performance_vars: list[str],
+    weight: str | None = None,
+    filename: str = "upload.sav",
+) -> dict[str, Any]:
+    """Run gap analysis (importance vs. performance) on an SPSS file.
+
+    Compares paired importance and performance variables to identify
+    priority areas (high importance, low performance).
+
+    Args:
+        api_key:           Your API key (sk_test_... or sk_live_...).
+        file_base64:       Base64-encoded content of the .sav file.
+        importance_vars:   List of importance variable names.
+        performance_vars:  List of performance variable names (same order as importance).
+        weight:            Optional weight variable name.
+        filename:          Original filename (default: upload.sav).
+    """
+    _auth(api_key)
+    file_bytes = _decode_spss(file_base64)
+    try:
+        result = await run_in_executor(
+            _run_gap_analysis, file_bytes, filename,
+            {"importance_vars": importance_vars, "performance_vars": performance_vars, "weight": weight},
+        )
+    except (ValueError, RuntimeError) as e:
+        raise ToolError(str(e))
+    except Exception as e:
+        raise ToolError(f"Gap analysis failed: {e}")
+    return result
+
+
+async def summarize_satisfaction(
+    api_key: str,
+    file_base64: str,
+    variables: list[str],
+    scale: str | None = None,
+    weight: str | None = None,
+    filename: str = "upload.sav",
+) -> dict[str, Any]:
+    """Generate a satisfaction summary for selected variables in an SPSS file.
+
+    Computes mean, Top 2 Box, Bottom 2 Box, and distribution for each variable.
+    Scale is auto-detected if not specified.
+
+    Args:
+        api_key:     Your API key (sk_test_... or sk_live_...).
+        file_base64: Base64-encoded content of the .sav file.
+        variables:   List of satisfaction variable names (minimum 1).
+        scale:       Scale type — "5pt", "7pt", "10pt", or None for auto-detect.
+        weight:      Optional weight variable name.
+        filename:    Original filename (default: upload.sav).
+    """
+    _auth(api_key)
+    file_bytes = _decode_spss(file_base64)
+    try:
+        result = await run_in_executor(
+            _run_satisfaction_summary, file_bytes, filename,
+            {"variables": variables, "scale": scale, "weight": weight},
+        )
+    except (ValueError, RuntimeError) as e:
+        raise ToolError(str(e))
+    except Exception as e:
+        raise ToolError(f"Satisfaction summary failed: {e}")
+    return result
+
+
+async def auto_analyze(
+    api_key: str,
+    file_base64: str,
+    max_banners: int = 3,
+    output_mode: str = "multi_sheet",
+    filename: str = "upload.sav",
+) -> dict[str, Any]:
+    """Zero-config automatic analysis of an SPSS file.
+
+    Automatically selects banners, stubs, and nets, then produces a full
+    tabulation Excel workbook. Returns the Excel file as base64-encoded data
+    plus a summary of what was analyzed.
+
+    Args:
+        api_key:      Your API key (sk_test_... or sk_live_...).
+        file_base64:  Base64-encoded content of the .sav file.
+        max_banners:  Maximum number of banner variables to use (default 3).
+        output_mode:  Output mode — "multi_sheet" (default) or "single_sheet".
+        filename:     Original filename (default: upload.sav).
+    """
+    _auth(api_key)
+    file_bytes = _decode_spss(file_base64)
+    try:
+        result = await run_in_executor(
+            _run_auto_analyze, file_bytes, filename,
+            {"max_banners": max_banners, "output_mode": output_mode},
+        )
+    except (ValueError, RuntimeError) as e:
+        raise ToolError(str(e))
+    except Exception as e:
+        raise ToolError(f"Auto-analyze failed: {e}")
+
+    base_name = filename.rsplit(".", 1)[0] if "." in filename else filename
+    return {
+        "filename": result.get("filename", f"auto_analyze_{base_name}.xlsx"),
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "data_base64": base64.b64encode(result["excel_bytes"]).decode(),
+        "summary": result["summary"],
     }
 
 
@@ -411,6 +616,11 @@ for _fn in [
     export_data,
     create_tabulation,
     list_files,
+    analyze_correlation,
+    analyze_anova,
+    analyze_gap,
+    summarize_satisfaction,
+    auto_analyze,
 ]:
     mcp.tool()(_fn)
 
