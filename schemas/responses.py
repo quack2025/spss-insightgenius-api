@@ -41,6 +41,22 @@ class VariableInfo(BaseModel):
     detected_type: str | None = None  # from auto_detect: "nps", "likert_5", "binary", "mrs", etc.
 
 
+class SuggestedBanner(BaseModel):
+    variable: str
+    label: str | None = None
+    n_categories: int = 0
+    confidence: float = 0.0
+    reason: str | None = None
+
+
+class DetectedGroup(BaseModel):
+    name: str
+    display_name: str | None = None
+    question_type: str = ""  # "awareness", "scale", "top_of_mind"
+    variables: list[str] = []
+    confidence: float = 0.0
+
+
 class MetadataResponse(BaseModel):
     file_name: str = ""
     n_cases: int
@@ -49,6 +65,9 @@ class MetadataResponse(BaseModel):
     detected_weights: list[str] = []
     auto_detect: dict[str, Any] | None = None
     file_label: str | None = None
+    suggested_banners: list[SuggestedBanner] | None = None
+    detected_groups: list[DetectedGroup] | None = None
+    preset_nets: dict[str, dict[str, list[int | float]]] | None = None
 
 
 # --- /v1/frequency ---
@@ -71,6 +90,14 @@ class FrequencyResponse(BaseModel):
     total_missing: int = 0
     pct_missing: float = 0.0
     frequencies: list[FrequencyItem] = []
+    mean: float | None = None
+    std: float | None = None
+    median: float | None = None
+    is_weighted: bool = False
+
+    @field_serializer("mean", "std", "median")
+    def sanitize_stats(self, v):
+        return _sanitize_float(v)
 
 
 # --- /v1/crosstab ---
@@ -95,6 +122,13 @@ class CrosstabResponse(BaseModel):
     col_value_labels: dict[str, str] = {}  # {"1.0": "Male", "2.0": "Female"}
     significance_level: float = 0.95
     significant_pairs: list[dict[str, Any]] = []
+    chi2: float | None = None
+    chi2_pvalue: float | None = None
+    chi2_warning: str | None = None
+
+    @field_serializer("chi2", "chi2_pvalue")
+    def sanitize_chi2(self, v):
+        return _sanitize_float(v)
 
 
 # --- /v1/process ---
