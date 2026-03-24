@@ -1204,8 +1204,25 @@ _ALWAYS_TOOLS = [
     ("spss_export_data", export_data),
     ("spss_create_tabulation", create_tabulation),
     ("spss_auto_analyze", auto_analyze),
-    ("spss_list_tools", list_files),
+    # list_files kept in code for backwards compat but NOT registered — replaced by spss_get_server_info
 ]
+
+# Annotations per tool (MCP spec requires these for registry submission)
+_ANNOTATIONS = {
+    "spss_upload_file":           {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+    "spss_get_server_info":       {"readOnlyHint": True,  "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+    "spss_get_metadata":          {"readOnlyHint": True,  "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+    "spss_describe_variable":     {"readOnlyHint": True,  "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+    "spss_analyze_frequencies":   {"readOnlyHint": True,  "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+    "spss_analyze_crosstab":      {"readOnlyHint": True,  "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+    "spss_analyze_correlation":   {"readOnlyHint": True,  "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+    "spss_analyze_anova":         {"readOnlyHint": True,  "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+    "spss_analyze_gap":           {"readOnlyHint": True,  "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+    "spss_summarize_satisfaction": {"readOnlyHint": True,  "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+    "spss_auto_analyze":          {"readOnlyHint": True,  "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+    "spss_create_tabulation":     {"readOnlyHint": True,  "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+    "spss_export_data":           {"readOnlyHint": True,  "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+}
 
 # Conditional tools (require QuantipyMRX)
 _CONDITIONAL_TOOLS = [
@@ -1216,18 +1233,18 @@ _CONDITIONAL_TOOLS = [
 ]
 
 for _name, _fn in _ALWAYS_TOOLS:
-    mcp.tool(name=_name)(_fn)
+    mcp.tool(name=_name, annotations=_ANNOTATIONS.get(_name, {}))(_fn)
 
 if QUANTIPYMRX_AVAILABLE:
     for _name, _fn in _CONDITIONAL_TOOLS:
-        mcp.tool(name=_name)(_fn)
-    logger.info("MCP: Registered all 13 tools (QuantipyMRX available)")
+        mcp.tool(name=_name, annotations=_ANNOTATIONS.get(_name, {}))(_fn)
+    logger.info("MCP: Registered all 13 tools with annotations (QuantipyMRX available)")
 else:
     for _name, _fn in _CONDITIONAL_TOOLS:
         logger.warning(
             "MCP: Tool '%s' NOT registered — QuantipyMRX not available", _name
         )
-    logger.info("MCP: Registered 9 of 13 tools (QuantipyMRX not available)")
+    logger.info("MCP: Registered 9 of 13 tools with annotations (QuantipyMRX not available)")
 
 
 # ── Redis-backed SSE transport ─────────────────────────────────────────────────
