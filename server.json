@@ -1,0 +1,38 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "spss_mcp",
+  "display_name": "SPSS InsightGenius",
+  "description": "Professional SPSS processing MCP server for market research. Upload .sav/.csv/.xlsx files, get crosstabs with significance testing, auto-detected question types, correlation, ANOVA, gap analysis, and publication-ready Excel exports. AI-powered zero-config analysis.",
+  "version": "2.0.0",
+  "vendor": {
+    "name": "Genius Labs",
+    "url": "https://spss.insightgenius.io"
+  },
+  "repository": "https://github.com/quack2025/spss-insightgenius-api",
+  "license": "proprietary",
+  "remote": {
+    "type": "streamable-http",
+    "url": "https://spss.insightgenius.io/mcp/http",
+    "authorization": {
+      "type": "bearer",
+      "description": "API key (sk_live_... or sk_test_...). Get one at https://spss.insightgenius.io"
+    }
+  },
+  "tools": [
+    {"name": "spss_upload_file", "description": "Upload .sav/.csv/.xlsx file, get reusable file_id (30-min session)"},
+    {"name": "spss_get_metadata", "description": "Variable metadata + AI-detected banners, groups, nets"},
+    {"name": "spss_describe_variable", "description": "Deep single-variable profile: distribution, labels, missing"},
+    {"name": "spss_get_server_info", "description": "Engine status, available tools, plan limits"},
+    {"name": "spss_analyze_frequencies", "description": "Frequency tables (batch 1-50 variables)"},
+    {"name": "spss_analyze_crosstab", "description": "Cross-tabulation with significance letters (A/B/C) + chi2"},
+    {"name": "spss_analyze_correlation", "description": "Correlation matrix (Pearson/Spearman/Kendall) with p-values"},
+    {"name": "spss_analyze_anova", "description": "One-way ANOVA with Tukey HSD post-hoc comparisons"},
+    {"name": "spss_analyze_gap", "description": "Importance-Performance gap analysis with quadrants"},
+    {"name": "spss_summarize_satisfaction", "description": "Compact T2B/B2B/Mean summary for scale variables"},
+    {"name": "spss_auto_analyze", "description": "Zero-config: upload file, get complete Excel with AI-detected analysis"},
+    {"name": "spss_create_tabulation", "description": "Full professional Excel tabulation with sig, nets, means, MRS, grids"},
+    {"name": "spss_export_data", "description": "Convert file to xlsx/csv/parquet/dta"}
+  ],
+  "keywords": ["spss", "market-research", "crosstabs", "significance-testing", "survey-data", "excel", "tabulation"],
+  "categories": ["data-analysis", "market-research"]
+}

@@ -59,7 +59,7 @@ logger = logging.getLogger(__name__)
 # ── MCP server ────────────────────────────────────────────────────────────────
 
 mcp = FastMCP(
-    "SPSS InsightGenius",
+    "spss_mcp",
     instructions=(
         "MCP server for SPSS (.sav) file processing and market research analysis.\n\n"
         "**File sessions (recommended):** Call `spss_upload_file` once to upload your "
@@ -259,6 +259,45 @@ def _extract_tables_summary(sheets: list) -> list[dict[str, Any]]:
 # All tools use Pydantic input models from schemas/mcp_models.py via explicit
 # parameters. Functions are defined as plain async callables so tests can import
 # and call them directly.
+
+
+# Tool 0: spss_get_server_info ────────────────────────────────────────────────
+
+async def spss_get_server_info() -> dict[str, Any]:
+    """Get server status, available tools, engine info, and plan limits.
+
+    Call this first to understand what the server can do. No authentication required.
+    Returns which tools are available and which require QuantipyMRX.
+    """
+    settings = get_settings()
+    all_tools = [
+        "spss_upload_file", "spss_get_metadata", "spss_describe_variable",
+        "spss_get_server_info", "spss_analyze_frequencies", "spss_analyze_crosstab",
+        "spss_analyze_correlation", "spss_analyze_anova", "spss_analyze_gap",
+        "spss_summarize_satisfaction", "spss_auto_analyze", "spss_create_tabulation",
+        "spss_export_data",
+    ]
+    mrx_tools = ["spss_analyze_correlation", "spss_analyze_anova", "spss_analyze_gap", "spss_summarize_satisfaction"]
+    available = [t for t in all_tools if t not in mrx_tools or QUANTIPYMRX_AVAILABLE]
+    unavailable = [{"tool": t, "reason": "Requires QuantipyMRX engine (not installed)"} for t in mrx_tools if not QUANTIPYMRX_AVAILABLE]
+
+    redis_ok = bool(settings.redis_url)
+    return {
+        "server": "spss_mcp",
+        "version": settings.app_version,
+        "engine": "quantipymrx",
+        "quantipymrx_available": QUANTIPYMRX_AVAILABLE,
+        "file_sessions_enabled": redis_ok,
+        "session_ttl_seconds": settings.spss_session_ttl_seconds if redis_ok else 0,
+        "supported_formats": [".sav", ".por", ".zsav", ".csv", ".tsv", ".xlsx", ".xls"],
+        "tools_available": available,
+        "tools_unavailable": unavailable,
+        "plan_limits": {
+            "free": {"requests_per_min": settings.rate_limit_free, "max_file_mb": 5},
+            "pro": {"requests_per_min": settings.rate_limit_pro, "max_file_mb": 50},
+            "business": {"requests_per_min": settings.rate_limit_business, "max_file_mb": 200},
+        },
+    }
 
 
 # Tool 1: spss_upload_file ────────────────────────────────────────────────────
@@ -1158,6 +1197,7 @@ async def list_files(api_key: str) -> dict[str, Any]:
 _ALWAYS_TOOLS = [
     ("spss_upload_file", spss_upload_file),
     ("spss_get_metadata", get_spss_metadata),
+    ("spss_get_server_info", spss_get_server_info),
     ("spss_describe_variable", get_variable_info),
     ("spss_analyze_frequencies", analyze_frequencies),
     ("spss_analyze_crosstab", analyze_crosstabs),
