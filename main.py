@@ -176,9 +176,28 @@ def create_application() -> FastAPI:
     app.include_router(auto_analyze_router)
     app.include_router(downloads_router)
 
-    # MCP server (SSE transport) — mounted at /mcp/
-    from routers.mcp_server import get_mcp_asgi_app
+    # MCP server — dual transport
+    from routers.mcp_server import get_mcp_asgi_app, mcp as mcp_server
+
+    # Streamable HTTP (MCP standard 2025-11) — primary transport
+    # mcp.http_app() returns a Starlette ASGI app with /mcp endpoint
+    try:
+        mcp_http = mcp_server.http_app()
+        app.mount("/mcp/http", mcp_http)
+        logger.info("MCP Streamable HTTP mounted at /mcp/http")
+    except Exception as e:
+        logger.warning("MCP Streamable HTTP failed to mount: %s", e)
+
+    # SSE transport (deprecated, kept for backwards compatibility)
     app.mount("/mcp", get_mcp_asgi_app())
+
+    # SSE deprecation header
+    @app.middleware("http")
+    async def mcp_deprecation_header(request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/mcp/sse"):
+            response.headers["X-MCP-Deprecated"] = "Use /mcp/http instead. SSE will be removed 2026-06-01."
+        return response
 
     # Serve frontend
     public_dir = Path(__file__).parent / "public"

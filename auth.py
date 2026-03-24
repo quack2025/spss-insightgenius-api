@@ -108,6 +108,26 @@ def get_key_config(raw_key: str) -> KeyConfig:
     raise ValueError("Invalid API key")
 
 
+def auth_from_header(authorization: str) -> KeyConfig:
+    """Extract API key from Authorization header and validate.
+
+    Used by MCP Streamable HTTP transport for transport-level auth.
+    Accepts: "Bearer sk_live_..." or "Bearer sk_test_..."
+
+    Returns:
+        KeyConfig if valid.
+
+    Raises:
+        ValueError: If header is missing, malformed, or key is invalid.
+    """
+    if not authorization:
+        raise ValueError("Missing Authorization header. Use: Authorization: Bearer sk_live_...")
+    parts = authorization.split(" ", 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise ValueError("Invalid Authorization format. Use: Authorization: Bearer YOUR_API_KEY")
+    return get_key_config(parts[1])
+
+
 def require_scope(scope: str):
     """Factory: returns a dependency that checks the key has a specific scope."""
 
