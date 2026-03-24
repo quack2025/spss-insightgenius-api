@@ -199,12 +199,20 @@ def create_application() -> FastAPI:
             response.headers["X-MCP-Deprecated"] = "Use /mcp/http instead. SSE will be removed 2026-06-01."
         return response
 
-    # Serve frontend
+    # Serve frontend + static pages
     public_dir = Path(__file__).parent / "public"
     if public_dir.exists():
         @app.get("/", include_in_schema=False)
         async def root():
             return FileResponse(public_dir / "index.html")
+
+        @app.get("/privacy", include_in_schema=False)
+        async def privacy():
+            return FileResponse(public_dir / "privacy.html")
+
+        @app.get("/docs/mcp", include_in_schema=False)
+        async def mcp_docs():
+            return FileResponse(public_dir / "mcp-docs.html")
 
         app.mount("/static", StaticFiles(directory=str(public_dir)), name="static")
     else:
