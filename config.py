@@ -89,10 +89,12 @@ class Settings(BaseSettings):
             # pk_test_<base64_domain>$ → decode to get domain
             import base64
             try:
-                encoded = self.clerk_publishable_key.split("_")[-1].rstrip("$")
+                encoded = self.clerk_publishable_key.split("_", 2)[-1].rstrip("$")
                 # Add padding
-                encoded += "=" * (4 - len(encoded) % 4) if len(encoded) % 4 else ""
-                domain = base64.b64decode(encoded).decode("utf-8")
+                padding = 4 - len(encoded) % 4
+                if padding != 4:
+                    encoded += "=" * padding
+                domain = base64.b64decode(encoded).decode("utf-8").rstrip("$").strip()
                 return f"https://{domain}"
             except Exception:
                 pass
