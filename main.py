@@ -145,6 +145,18 @@ def create_application() -> FastAPI:
             },
         )
 
+    # OAuth 2.0 discovery endpoints (RFC 9728)
+    @app.get("/.well-known/oauth-protected-resource", include_in_schema=False)
+    async def oauth_protected_resource():
+        """RFC 9728 Protected Resource Metadata — tells Claude.ai where to find the auth server."""
+        clerk_url = settings.clerk_frontend_api
+        return {
+            "resource": settings.base_url,
+            "authorization_servers": [clerk_url] if clerk_url else [],
+            "scopes_supported": ["openid", "profile", "email"],
+            "bearer_methods_supported": ["header"],
+        }
+
     # Register routers
     from routers.health import router as health_router
     from routers.metadata import router as metadata_router

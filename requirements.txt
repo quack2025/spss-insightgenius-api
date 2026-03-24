@@ -36,5 +36,8 @@ redis>=5.0.0
 # MCP (Model Context Protocol) server — SSE transport
 fastmcp>=2.0.0
 
-# HTTP (for future webhook support)
+# Auth (Clerk JWT validation)
+PyJWT[crypto]>=2.8.0
+
+# HTTP
 httpx>=0.26.0

@@ -98,8 +98,72 @@ def _make_error(error_code: str, user_message: str, recovery_action: str, **extr
     }
 
 
+async def _auth_async(api_key: str):
+    """Validate API key OR Clerk JWT token. Supports dual auth.
+
+    If api_key looks like a JWT (contains dots, doesn't start with sk_),
+    validates as Clerk OAuth token. Otherwise validates as API key.
+    """
+    if not api_key or api_key in ("", "sk_test_default", "your_api_key", "YOUR_API_KEY"):
+        raise ToolError(
+            '{"error": "invalid_api_key", '
+            '"user_message": "I need your Talk2Data API key to proceed. '
+            'You can find it at https://spss.insightgenius.io/account. '
+            'It looks like sk_test_... or sk_live_...", '
+            '"recovery_action": "Ask the user for their API key. Do NOT retry with a guessed key.", '
+            '"docs_url": "https://spss.insightgenius.io/docs/mcp#authentication"}'
+        )
+
+    # Check if this is a Clerk JWT token (has 3 dot-separated parts, doesn't start with sk_)
+    if "." in api_key and not api_key.startswith("sk_") and api_key.count(".") == 2:
+        try:
+            from middleware.clerk_auth import validate_clerk_token
+            user = await validate_clerk_token(api_key)
+            # Return a KeyConfig-like object for compatibility
+            from auth import KeyConfig
+            return KeyConfig(
+                key_hash="oauth",
+                name=user.email or user.user_id,
+                plan=user.plan,
+                scopes=["process", "metadata", "convert", "crosstab", "frequency", "parse_ticket"],
+            )
+        except ValueError as e:
+            raise ToolError(
+                '{"error": "invalid_token", '
+                '"user_message": "Your OAuth session has expired or is invalid. '
+                'Please reconnect Talk2Data in Claude.ai settings.", '
+                '"recovery_action": "Tell the user to go to Claude.ai Settings > Connectors > Talk2Data > Reconnect", '
+                f'"details": "{e}"}}'
+            )
+
+    # Standard API key validation
+    try:
+        return get_key_config(api_key)
+    except ValueError:
+        raise ToolError(
+            '{"error": "invalid_api_key", '
+            '"user_message": "The API key you provided is not valid. '
+            'Please check your key at https://spss.insightgenius.io/account. '
+            'It should look like sk_test_... or sk_live_...", '
+            '"recovery_action": "Ask the user to verify their API key. Do NOT retry with a different guessed key.", '
+            '"docs_url": "https://spss.insightgenius.io/docs/mcp#authentication"}'
+        )
+
+
 def _auth(api_key: str):
-    """Validate API key, raise ToolError with actionable guidance on failure."""
+    """Sync wrapper for backwards compatibility. For new code, use _auth_async."""
+    # For JWT tokens, we need async. For API keys, sync is fine.
+    if "." in api_key and not api_key.startswith("sk_") and api_key.count(".") == 2:
+        import asyncio
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # We're already in an async context — use create_task workaround
+            raise ToolError(
+                "OAuth tokens require async auth. This tool should use _auth_async instead of _auth."
+            )
+        return loop.run_until_complete(_auth_async(api_key))
+
+    # Standard API key — sync validation
     if not api_key or api_key in ("", "sk_test_default", "your_api_key", "YOUR_API_KEY"):
         raise ToolError(
             '{"error": "invalid_api_key", '
@@ -423,7 +487,7 @@ async def spss_upload_file(
         filename:    Original filename with extension (e.g., 'survey.sav').
         file_id:     Pre-uploaded file_id from /v1/files/upload or a previous session.
     """
-    _auth(api_key)
+    await _auth_async(api_key)
 
     # If file_id provided, validate it exists and return session info
     if file_id:
@@ -555,7 +619,7 @@ async def get_spss_metadata(
         filename:        Original filename (default: upload.sav).
         response_format: 'json' or 'markdown'.
     """
-    _auth(api_key)
+    await _auth_async(api_key)
     file_bytes, fmt = await _resolve_file(file_id, file_base64, filename)
     try:
         data = await run_in_executor(_load_data, file_bytes, fmt, filename)
@@ -601,7 +665,7 @@ async def get_variable_info(
         filename:        Original filename (default: upload.sav).
         response_format: 'json' or 'markdown'.
     """
-    _auth(api_key)
+    await _auth_async(api_key)
     # Accept either single variable or list
     var_list = variables or ([variable] if variable else [])
     if not var_list:
@@ -665,7 +729,7 @@ async def analyze_frequencies(
         filename:        Original filename (default: upload.sav).
         response_format: 'json' or 'markdown'.
     """
-    _auth(api_key)
+    await _auth_async(api_key)
     var_list = variables or ([variable] if variable else [])
     if not var_list:
         raise ToolError("Provide 'variable' or 'variables'.")
@@ -735,7 +799,7 @@ async def analyze_crosstabs(
         filename:           Original filename (default: upload.sav).
         response_format:    'json' or 'markdown'.
     """
-    _auth(api_key)
+    await _auth_async(api_key)
     # Accept both v1 (row_variable/col_variable) and v2 (row/col) param names
     actual_row = row or row_variable
     actual_col = col or col_variable
@@ -806,7 +870,7 @@ async def export_data(
         file_base64:            Base64-encoded file content.
         filename:               Original filename (default: upload.sav).
     """
-    _auth(api_key)
+    await _auth_async(api_key)
     actual_format = format or target_format
     valid_formats = {"xlsx", "csv", "dta", "parquet"}
     if actual_format not in valid_formats:
@@ -868,7 +932,7 @@ async def analyze_correlation(
         filename:        Original filename (default: upload.sav).
         response_format: 'json' or 'markdown'.
     """
-    _auth(api_key)
+    await _auth_async(api_key)
     from routers.correlation import _run_correlation
 
     file_bytes, fmt = await _resolve_file(file_id, file_base64, filename)
@@ -924,7 +988,7 @@ async def analyze_anova(
         filename:        Original filename (default: upload.sav).
         response_format: 'json' or 'markdown'.
     """
-    _auth(api_key)
+    await _auth_async(api_key)
     from routers.anova import _run_anova
 
     file_bytes, fmt = await _resolve_file(file_id, file_base64, filename)
@@ -978,7 +1042,7 @@ async def analyze_gap(
         filename:          Original filename (default: upload.sav).
         response_format:   'json' or 'markdown'.
     """
-    _auth(api_key)
+    await _auth_async(api_key)
     from routers.gap_analysis import _run_gap_analysis
 
     file_bytes, fmt = await _resolve_file(file_id, file_base64, filename)
@@ -1036,7 +1100,7 @@ async def summarize_satisfaction(
         filename:        Original filename (default: upload.sav).
         response_format: 'json' or 'markdown'.
     """
-    _auth(api_key)
+    await _auth_async(api_key)
     from routers.satisfaction import _run_satisfaction_summary
 
     file_bytes, fmt = await _resolve_file(file_id, file_base64, filename)
@@ -1116,7 +1180,7 @@ async def create_tabulation(
         filename:             Original filename (default: upload.sav).
         response_format:      'json' or 'markdown'.
     """
-    _auth(api_key)
+    await _auth_async(api_key)
     file_bytes, fmt = await _resolve_file(file_id, file_base64, filename)
     try:
         data = await run_in_executor(_load_data, file_bytes, fmt, filename)
@@ -1235,7 +1299,7 @@ async def auto_analyze(
         filename:           Original filename (default: upload.sav).
         response_format:    'json' or 'markdown'.
     """
-    _auth(api_key)
+    await _auth_async(api_key)
     from routers.auto_analyze import _run_auto_analyze
 
     file_bytes, fmt = await _resolve_file(file_id, file_base64, filename)

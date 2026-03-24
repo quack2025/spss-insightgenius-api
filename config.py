@@ -44,6 +44,16 @@ class Settings(BaseSettings):
     spss_session_ttl_seconds: int = 1800  # 30 minutes sliding window
     redis_max_file_size_mb: int = 100
 
+    # Clerk (OAuth 2.0 auth provider)
+    clerk_publishable_key: str = ""
+    clerk_secret_key: str = ""
+    clerk_jwt_issuer: str = ""  # Auto-detected from publishable key if empty
+    clerk_domain: str = ""  # e.g., "beloved-redbird-68.clerk.accounts.dev" or "clerk.insightgenius.io"
+
+    # Supabase (user data, API keys, usage tracking)
+    supabase_url: str = ""
+    supabase_service_role_key: str = ""
+
     # Base URL for download links
     base_url: str = "https://spss.insightgenius.io"
 
@@ -69,6 +79,30 @@ class Settings(BaseSettings):
             return origins if isinstance(origins, list) else ["*"]
         except json.JSONDecodeError:
             return ["*"]
+
+    @property
+    def clerk_frontend_api(self) -> str:
+        """Derive Clerk Frontend API URL from publishable key or explicit domain."""
+        if self.clerk_domain:
+            return f"https://{self.clerk_domain}"
+        if self.clerk_publishable_key:
+            # pk_test_<base64_domain>$ → decode to get domain
+            import base64
+            try:
+                encoded = self.clerk_publishable_key.split("_")[-1].rstrip("$")
+                # Add padding
+                encoded += "=" * (4 - len(encoded) % 4) if len(encoded) % 4 else ""
+                domain = base64.b64decode(encoded).decode("utf-8")
+                return f"https://{domain}"
+            except Exception:
+                pass
+        return ""
+
+    @property
+    def clerk_jwks_url(self) -> str:
+        """JWKS URL for validating Clerk JWTs."""
+        frontend = self.clerk_frontend_api
+        return f"{frontend}/.well-known/jwks.json" if frontend else ""
 
     def rate_limit_for_plan(self, plan: str) -> int:
         limits = {
