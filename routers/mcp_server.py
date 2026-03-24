@@ -304,23 +304,71 @@ async def spss_get_server_info() -> dict[str, Any]:
 
 async def spss_upload_file(
     api_key: str,
-    file_base64: str,
+    file_base64: str | None = None,
     filename: str = "upload.sav",
+    file_id: str | None = None,
 ) -> dict[str, Any]:
     """Upload a data file to create a reusable file session.
 
     Stores the file in Redis with a 30-minute sliding TTL. Returns a file_id
     that you pass to all subsequent tools instead of re-uploading.
 
+    For large files (> 1MB): ask the user to upload at https://spss.insightgenius.io/upload
+    and give you the file_id. Then pass that file_id here.
+
     Supported formats: .sav (SPSS), .csv, .tsv, .xlsx, .xls.
     For CSV/Excel: metadata is inferred from column names and dtypes (no SPSS labels).
 
     Args:
         api_key:     Your API key (sk_test_... or sk_live_...).
-        file_base64: Base64-encoded file contents.
+        file_base64: Base64-encoded file contents (optional if file_id provided).
         filename:    Original filename with extension (e.g., 'survey.sav').
+        file_id:     Pre-uploaded file_id from /v1/files/upload or a previous session.
     """
     _auth(api_key)
+
+    # If file_id provided, validate it exists and return session info
+    if file_id:
+        r = await _get_redis()
+        if r is None:
+            raise ToolError("File sessions require Redis (REDIS_URL).")
+        try:
+            meta_raw = await r.get(f"spss:meta:{file_id}")
+            await r.aclose()
+        except Exception as e:
+            try:
+                await r.aclose()
+            except Exception:
+                pass
+            raise ToolError(f"Redis error: {e}")
+
+        if not meta_raw:
+            raise ToolError(f"file_id '{file_id}' not found or expired.")
+        import json as _json2
+        meta = _json2.loads(meta_raw)
+        return {
+            "file_id": file_id,
+            "filename": meta.get("filename", "unknown"),
+            "format_detected": meta.get("format", "sav"),
+            "n_cases": meta.get("n_cases", 0),
+            "n_variables": meta.get("n_variables", 0),
+            "size_bytes": meta.get("size_bytes", 0),
+            "message": f"File session active. Use file_id='{file_id}' in subsequent tool calls.",
+        }
+
+    # If no file_base64, return instructions for large file upload
+    if not file_base64:
+        return {
+            "file_id": None,
+            "upload_url": "https://spss.insightgenius.io/upload",
+            "api_endpoint": "https://spss.insightgenius.io/v1/files/upload",
+            "message": (
+                "No file provided. For large files, ask the user to upload at "
+                "https://spss.insightgenius.io/upload and give you the file_id. "
+                "For small files (< 1MB), pass file_base64 directly."
+            ),
+        }
+
     file_bytes = _decode_base64(file_base64)
 
     settings = get_settings()
@@ -328,7 +376,8 @@ async def spss_upload_file(
     if len(file_bytes) > max_bytes:
         raise ToolError(
             f"File too large ({len(file_bytes) / 1024 / 1024:.1f} MB). "
-            f"Maximum: {settings.redis_max_file_size_mb} MB."
+            f"Maximum: {settings.redis_max_file_size_mb} MB. "
+            f"For large files, upload at https://spss.insightgenius.io/upload instead."
         )
 
     # Validate the file can be loaded before storing

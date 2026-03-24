@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Upload File — Talk2Data InsightGenius</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .drop-active { border-color: #2563eb !important; background: #eff6ff !important; }
+        .file-id-box { font-family: 'Courier New', monospace; letter-spacing: 0.5px; }
+        @keyframes pulse-border { 0%,100% { border-color: #2563eb; } 50% { border-color: #93c5fd; } }
+        .uploading { animation: pulse-border 1.5s ease-in-out infinite; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 px-6 py-4">
+        <div class="max-w-2xl mx-auto flex items-center justify-between">
+            <div>
+                <h1 class="text-xl font-bold text-gray-900">Talk2Data InsightGenius</h1>
+                <p class="text-sm text-gray-500">Upload file for Claude analysis</p>
+            </div>
+            <a href="/export" class="text-sm text-blue-600 hover:text-blue-800">Full Processor &rarr;</a>
+        </div>
+    </header>
+
+    <!-- Main -->
+    <main class="flex-1 flex items-center justify-center px-6 py-12">
+        <div class="max-w-lg w-full">
+
+            <!-- Step 1: API Key -->
+            <div id="step-key" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold">1</div>
+                    <h2 class="text-lg font-semibold text-gray-900">Enter your API Key</h2>
+                </div>
+                <input id="apiKeyInput" type="password" placeholder="sk_test_... or sk_live_..."
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    autocomplete="off"/>
+                <p class="mt-2 text-xs text-gray-400">Your key is sent directly to the API and never stored in the browser.</p>
+            </div>
+
+            <!-- Step 2: Upload -->
+            <div id="step-upload" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold">2</div>
+                    <h2 class="text-lg font-semibold text-gray-900">Upload your file</h2>
+                </div>
+
+                <div id="dropZone"
+                    class="border-2 border-dashed border-gray-300 rounded-xl p-10 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all">
+                    <svg class="mx-auto mb-3 w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    <p class="text-gray-600 font-medium" id="dropText">Drop your file here or click to browse</p>
+                    <p class="text-xs text-gray-400 mt-2">.sav, .csv, .tsv, .xlsx, .xls — up to 50 MB</p>
+                </div>
+                <input type="file" id="fileInput" class="hidden" accept=".sav,.csv,.tsv,.xlsx,.xls"/>
+
+                <!-- Progress -->
+                <div id="progressBar" class="hidden mt-4">
+                    <div class="flex justify-between text-xs text-gray-500 mb-1">
+                        <span id="progressFile"></span>
+                        <span id="progressPct">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="progressFill" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width:0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Result -->
+            <div id="step-result" class="hidden bg-white rounded-xl shadow-sm border-2 border-green-200 p-6 mb-6">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center text-sm font-bold">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    </div>
+                    <h2 class="text-lg font-semibold text-gray-900">File uploaded!</h2>
+                </div>
+
+                <p class="text-sm text-gray-600 mb-3">Give this code to Claude:</p>
+
+                <div class="relative">
+                    <div id="fileIdDisplay" class="file-id-box bg-gray-900 text-green-400 text-lg font-bold px-5 py-4 rounded-lg text-center select-all"></div>
+                    <button id="copyBtn" onclick="copyFileId()"
+                        class="absolute right-3 top-1/2 -translate-y-1/2 bg-gray-700 hover:bg-gray-600 text-white text-xs px-3 py-1.5 rounded-md transition-colors">
+                        Copy
+                    </button>
+                </div>
+
+                <div id="fileMeta" class="mt-4 grid grid-cols-3 gap-3 text-center"></div>
+
+                <div class="mt-4 p-3 bg-blue-50 rounded-lg">
+                    <p class="text-xs text-blue-800">
+                        <strong>Tell Claude:</strong> "My file_id is <span id="fileIdInline" class="font-mono"></span>. Analyze the frequencies."
+                    </p>
+                </div>
+
+                <p class="mt-3 text-xs text-gray-400 text-center">Session expires in 30 minutes of inactivity.</p>
+
+                <button onclick="resetUpload()" class="mt-4 w-full py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">Upload another file</button>
+            </div>
+
+            <!-- Error -->
+            <div id="step-error" class="hidden bg-white rounded-xl shadow-sm border-2 border-red-200 p-6 mb-6">
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center text-sm font-bold">!</div>
+                    <h2 class="text-lg font-semibold text-red-800">Upload failed</h2>
+                </div>
+                <p id="errorMsg" class="text-sm text-red-600"></p>
+                <button onclick="resetUpload()" class="mt-4 text-sm text-blue-600 hover:text-blue-800">Try again</button>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center py-4 text-xs text-gray-400">
+        Talk2Data InsightGenius &mdash; Statistical Precision Guaranteed
+    </footer>
+
+    <script>
+    const BASE = window.location.origin;
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+
+    // Drag & drop
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drop-active'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drop-active'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drop-active');
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', () => { if (fileInput.files.length) handleFile(fileInput.files[0]); });
+
+    async function handleFile(file) {
+        const apiKey = document.getElementById('apiKeyInput').value.trim();
+        if (!apiKey) {
+            document.getElementById('apiKeyInput').focus();
+            document.getElementById('apiKeyInput').classList.add('ring-2', 'ring-red-400');
+            setTimeout(() => document.getElementById('apiKeyInput').classList.remove('ring-2', 'ring-red-400'), 2000);
+            return;
+        }
+
+        // Validate extension
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (!['sav','csv','tsv','xlsx','xls'].includes(ext)) {
+            showError(`Unsupported format .${ext}. Accepted: .sav, .csv, .tsv, .xlsx, .xls`);
+            return;
+        }
+
+        // Show progress
+        document.getElementById('progressBar').classList.remove('hidden');
+        document.getElementById('progressFile').textContent = `${file.name} (${(file.size/1024/1024).toFixed(1)} MB)`;
+        document.getElementById('progressPct').textContent = '0%';
+        document.getElementById('progressFill').style.width = '0%';
+        document.getElementById('dropText').textContent = 'Uploading...';
+        dropZone.classList.add('uploading');
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `${BASE}/v1/files/upload?api_key=${encodeURIComponent(apiKey)}`);
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const pct = Math.round((e.loaded / e.total) * 100);
+                    document.getElementById('progressPct').textContent = pct + '%';
+                    document.getElementById('progressFill').style.width = pct + '%';
+                }
+            };
+
+            xhr.onload = () => {
+                dropZone.classList.remove('uploading');
+                if (xhr.status === 200) {
+                    const data = JSON.parse(xhr.responseText);
+                    showResult(data);
+                } else {
+                    let msg = 'Upload failed';
+                    try { msg = JSON.parse(xhr.responseText).error || msg; } catch(e) {}
+                    if (typeof msg === 'object') msg = msg.error || JSON.stringify(msg);
+                    showError(msg);
+                }
+            };
+
+            xhr.onerror = () => {
+                dropZone.classList.remove('uploading');
+                showError('Network error. Check your connection and try again.');
+            };
+
+            xhr.send(formData);
+        } catch (err) {
+            dropZone.classList.remove('uploading');
+            showError(err.message);
+        }
+    }
+
+    function showResult(data) {
+        document.getElementById('step-upload').classList.add('hidden');
+        document.getElementById('step-error').classList.add('hidden');
+        document.getElementById('step-result').classList.remove('hidden');
+        document.getElementById('fileIdDisplay').textContent = data.file_id;
+        document.getElementById('fileIdInline').textContent = data.file_id;
+
+        const meta = document.getElementById('fileMeta');
+        meta.innerHTML = `
+            <div class="bg-gray-50 rounded-lg p-3">
+                <div class="text-lg font-bold text-gray-900">${data.n_cases?.toLocaleString() || '?'}</div>
+                <div class="text-xs text-gray-500">Cases</div>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3">
+                <div class="text-lg font-bold text-gray-900">${data.n_variables?.toLocaleString() || '?'}</div>
+                <div class="text-xs text-gray-500">Variables</div>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3">
+                <div class="text-lg font-bold text-gray-900">${(data.size_bytes / 1024 / 1024).toFixed(1)}</div>
+                <div class="text-xs text-gray-500">MB</div>
+            </div>
+        `;
+    }
+
+    function showError(msg) {
+        document.getElementById('step-upload').classList.add('hidden');
+        document.getElementById('step-result').classList.add('hidden');
+        document.getElementById('step-error').classList.remove('hidden');
+        document.getElementById('errorMsg').textContent = msg;
+    }
+
+    function resetUpload() {
+        document.getElementById('step-upload').classList.remove('hidden');
+        document.getElementById('step-result').classList.add('hidden');
+        document.getElementById('step-error').classList.add('hidden');
+        document.getElementById('progressBar').classList.add('hidden');
+        document.getElementById('dropText').textContent = 'Drop your file here or click to browse';
+        dropZone.classList.remove('uploading');
+        fileInput.value = '';
+    }
+
+    function copyFileId() {
+        const id = document.getElementById('fileIdDisplay').textContent;
+        navigator.clipboard.writeText(id).then(() => {
+            const btn = document.getElementById('copyBtn');
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = 'Copy', 1500);
+        });
+    }
+    </script>
+</body>
+</html>
