@@ -46,19 +46,19 @@ def test_list_files_valid_key():
 
 def test_list_files_invalid_key():
     from fastmcp.exceptions import ToolError
-    with pytest.raises(ToolError, match="Invalid API key"):
+    with pytest.raises(ToolError, match="invalid_api_key"):
         run(list_files(api_key="sk_test_bad_key"))
 
 
 def test_list_files_missing_key():
     from fastmcp.exceptions import ToolError
-    with pytest.raises(ToolError, match="required"):
+    with pytest.raises(ToolError, match="invalid_api_key"):
         run(list_files(api_key=""))
 
 
 def test_list_files_bad_prefix():
     from fastmcp.exceptions import ToolError
-    with pytest.raises(ToolError, match="format"):
+    with pytest.raises(ToolError, match="invalid_api_key"):
         run(list_files(api_key="not_a_valid_key"))
 
 
