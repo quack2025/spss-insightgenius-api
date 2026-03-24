@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>API Keys | InsightGenius</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "inverse-on-surface": "#eaf1ff",
+              "on-tertiary-container": "#faecff",
+              "background": "#f8f9ff",
+              "on-primary-container": "#eeefff",
+              "on-secondary-container": "#00217a",
+              "on-background": "#0b1c30",
+              "surface-dim": "#cbdbf5",
+              "on-secondary-fixed-variant": "#173bab",
+              "surface-container": "#e5eeff",
+              "tertiary": "#762fb3",
+              "on-primary-fixed-variant": "#003ea8",
+              "primary-fixed": "#dbe1ff",
+              "surface-container-high": "#dce9ff",
+              "inverse-surface": "#213145",
+              "secondary": "#3755c3",
+              "on-tertiary-fixed-variant": "#661aa3",
+              "secondary-container": "#708cfd",
+              "secondary-fixed-dim": "#b8c4ff",
+              "outline": "#737686",
+              "on-secondary-fixed": "#001453",
+              "tertiary-container": "#904bce",
+              "surface-bright": "#f8f9ff",
+              "primary-container": "#2563eb",
+              "tertiary-fixed": "#f1dbff",
+              "on-tertiary-fixed": "#2d0050",
+              "primary": "#004ac6",
+              "outline-variant": "#c3c6d7",
+              "error-container": "#ffdad6",
+              "on-surface-variant": "#434655",
+              "inverse-primary": "#b4c5ff",
+              "surface-tint": "#0053db",
+              "surface-container-highest": "#d3e4fe",
+              "tertiary-fixed-dim": "#dfb7ff",
+              "on-secondary": "#ffffff",
+              "on-primary": "#ffffff",
+              "primary-fixed-dim": "#b4c5ff",
+              "surface-container-lowest": "#ffffff",
+              "surface": "#f8f9ff",
+              "secondary-fixed": "#dde1ff",
+              "error": "#ba1a1a",
+              "on-surface": "#0b1c30",
+              "on-error-container": "#93000a",
+              "surface-variant": "#d3e4fe",
+              "surface-container-low": "#eff4ff",
+              "on-error": "#ffffff",
+              "on-primary-fixed": "#00174b",
+              "on-tertiary": "#ffffff"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .code-block {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body antialiased">
+<!-- SideNavBar (Authority: Shared Components JSON) -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-[#eff4ff] flex flex-col h-full py-6 px-4 z-40">
+<div class="mb-10 px-2">
+<h1 class="text-lg font-black text-[#0b1c30] tracking-tighter uppercase">InsightGenius</h1>
+<p class="text-[10px] text-[#0b1c30]/60 font-bold tracking-widest uppercase mt-1">Precision Architect</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-[#0b1c30]/60 hover:bg-[#dce9ff] transition-all duration-150 ease-in-out font-['Inter'] text-sm font-medium" href="#">
+<span class="material-symbols-outlined text-lg">add_chart</span>
+                New Analysis
+            </a>
+<!-- Active State Logic applied to API Keys -->
+<a class="flex items-center gap-3 px-3 py-2 bg-[#dbe1ff] text-[#004ac6] border-l-4 border-[#004ac6] transition-all duration-150 ease-in-out font-['Inter'] text-sm font-medium" href="#">
+<span class="material-symbols-outlined text-lg">vpn_key</span>
+                API Keys
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#0b1c30]/60 hover:bg-[#dce9ff] transition-all duration-150 ease-in-out font-['Inter'] text-sm font-medium" href="#">
+<span class="material-symbols-outlined text-lg">bar_chart</span>
+                Usage
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#0b1c30]/60 hover:bg-[#dce9ff] transition-all duration-150 ease-in-out font-['Inter'] text-sm font-medium" href="#">
+<span class="material-symbols-outlined text-lg">payments</span>
+                Billing
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#0b1c30]/60 hover:bg-[#dce9ff] transition-all duration-150 ease-in-out font-['Inter'] text-sm font-medium" href="#">
+<span class="material-symbols-outlined text-lg">description</span>
+                Docs
+            </a>
+</nav>
+<div class="mt-auto pt-6 space-y-4">
+<div class="bg-primary/5 rounded-xl p-4 border border-primary/10">
+<p class="text-xs font-bold text-primary mb-2 uppercase tracking-tight">Pro Plan Active</p>
+<button class="w-full py-2 bg-gradient-to-br from-primary to-primary-container text-white text-xs font-bold rounded-lg shadow-sm hover:opacity-90 transition-opacity">
+                    Upgrade to Pro
+                </button>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-[#0b1c30]/60 hover:bg-[#dce9ff] cursor-pointer rounded-lg transition-all duration-150">
+<span class="material-symbols-outlined text-lg">logout</span>
+<span class="font-['Inter'] text-sm font-medium">Sign Out</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 min-h-screen p-8 lg:p-12 max-w-[1400px]">
+<!-- Header Section -->
+<header class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+<div class="space-y-2">
+<div class="flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">vpn_key</span>
+<span class="text-xs font-bold tracking-widest uppercase">Developer Interface</span>
+</div>
+<h2 class="text-4xl font-extrabold tracking-tight text-on-background">API Keys Management</h2>
+<p class="text-on-surface-variant max-w-xl text-sm leading-relaxed">
+                    Generate and manage secure access tokens for the InsightGenius Statistical Engine. Integrate high-precision analysis directly into your workflow.
+                </p>
+</div>
+<button class="flex items-center gap-2 px-6 py-3 bg-primary text-white font-bold rounded-xl shadow-lg hover:shadow-primary/20 active:scale-95 transition-all">
+<span class="material-symbols-outlined">add</span>
+                Create New Key
+            </button>
+</header>
+<!-- API Keys Bento Grid -->
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
+<!-- Table Container (Taking 2 cols) -->
+<div class="lg:col-span-2 bg-surface-container-low rounded-2xl overflow-hidden">
+<div class="p-6 border-b border-outline-variant/10 bg-surface-container-high/30 flex justify-between items-center">
+<h3 class="text-sm font-bold uppercase tracking-wider text-on-surface">Active Credentials</h3>
+<span class="px-2 py-0.5 bg-success text-[#16A34A] text-[10px] font-bold rounded border border-[#16A34A]/20">3 ACTIVE</span>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-high/20">
+<th class="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-outline">Name</th>
+<th class="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-outline text-center">Plan</th>
+<th class="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-outline">Scopes</th>
+<th class="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-outline">Created</th>
+<th class="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-outline text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/5">
+<tr class="hover:bg-surface-container-lowest transition-colors group">
+<td class="px-6 py-5">
+<div class="flex flex-col">
+<span class="text-sm font-bold text-on-surface">Production_Main_App</span>
+<div class="flex items-center gap-2 mt-1">
+<code class="text-[10px] bg-surface-container-highest px-1.5 py-0.5 rounded text-primary font-mono tracking-tight">ig_live_••••8x2k</code>
+<button class="opacity-0 group-hover:opacity-100 transition-opacity"><span class="material-symbols-outlined text-xs text-outline hover:text-primary">content_copy</span></button>
+</div>
+</div>
+</td>
+<td class="px-6 py-5 text-center">
+<span class="px-2 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-full">ENTERPRISE</span>
+</td>
+<td class="px-6 py-5">
+<div class="flex flex-wrap gap-1">
+<span class="px-1.5 py-0.5 bg-outline-variant/20 text-on-surface-variant text-[9px] font-bold rounded">read:stats</span>
+<span class="px-1.5 py-0.5 bg-outline-variant/20 text-on-surface-variant text-[9px] font-bold rounded">write:data</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="text-[11px] font-medium text-on-surface-variant">Oct 12, 2024</span>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-[10px] font-bold text-error uppercase tracking-tighter hover:bg-error/10 px-3 py-1.5 rounded transition-colors">Revoke</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors group">
+<td class="px-6 py-5">
+<div class="flex flex-col">
+<span class="text-sm font-bold text-on-surface">Development_Local</span>
+<div class="flex items-center gap-2 mt-1">
+<code class="text-[10px] bg-surface-container-highest px-1.5 py-0.5 rounded text-primary font-mono tracking-tight">ig_test_••••3w1q</code>
+<button class="opacity-0 group-hover:opacity-100 transition-opacity"><span class="material-symbols-outlined text-xs text-outline hover:text-primary">content_copy</span></button>
+</div>
+</div>
+</td>
+<td class="px-6 py-5 text-center">
+<span class="px-2 py-1 bg-surface-container-highest text-on-surface-variant text-[10px] font-bold rounded-full">DEVELOPER</span>
+</td>
+<td class="px-6 py-5">
+<div class="flex flex-wrap gap-1">
+<span class="px-1.5 py-0.5 bg-outline-variant/20 text-on-surface-variant text-[9px] font-bold rounded">read:stats</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="text-[11px] font-medium text-on-surface-variant">Nov 03, 2024</span>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-[10px] font-bold text-error uppercase tracking-tighter hover:bg-error/10 px-3 py-1.5 rounded transition-colors">Revoke</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors group">
+<td class="px-6 py-5">
+<div class="flex flex-col">
+<span class="text-sm font-bold text-on-surface">Claude_MCP_Connector</span>
+<div class="flex items-center gap-2 mt-1">
+<code class="text-[10px] bg-surface-container-highest px-1.5 py-0.5 rounded text-primary font-mono tracking-tight">ig_mcp_••••9l0p</code>
+<button class="opacity-0 group-hover:opacity-100 transition-opacity"><span class="material-symbols-outlined text-xs text-outline hover:text-primary">content_copy</span></button>
+</div>
+</div>
+</td>
+<td class="px-6 py-5 text-center">
+<span class="px-2 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-full">ENTERPRISE</span>
+</td>
+<td class="px-6 py-5">
+<div class="flex flex-wrap gap-1">
+<span class="px-1.5 py-0.5 bg-outline-variant/20 text-on-surface-variant text-[9px] font-bold rounded">full:access</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="text-[11px] font-medium text-on-surface-variant">2 hours ago</span>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-[10px] font-bold text-error uppercase tracking-tighter hover:bg-error/10 px-3 py-1.5 rounded transition-colors">Revoke</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Stats/Info Card -->
+<div class="space-y-6">
+<div class="bg-surface-container-highest rounded-2xl p-6 relative overflow-hidden">
+<div class="relative z-10">
+<h4 class="text-xs font-bold uppercase tracking-widest text-primary mb-4">Security Overview</h4>
+<div class="space-y-4">
+<div class="flex justify-between items-center">
+<span class="text-xs font-medium text-on-surface-variant">Last Rotation</span>
+<span class="text-[11px] font-bold text-on-surface">14 Days Ago</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-xs font-medium text-on-surface-variant">Active Requests</span>
+<span class="text-[11px] font-bold text-on-surface">242/sec</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-xs font-medium text-on-surface-variant">Health Status</span>
+<div class="flex items-center gap-1.5">
+<div class="w-1.5 h-1.5 rounded-full bg-success"></div>
+<span class="text-[11px] font-bold text-success uppercase">Optimal</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Decorative element -->
+<div class="absolute -right-4 -bottom-4 opacity-10 pointer-events-none">
+<span class="material-symbols-outlined text-8xl" style="font-variation-settings: 'FILL' 1;">security</span>
+</div>
+</div>
+<div class="bg-primary rounded-2xl p-6 text-white shadow-xl shadow-primary/20">
+<h4 class="text-xs font-bold uppercase tracking-widest text-primary-fixed mb-2">Need higher limits?</h4>
+<p class="text-sm font-medium leading-relaxed opacity-90 mb-4">Scale your analysis with our Custom Enterprise API solutions.</p>
+<button class="w-full py-3 bg-white text-primary font-bold text-xs rounded-xl hover:bg-surface-container-low transition-colors">
+                        Contact Solutions Architect
+                    </button>
+</div>
+</div>
+</section>
+<!-- Implementation Docs Section -->
+<section class="space-y-8">
+<div class="flex items-center gap-4">
+<div class="h-[1px] flex-1 bg-outline-variant/20"></div>
+<h3 class="text-[11px] font-black uppercase tracking-[0.2em] text-outline shrink-0">Implementation Guides</h3>
+<div class="h-[1px] flex-1 bg-outline-variant/20"></div>
+</div>
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+<!-- cURL -->
+<div class="bg-surface-container-lowest rounded-2xl p-6 shadow-sm border border-outline-variant/5">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg">terminal</span>
+<span class="text-sm font-bold text-on-surface">cURL</span>
+</div>
+<button class="p-1.5 hover:bg-surface-container rounded-lg transition-colors"><span class="material-symbols-outlined text-sm text-outline">content_copy</span></button>
+</div>
+<div class="bg-on-surface rounded-xl p-4 overflow-x-auto">
+<pre class="code-block text-[11px] text-surface-container-low leading-relaxed">curl -X GET "https://api.insightgenius.io/v1/analyze" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json"</pre>
+</div>
+</div>
+<!-- Python -->
+<div class="bg-surface-container-lowest rounded-2xl p-6 shadow-sm border border-outline-variant/5">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg">code</span>
+<span class="text-sm font-bold text-on-surface">Python SDK</span>
+</div>
+<button class="p-1.5 hover:bg-surface-container rounded-lg transition-colors"><span class="material-symbols-outlined text-sm text-outline">content_copy</span></button>
+</div>
+<div class="bg-on-surface rounded-xl p-4 overflow-x-auto">
+<pre class="code-block text-[11px] text-surface-container-low leading-relaxed">import insightgenius as ig
+
+client = ig.Client(api_key="YOUR_KEY")
+report = client.analyze(
+    dataset_id="ds_8293",
+    metrics=["p_value", "std_dev"]
+)</pre>
+</div>
+</div>
+<!-- MCP Config -->
+<div class="bg-surface-container-lowest rounded-2xl p-6 shadow-sm border border-outline-variant/5">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg">integration_instructions</span>
+<span class="text-sm font-bold text-on-surface">Claude Desktop (MCP)</span>
+</div>
+<button class="p-1.5 hover:bg-surface-container rounded-lg transition-colors"><span class="material-symbols-outlined text-sm text-outline">content_copy</span></button>
+</div>
+<div class="bg-on-surface rounded-xl p-4 overflow-x-auto">
+<pre class="code-block text-[11px] text-surface-container-low leading-relaxed">{
+  "mcpServers": {
+    "insight-genius": {
+      "command": "npx",
+      "args": ["@insightgenius/mcp-server"],
+      "env": { "IG_API_KEY": "YOUR_KEY" }
+    }
+  }
+}</pre>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer (Authority: Shared Components JSON) -->
+<footer class="ml-64 bg-[#f8f9ff] w-full py-12 border-t border-[#0b1c30]/5">
+<div class="max-w-7xl mx-auto px-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+<div class="flex flex-col gap-4">
+<span class="font-bold text-[#0b1c30]">InsightGenius</span>
+<p class="font-['Inter'] text-xs uppercase tracking-widest text-[#0b1c30]/50">
+                    © 2024 InsightGenius. Statistical Precision Guaranteed.
+                </p>
+</div>
+<div class="flex flex-wrap gap-6 md:justify-end">
+<a class="font-['Inter'] text-xs uppercase tracking-widest text-[#0b1c30]/50 hover:text-[#004ac6] transition-opacity" href="#">Privacy Policy</a>
+<a class="font-['Inter'] text-xs uppercase tracking-widest text-[#0b1c30]/50 hover:text-[#004ac6] transition-opacity" href="#">Terms of Service</a>
+<a class="font-['Inter'] text-xs uppercase tracking-widest text-[#0b1c30]/50 hover:text-[#004ac6] transition-opacity" href="#">Support</a>
+<a class="font-['Inter'] text-xs uppercase tracking-widest text-[#0b1c30]/50 hover:text-[#004ac6] transition-opacity" href="#">API Status</a>
+</div>
+</div>
+</footer>
+</body></html>

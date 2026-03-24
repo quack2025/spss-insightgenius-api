@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Usage &amp; Billing | InsightGenius</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "inverse-on-surface": "#eaf1ff",
+              "on-tertiary-container": "#faecff",
+              "background": "#f8f9ff",
+              "on-primary-container": "#eeefff",
+              "on-secondary-container": "#00217a",
+              "on-background": "#0b1c30",
+              "surface-dim": "#cbdbf5",
+              "on-secondary-fixed-variant": "#173bab",
+              "surface-container": "#e5eeff",
+              "tertiary": "#762fb3",
+              "on-primary-fixed-variant": "#003ea8",
+              "primary-fixed": "#dbe1ff",
+              "surface-container-high": "#dce9ff",
+              "inverse-surface": "#213145",
+              "secondary": "#3755c3",
+              "on-tertiary-fixed-variant": "#661aa3",
+              "secondary-container": "#708cfd",
+              "secondary-fixed-dim": "#b8c4ff",
+              "outline": "#737686",
+              "on-secondary-fixed": "#001453",
+              "tertiary-container": "#904bce",
+              "surface-bright": "#f8f9ff",
+              "primary-container": "#2563eb",
+              "tertiary-fixed": "#f1dbff",
+              "on-tertiary-fixed": "#2d0050",
+              "primary": "#004ac6",
+              "outline-variant": "#c3c6d7",
+              "error-container": "#ffdad6",
+              "on-surface-variant": "#434655",
+              "inverse-primary": "#b4c5ff",
+              "surface-tint": "#0053db",
+              "surface-container-highest": "#d3e4fe",
+              "tertiary-fixed-dim": "#dfb7ff",
+              "on-secondary": "#ffffff",
+              "on-primary": "#ffffff",
+              "primary-fixed-dim": "#b4c5ff",
+              "surface-container-lowest": "#ffffff",
+              "surface": "#f8f9ff",
+              "secondary-fixed": "#dde1ff",
+              "error": "#ba1a1a",
+              "on-surface": "#0b1c30",
+              "on-error-container": "#93000a",
+              "surface-variant": "#d3e4fe",
+              "surface-container-low": "#eff4ff",
+              "on-error": "#ffffff",
+              "on-primary-fixed": "#00174b",
+              "on-tertiary": "#ffffff"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(248, 249, 255, 0.8);
+            backdrop-filter: blur(12px);
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-background text-on-background antialiased overflow-hidden">
+<!-- Sidebar Navigation -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-surface-container-low flex flex-col py-6 px-4 z-40">
+<div class="mb-10 px-2">
+<h1 class="text-lg font-black text-on-background tracking-tighter">InsightGenius</h1>
+<p class="text-[10px] uppercase tracking-[0.2em] text-on-surface-variant font-bold opacity-70">Precision Architect</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container-high transition-all duration-150 rounded-lg group" href="#">
+<span class="material-symbols-outlined text-[20px]">add_chart</span>
+<span class="font-medium text-sm">New Analysis</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container-high transition-all duration-150 rounded-lg group" href="#">
+<span class="material-symbols-outlined text-[20px]">vpn_key</span>
+<span class="font-medium text-sm">API Keys</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container-high transition-all duration-150 rounded-lg group" href="#">
+<span class="material-symbols-outlined text-[20px]">bar_chart</span>
+<span class="font-medium text-sm">Usage</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 bg-primary-fixed text-primary border-l-4 border-primary transition-all duration-150 rounded-r-lg group" href="#">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">payments</span>
+<span class="font-medium text-sm">Billing</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-container-high transition-all duration-150 rounded-lg group" href="#">
+<span class="material-symbols-outlined text-[20px]">description</span>
+<span class="font-medium text-sm">Docs</span>
+</a>
+</nav>
+<div class="mt-auto space-y-4">
+<div class="bg-surface-container p-4 rounded-xl">
+<p class="text-[11px] font-bold text-primary uppercase tracking-wider mb-2">Current Tier</p>
+<p class="text-sm font-bold text-on-surface mb-3">Professional Plan</p>
+<button class="w-full bg-primary text-on-primary text-xs font-bold py-2 rounded-lg hover:opacity-90 transition-opacity active:scale-95 duration-200">
+                    Upgrade to Pro
+                </button>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-error transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-[20px]">logout</span>
+<span class="font-medium text-sm">Sign Out</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-64 h-screen overflow-y-auto bg-background p-8 no-scrollbar">
+<header class="max-w-5xl mx-auto mb-10">
+<h2 class="text-3xl font-extrabold tracking-tight text-on-surface">Usage &amp; Billing</h2>
+<p class="text-on-surface-variant mt-1 text-sm">Manage your statistical processing power and billing history.</p>
+</header>
+<div class="max-w-5xl mx-auto grid grid-cols-12 gap-6">
+<!-- Bento Row 1: Plan & Usage -->
+<section class="col-span-12 md:col-span-5 flex flex-col gap-6">
+<!-- Current Plan Card -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0_10px_30px_-5px_rgba(11,28,48,0.06)] relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4">
+<span class="bg-primary-fixed text-primary text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-tighter">Pro Tier</span>
+</div>
+<h3 class="text-on-surface-variant text-xs font-bold uppercase tracking-widest mb-1">Active Subscription</h3>
+<div class="flex items-baseline gap-1 mb-4">
+<span class="text-4xl font-black text-on-surface tracking-tighter">$49</span>
+<span class="text-on-surface-variant text-sm font-medium">/ month</span>
+</div>
+<p class="text-sm text-on-surface-variant leading-relaxed mb-6">Your next billing cycle starts on <span class="text-on-surface font-bold">Nov 12, 2024</span>.</p>
+<button class="flex items-center gap-2 text-primary font-bold text-sm group-hover:underline">
+                        Manage Plan 
+                        <span class="material-symbols-outlined text-sm">open_in_new</span>
+</button>
+</div>
+<!-- Plan Features -->
+<div class="bg-surface-container-low p-6 rounded-xl">
+<h3 class="text-on-surface-variant text-xs font-bold uppercase tracking-widest mb-4">Included in Professional</h3>
+<ul class="space-y-3">
+<li class="flex items-center gap-3 text-sm text-on-surface font-medium">
+<span class="material-symbols-outlined text-success text-[18px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                            Unlimited Data Sets
+                        </li>
+<li class="flex items-center gap-3 text-sm text-on-surface font-medium">
+<span class="material-symbols-outlined text-success text-[18px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                            Priority CPU Allocation
+                        </li>
+<li class="flex items-center gap-3 text-sm text-on-surface font-medium">
+<span class="material-symbols-outlined text-success text-[18px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                            Advanced P-Value Modeling
+                        </li>
+<li class="flex items-center gap-3 text-sm text-on-surface font-medium">
+<span class="material-symbols-outlined text-success text-[18px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                            SSO &amp; Team Access
+                        </li>
+</ul>
+</div>
+</section>
+<!-- Usage Dashboard -->
+<section class="col-span-12 md:col-span-7 bg-surface-container-lowest p-8 rounded-xl shadow-[0_10px_30px_-5px_rgba(11,28,48,0.06)] flex flex-col">
+<div class="flex justify-between items-start mb-8">
+<div>
+<h3 class="text-on-surface text-xl font-bold tracking-tight">Resource Utilization</h3>
+<p class="text-on-surface-variant text-xs font-medium">Current cycle: Oct 12 — Nov 12</p>
+</div>
+<span class="material-symbols-outlined text-outline-variant">analytics</span>
+</div>
+<div class="space-y-10">
+<!-- Analyses Progress -->
+<div>
+<div class="flex justify-between mb-3 items-end">
+<div class="flex flex-col">
+<span class="text-on-surface-variant text-xs font-bold uppercase tracking-widest">Analyses Processed</span>
+<span class="text-2xl font-black text-on-surface tracking-tighter">23 <span class="text-outline-variant text-lg font-normal">/ 50</span></span>
+</div>
+<span class="text-xs font-bold text-primary bg-primary-fixed px-2 py-0.5 rounded">46% Capacity</span>
+</div>
+<div class="h-3 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-primary to-primary-container rounded-full" style="width: 46%"></div>
+</div>
+</div>
+<!-- Storage Progress -->
+<div>
+<div class="flex justify-between mb-3 items-end">
+<div class="flex flex-col">
+<span class="text-on-surface-variant text-xs font-bold uppercase tracking-widest">Max File Size (Single Upload)</span>
+<span class="text-2xl font-black text-on-surface tracking-tighter">1.2 <span class="text-outline-variant text-lg font-normal">/ 5.0 GB</span></span>
+</div>
+</div>
+<div class="h-3 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-primary to-primary-container rounded-full" style="width: 24%"></div>
+</div>
+<p class="text-[11px] text-on-surface-variant mt-2 italic">* Largest individual SPSS file allowed on your current tier.</p>
+</div>
+<!-- API Calls Progress -->
+<div>
+<div class="flex justify-between mb-3 items-end">
+<div class="flex flex-col">
+<span class="text-on-surface-variant text-xs font-bold uppercase tracking-widest">API Endpoint Requests</span>
+<span class="text-2xl font-black text-on-surface tracking-tighter">8,402 <span class="text-outline-variant text-lg font-normal">/ 25k</span></span>
+</div>
+</div>
+<div class="h-3 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-primary to-primary-container rounded-full" style="width: 33%"></div>
+</div>
+</div>
+</div>
+<div class="mt-auto pt-8">
+<button class="w-full bg-primary text-on-primary py-4 rounded-xl font-bold text-sm shadow-lg shadow-primary/20 hover:shadow-xl transition-all active:scale-[0.98]">
+                        Upgrade to Enterprise Capacity
+                    </button>
+</div>
+</section>
+<!-- Invoice History -->
+<section class="col-span-12">
+<div class="bg-surface-container-low rounded-2xl overflow-hidden mt-4">
+<div class="p-6 flex justify-between items-center">
+<h3 class="text-on-surface font-bold">Invoice History</h3>
+<button class="text-xs font-bold text-primary-container hover:underline">Download All (CSV)</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-high border-b border-outline-variant/10">
+<th class="px-6 py-4 text-xs font-black text-on-surface-variant uppercase tracking-widest">Invoice ID</th>
+<th class="px-6 py-4 text-xs font-black text-on-surface-variant uppercase tracking-widest">Billing Date</th>
+<th class="px-6 py-4 text-xs font-black text-on-surface-variant uppercase tracking-widest">Amount</th>
+<th class="px-6 py-4 text-xs font-black text-on-surface-variant uppercase tracking-widest">Status</th>
+<th class="px-6 py-4 text-xs font-black text-on-surface-variant uppercase tracking-widest">Receipt</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/10">
+<tr class="hover:bg-surface-container transition-colors group">
+<td class="px-6 py-5 font-mono text-sm text-on-surface">#IG-998231</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">Oct 12, 2024</td>
+<td class="px-6 py-5 text-sm font-bold text-on-surface">$49.00</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-success/10 text-success uppercase">
+                                            Paid
+                                        </span>
+</td>
+<td class="px-6 py-5">
+<button class="text-primary material-symbols-outlined text-[20px] hover:scale-110 transition-transform">download</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container transition-colors group">
+<td class="px-6 py-5 font-mono text-sm text-on-surface">#IG-994512</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">Sep 12, 2024</td>
+<td class="px-6 py-5 text-sm font-bold text-on-surface">$49.00</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-success/10 text-success uppercase">
+                                            Paid
+                                        </span>
+</td>
+<td class="px-6 py-5">
+<button class="text-primary material-symbols-outlined text-[20px] hover:scale-110 transition-transform">download</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container transition-colors group">
+<td class="px-6 py-5 font-mono text-sm text-on-surface">#IG-991204</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">Aug 12, 2024</td>
+<td class="px-6 py-5 text-sm font-bold text-on-surface">$49.00</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-success/10 text-success uppercase">
+                                            Paid
+                                        </span>
+</td>
+<td class="px-6 py-5">
+<button class="text-primary material-symbols-outlined text-[20px] hover:scale-110 transition-transform">download</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</div>
+<!-- Professional Footer -->
+<footer class="max-w-5xl mx-auto mt-16 pt-12 pb-12 border-t border-outline-variant/10 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+<div class="flex flex-col gap-2">
+<span class="font-bold text-on-surface tracking-tighter">InsightGenius</span>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant opacity-60">© 2024 InsightGenius. Statistical Precision Guaranteed.</p>
+</div>
+<div class="flex md:justify-end gap-6">
+<a class="text-[10px] uppercase tracking-widest text-on-surface-variant hover:text-primary font-bold transition-colors" href="#">Privacy Policy</a>
+<a class="text-[10px] uppercase tracking-widest text-on-surface-variant hover:text-primary font-bold transition-colors" href="#">Terms of Service</a>
+<a class="text-[10px] uppercase tracking-widest text-on-surface-variant hover:text-primary font-bold transition-colors" href="#">Support</a>
+<a class="text-[10px] uppercase tracking-widest text-on-surface-variant hover:text-primary font-bold transition-colors" href="#">API Status</a>
+</div>
+</footer>
+</main>
+<!-- Bottom Notification (Simulated Toast) -->
+<div class="fixed bottom-6 right-6 z-50 animate-bounce hover:animate-none">
+<div class="bg-inverse-surface text-inverse-on-surface px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 border border-outline-variant/20">
+<div class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></div>
+<p class="text-sm font-bold tracking-tight">Enterprise beta now open for Precision Architect users.</p>
+<button class="ml-4 material-symbols-outlined text-sm opacity-50 hover:opacity-100">close</button>
+</div>
+</div>
+</body></html>

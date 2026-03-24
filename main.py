@@ -202,10 +202,38 @@ def create_application() -> FastAPI:
     # Serve frontend + static pages
     public_dir = Path(__file__).parent / "public"
     if public_dir.exists():
+        # Landing page (new Stitch design)
         @app.get("/", include_in_schema=False)
         async def root():
             return FileResponse(public_dir / "index.html")
 
+        # Auth pages
+        @app.get("/login", include_in_schema=False)
+        async def login_page():
+            return FileResponse(public_dir / "login.html")
+
+        @app.get("/signup", include_in_schema=False)
+        async def signup_page():
+            return FileResponse(public_dir / "signup.html")
+
+        # Dashboard pages
+        @app.get("/app", include_in_schema=False)
+        async def app_page():
+            return FileResponse(public_dir / "app.html")
+
+        @app.get("/app/dashboard", include_in_schema=False)
+        async def dashboard_page():
+            return FileResponse(public_dir / "dashboard.html")
+
+        @app.get("/app/keys", include_in_schema=False)
+        async def api_keys_page():
+            return FileResponse(public_dir / "api-keys.html")
+
+        @app.get("/app/billing", include_in_schema=False)
+        async def billing_page():
+            return FileResponse(public_dir / "billing.html")
+
+        # Info pages
         @app.get("/privacy", include_in_schema=False)
         async def privacy():
             return FileResponse(public_dir / "privacy.html")

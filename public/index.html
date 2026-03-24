@@ -1,1002 +1,631 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SPSS InsightGenius</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    body { font-family: 'Inter', sans-serif; }
-    .drop-zone { transition: all 0.2s; }
-    .drop-zone.dragover { border-color: #2563eb; background: #eff6ff; }
-    .fade-in { animation: fadeIn 0.3s ease-in; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-    .spinner { border: 3px solid #e5e7eb; border-top: 3px solid #2563eb; border-radius: 50%; width: 20px; height: 20px; animation: spin 0.8s linear infinite; display: inline-block; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    select[multiple] { min-height: 100px; }
-    .pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; cursor: default; }
-    .pill-blue { background: #dbeafe; color: #1e40af; }
-    .pill-green { background: #dcfce7; color: #166534; }
-    .pill-purple { background: #f3e8ff; color: #6b21a8; }
-    .pill .remove { cursor: pointer; opacity: 0.6; font-size: 14px; }
-    .pill .remove:hover { opacity: 1; }
-    .chip { padding: 6px 12px; border-radius: 8px; border: 1.5px solid #e5e7eb; font-size: 13px; cursor: pointer; transition: all 0.15s; user-select: none; }
-    .chip:hover { border-color: #93c5fd; background: #eff6ff; }
-    .chip.selected { border-color: #2563eb; background: #dbeafe; color: #1e40af; font-weight: 500; }
-    .section-badge { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 12px; font-weight: 700; }
-  </style>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>InsightGenius | Statistical Precision Guaranteed</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-error-container": "#93000a",
+                        "primary": "#004ac6",
+                        "on-surface": "#191c1e",
+                        "surface": "#f7f9fb",
+                        "surface-container-low": "#f2f4f6",
+                        "tertiary-container": "#007d55",
+                        "primary-container": "#2563eb",
+                        "background": "#f7f9fb",
+                        "on-primary-container": "#eeefff",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "on-surface-variant": "#434655",
+                        "secondary": "#4059aa",
+                        "tertiary": "#006242",
+                        "surface-dim": "#d8dadc",
+                        "secondary-fixed": "#dce1ff",
+                        "inverse-surface": "#2d3133",
+                        "on-tertiary": "#ffffff",
+                        "secondary-container": "#8fa7fe",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed": "#dbe1ff",
+                        "surface-variant": "#e0e3e5",
+                        "surface-container-high": "#e6e8ea",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-tertiary-fixed": "#002113",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "surface-container": "#eceef0",
+                        "surface-container-highest": "#e0e3e5",
+                        "tertiary-fixed": "#6ffbbe",
+                        "surface-bright": "#f7f9fb",
+                        "on-error": "#ffffff",
+                        "on-background": "#191c1e",
+                        "tertiary-fixed-dim": "#4edea3",
+                        "outline": "#737686",
+                        "on-primary": "#ffffff",
+                        "on-primary-fixed": "#00174b",
+                        "outline-variant": "#c3c6d7",
+                        "on-tertiary-container": "#bdffdb",
+                        "inverse-primary": "#b4c5ff",
+                        "secondary-fixed-dim": "#b6c4ff",
+                        "on-secondary-fixed-variant": "#264191",
+                        "error-container": "#ffdad6",
+                        "on-secondary": "#ffffff",
+                        "on-secondary-container": "#1d3989",
+                        "error": "#ba1a1a",
+                        "surface-tint": "#0053db",
+                        "on-secondary-fixed": "#00164e",
+                        "on-tertiary-fixed-variant": "#005236"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-panel { background: rgba(247, 249, 251, 0.8); backdrop-filter: blur(20px); }
+        .sig-letter { color: #ba1a1a; font-size: 0.6875rem; font-weight: 500; vertical-align: super; }
+    </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-
-  <header class="bg-white border-b border-gray-200">
-    <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-      <div>
-        <h1 class="text-xl font-bold text-gray-900">SPSS InsightGenius</h1>
-        <p class="text-sm text-gray-500">Upload SPSS &rarr; Professional crosstabs with significance testing</p>
-      </div>
-      <a href="/docs" target="_blank" class="text-sm text-blue-600 hover:text-blue-800 font-medium">API Docs &rarr;</a>
-    </div>
-  </header>
-
-  <main class="max-w-5xl mx-auto px-6 py-8 space-y-6">
-
-    <!-- Step 1: Upload -->
-    <section class="bg-white rounded-xl border border-gray-200 p-6">
-      <div class="flex items-center gap-2 mb-4">
-        <span class="section-badge bg-blue-600 text-white">1</span>
-        <h2 class="text-lg font-semibold text-gray-900">Upload files</h2>
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">SPSS file (.sav, .por, .zsav) <span class="text-red-500">*</span></label>
-          <div id="sav-drop" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400">
-            <div id="sav-icon" class="text-3xl mb-2">&#128202;</div>
-            <p id="sav-label" class="text-sm text-gray-500">Drop .sav, .por, or .zsav file here or click to browse</p>
-            <input type="file" id="sav-input" accept=".sav,.por,.zsav" class="hidden">
-          </div>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Reporting Ticket (.docx) <span class="text-gray-400">optional</span>
-            <span class="inline-block ml-1 w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold text-center leading-4 cursor-help" title="A Word document describing your reporting requirements (banners, stubs, sig level, nets). Our AI reads it and auto-configures your tables. If you don't have one, skip this and configure manually below.">?</span>
-          </label>
-          <div id="docx-drop" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400">
-            <div id="docx-icon" class="text-3xl mb-2">&#128203;</div>
-            <p id="docx-label" class="text-sm text-gray-500">Drop .docx reporting ticket here or click to browse</p>
-            <input type="file" id="docx-input" accept=".docx" class="hidden">
-          </div>
-        </div>
-      </div>
-      <div id="file-info" class="hidden mt-4 p-3 bg-blue-50 rounded-lg fade-in">
-        <p class="text-sm font-medium text-blue-900" id="file-info-text"></p>
-      </div>
-      <!-- Auto-Analyze quick action -->
-      <div id="auto-analyze-bar" class="hidden mt-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-200 fade-in">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-semibold text-indigo-900">One-click analysis</p>
-            <p class="text-xs text-indigo-600">AI auto-detects banners, nets, MRS groups and generates a complete Excel — zero config needed.</p>
-          </div>
-          <button id="auto-analyze-btn" onclick="autoAnalyze()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-5 rounded-lg text-sm transition-colors whitespace-nowrap flex items-center gap-1.5">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            Auto-Analyze
-          </button>
-        </div>
-        <div id="auto-progress" class="hidden mt-3">
-          <div class="flex items-center gap-2">
-            <div class="spinner"></div>
-            <p class="text-xs text-indigo-600" id="auto-progress-text">Running auto-analysis...</p>
-          </div>
-        </div>
-        <div id="auto-result" class="hidden mt-3 p-3 bg-white rounded-lg border border-green-200">
-          <div class="flex items-center justify-between">
-            <p class="text-sm font-medium text-green-800" id="auto-result-text"></p>
-            <button onclick="downloadAutoResult()" class="bg-green-600 hover:bg-green-700 text-white font-medium py-1.5 px-4 rounded-lg text-xs">Download .xlsx</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Step 2: Banners -->
-    <section id="banners-section" class="hidden bg-white rounded-xl border border-gray-200 p-6 fade-in">
-      <div class="flex items-center gap-2 mb-4">
-        <span class="section-badge bg-blue-600 text-white">2</span>
-        <h2 class="text-lg font-semibold text-gray-900">Select banners <span class="text-sm font-normal text-gray-400">(columns in your crosstab)</span></h2>
-      </div>
-      <p class="text-xs text-gray-500 mb-3">Banners are the demographic variables that appear as columns across the top of your table (e.g., Gender, Age, Region). Each banner category gets a letter for significance testing &mdash; e.g., Gender: Male (A), Female (B); Region: London (C), North (D), South (E).</p>
-      <div id="banner-chips" class="flex flex-wrap gap-2 mb-3"></div>
-      <div id="selected-banners" class="flex flex-wrap gap-2 min-h-[32px]"></div>
-    </section>
-
-    <!-- Step 3: Stubs + MRS -->
-    <section id="stubs-section" class="hidden bg-white rounded-xl border border-gray-200 p-6 fade-in">
-      <div class="flex items-center gap-2 mb-4">
-        <span class="section-badge bg-blue-600 text-white">3</span>
-        <h2 class="text-lg font-semibold text-gray-900">Select stubs <span class="text-sm font-normal text-gray-400">(rows in your crosstab)</span></h2>
-      </div>
-      <p class="text-xs text-gray-500 mb-3">Stubs are the questions that appear as rows in your tables. Each stub generates one crosstab sheet (or one block in single-sheet mode).</p>
-      <div class="flex items-center gap-3 mb-3">
-        <label class="flex items-center gap-1.5 text-sm cursor-pointer">
-          <input type="radio" name="stub-mode" value="all" checked class="text-blue-600"> All variables
-        </label>
-        <label class="flex items-center gap-1.5 text-sm cursor-pointer">
-          <input type="radio" name="stub-mode" value="select" class="text-blue-600"> Select specific
-        </label>
-      </div>
-      <select id="stubs-select" multiple class="hidden w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"></select>
-
-      <!-- MRS Groups -->
-      <div class="mt-4 pt-4 border-t border-gray-100">
-        <div class="flex items-center justify-between mb-2">
-          <label class="text-sm font-medium text-gray-700">Multiple Response Sets (MRS)</label>
-          <button onclick="toggleMrsPanel()" class="text-xs text-blue-600 hover:text-blue-800 font-medium">+ Add MRS group</button>
-        </div>
-        <p class="text-xs text-gray-400 mb-2"><strong>MRS = "select all that apply" questions</strong> (binary yes/no per option, e.g., brand awareness). Group the individual binary variables into one table where percentages can exceed 100%.</p>
-        <div id="mrs-groups" class="space-y-2"></div>
-        <div id="mrs-panel" class="hidden mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200 fade-in">
-          <div class="mb-3">
-            <label class="block text-xs font-medium text-gray-600 mb-1">Group name</label>
-            <input type="text" id="mrs-name" placeholder="e.g. Brand Awareness" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
-          </div>
-          <div class="mb-1">
-            <label class="block text-xs font-medium text-gray-600 mb-1">Select member variables <span id="mrs-count" class="text-gray-400">(0 selected)</span></label>
-            <input type="text" id="mrs-filter" placeholder="Type to filter variables..." class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs mb-1" oninput="filterMrsMembers()">
-          </div>
-          <select id="mrs-members" multiple class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" style="min-height:140px" onchange="updateMrsCount()"></select>
-          <p class="text-xs text-gray-400 mt-1">Hold Ctrl/Cmd to select multiple. Tip: filter by prefix (e.g. "AWARE" or "Q5")</p>
-          <div class="flex gap-2 mt-3">
-            <button onclick="addMrsGroup()" class="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Add group</button>
-            <button onclick="toggleMrsPanel()" class="px-4 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300">Cancel</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Grid/Battery Summary -->
-      <div class="mt-4 pt-4 border-t border-gray-100">
-        <div class="flex items-center justify-between mb-2">
-          <label class="text-sm font-medium text-gray-700">Grid / Battery Summary</label>
-          <button onclick="toggleGridPanel()" class="text-xs text-orange-600 hover:text-orange-800 font-medium" id="grid-add-btn">+ Add grid group</button>
-        </div>
-        <p class="text-xs text-gray-400 mb-2"><strong>Grid = rating scale questions with the same scale</strong> (e.g., 7 satisfaction questions all on 1-5). Shows Top 2 Box %, Bottom 2 Box %, and Mean in one compact summary sheet.</p>
-        <div id="grid-groups" class="space-y-2"></div>
-        <div id="grid-panel" class="hidden mt-3 p-4 bg-orange-50 rounded-lg border border-orange-200 fade-in">
-          <div class="mb-3">
-            <label class="block text-xs font-medium text-gray-600 mb-1">Group name</label>
-            <input type="text" id="grid-name" placeholder="e.g. Satisfaction Battery" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
-          </div>
-          <div class="mb-1">
-            <label class="block text-xs font-medium text-gray-600 mb-1">Select scale variables <span id="grid-count" class="text-gray-400">(0 selected)</span></label>
-            <input type="text" id="grid-filter" placeholder="Type to filter (e.g. sat_, Q20)..." class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs mb-1" oninput="filterGridMembers()">
-          </div>
-          <select id="grid-members" multiple class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm" style="min-height:140px" onchange="updateGridCount()"></select>
-          <p class="text-xs text-gray-400 mt-1">Select variables that share the same scale (e.g., all 1-5 satisfaction questions)</p>
-          <div class="flex flex-wrap gap-3 mt-3 mb-3">
-            <label class="text-xs font-medium text-gray-600">Show:</label>
-            <label class="flex items-center gap-1 text-xs"><input type="checkbox" id="grid-show-t2b" checked class="rounded text-orange-600"> Top 2 Box</label>
-            <label class="flex items-center gap-1 text-xs"><input type="checkbox" id="grid-show-b2b" checked class="rounded text-orange-600"> Bottom 2 Box</label>
-            <label class="flex items-center gap-1 text-xs"><input type="checkbox" id="grid-show-mean" checked class="rounded text-orange-600"> Mean</label>
-          </div>
-          <div class="flex gap-2 pt-2 border-t border-orange-200">
-            <button onclick="addGridGroup()" class="px-4 py-1.5 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700">Add grid</button>
-            <button onclick="toggleGridPanel()" class="px-4 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300">Cancel</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Step 4: Options -->
-    <section id="options-section" class="hidden bg-white rounded-xl border border-gray-200 p-6 fade-in">
-      <div class="flex items-center gap-2 mb-4">
-        <span class="section-badge bg-blue-600 text-white">4</span>
-        <h2 class="text-lg font-semibold text-gray-900">Options</h2>
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Significance level</label>
-          <select id="sig-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-            <option value="0.90">90%</option>
-            <option value="0.95" selected>95%</option>
-            <option value="0.99">99%</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Weight variable</label>
-          <select id="weight-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-            <option value="">None (unweighted)</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Report title</label>
-          <input type="text" id="title-input" placeholder="e.g. NPS Study Q1 2026" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-        </div>
-      </div>
-      <div class="mt-4 pt-4 border-t border-gray-100">
-        <label class="block text-sm font-medium text-gray-700 mb-3">Include in output</label>
-        <div class="flex flex-wrap gap-5">
-          <label class="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" id="opt-t2b" checked class="rounded text-blue-600 w-4 h-4"> Top 2 Box / Bottom 2 Box
-          </label>
-          <label class="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" id="opt-means" checked class="rounded text-blue-600 w-4 h-4"> Means with T-test
-          </label>
-        </div>
-        <p class="text-xs text-gray-400 mt-2">Top 2 Box / Bottom 2 Box (T2B/B2B) and Means auto-apply to scale variables (4-11 point scales). Significance letters (A, B, C...) show which columns are statistically different.</p>
-      </div>
-      <div class="mt-4 pt-4 border-t border-gray-100">
-        <label class="block text-sm font-medium text-gray-700 mb-3">Output format</label>
-        <div class="flex flex-wrap gap-4">
-          <label class="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="radio" name="output-mode" value="multi_sheet" checked class="text-blue-600"> One sheet per question
-          </label>
-          <label class="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="radio" name="output-mode" value="single_sheet" class="text-blue-600"> All questions in one sheet
-          </label>
-        </div>
-        <p class="text-xs text-gray-400 mt-2">Single sheet is ideal for scrolling, copy-paste to PPT, or comparing questions side by side.</p>
-      </div>
-    </section>
-
-    <!-- Step 5: Custom Groups -->
-    <section id="custom-groups-section" class="hidden bg-white rounded-xl border border-gray-200 p-6 fade-in">
-      <div class="flex items-center gap-2 mb-1">
-        <span class="section-badge bg-purple-600 text-white">5</span>
-        <h2 class="text-lg font-semibold text-gray-900">Custom Groups <span class="text-sm font-normal text-gray-400">(optional)</span></h2>
-      </div>
-      <p class="text-xs text-gray-500 mb-4">Define custom banner columns by combining conditions. Example: "London + Uber users" = region is London AND aware of Uber. Each group becomes a column with significance testing.</p>
-
-      <div id="custom-groups-list" class="space-y-2 mb-3"></div>
-
-      <div id="cg-builder" class="hidden p-4 bg-gray-50 rounded-lg border border-gray-200 fade-in">
-        <div class="mb-3">
-          <label class="block text-xs font-medium text-gray-600 mb-1">Group name</label>
-          <input type="text" id="cg-name" placeholder="e.g. London Uber Users" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
-        </div>
-
-        <label class="block text-xs font-medium text-gray-600 mb-1">Conditions <span class="text-gray-400">(all must be true &mdash; AND logic)</span></label>
-        <div id="cg-conditions" class="space-y-2 mb-3"></div>
-        <button onclick="addConditionRow()" class="text-xs text-blue-600 hover:text-blue-800 font-medium mb-3">+ Add condition</button>
-
-        <div class="flex gap-2 pt-2 border-t border-gray-200">
-          <button onclick="saveCustomGroup()" class="px-4 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700">Save group</button>
-          <button onclick="cancelCustomGroup()" class="px-4 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300">Cancel</button>
-        </div>
-      </div>
-
-      <button id="cg-add-btn" onclick="openCustomGroupBuilder()" class="text-sm text-purple-600 hover:text-purple-800 font-medium">+ Add custom group</button>
-    </section>
-
-    <!-- Generate -->
-    <section id="generate-section" class="hidden fade-in">
-      <!-- Summary bar -->
-      <div class="mb-3 p-3 bg-gray-100 rounded-lg">
-        <p class="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-1">Current configuration</p>
-        <div id="spec-summary" class="text-xs text-gray-600 font-mono">No configuration set &mdash; select banners above to start</div>
-      </div>
-
-      <button id="generate-btn" onclick="generate()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 px-6 rounded-xl text-base transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-        Generate Excel
-      </button>
-
-      <div id="progress" class="hidden mt-4 p-4 bg-white rounded-xl border border-gray-200 fade-in">
-        <div class="flex items-center gap-3">
-          <div class="spinner"></div>
-          <p id="progress-text" class="text-sm text-gray-600">Processing...</p>
-        </div>
-      </div>
-
-      <div id="result" class="hidden mt-4 p-4 bg-green-50 rounded-xl border border-green-200 fade-in">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-semibold text-green-800" id="result-text"></p>
-            <p class="text-xs text-green-600 mt-1" id="result-meta"></p>
-          </div>
-          <button onclick="downloadResult()" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-5 rounded-lg text-sm transition-colors flex items-center gap-1.5">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-            Download .xlsx
-          </button>
-        </div>
-      </div>
-
-      <div id="error" class="hidden mt-4 p-4 bg-red-50 rounded-xl border border-red-200 fade-in">
-        <div class="flex items-start gap-2">
-          <svg class="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          <div>
-            <p class="text-sm font-semibold text-red-800" id="error-text"></p>
-            <p class="text-xs text-red-600 mt-1">Check that your .sav file is valid and not corrupted. If the problem persists, try with fewer stubs or a smaller file. <a href="/docs" target="_blank" class="underline">API docs</a></p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- API Reference -->
-    <details class="bg-white rounded-xl border border-gray-200">
-      <summary class="px-6 py-4 cursor-pointer text-sm font-semibold text-gray-700 hover:text-gray-900">
-        API Reference &mdash; curl / Python / Node
-      </summary>
-      <div class="px-6 pb-6 text-sm">
-        <h3 class="font-semibold text-gray-800 mt-2 mb-2">curl &mdash; multiple banners + means + MRS</h3>
-        <pre class="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-xs"><code>curl -X POST https://spss.insightgenius.io/v1/tabulate \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -F "file=@survey.sav" \
-  -F 'spec={
-    "banners": ["gender", "region", "age_group"],
-    "stubs": ["_all_"],
-    "significance_level": 0.95,
-    "include_means": true,
-    "nets": {"sat_overall": {"Top 2 Box": [4,5], "Bottom 2 Box": [1,2]}},
-    "mrs_groups": {"Brand_Awareness": ["AWARE_A","AWARE_B","AWARE_C"]}
-  }' -o tabulation.xlsx</code></pre>
-
-        <h3 class="font-semibold text-gray-800 mt-4 mb-2">Python</h3>
-        <pre class="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-xs"><code>import requests, json
-
-resp = requests.post(
-    "https://spss.insightgenius.io/v1/tabulate",
-    headers={"Authorization": "Bearer YOUR_API_KEY"},
-    files={"file": open("survey.sav", "rb")},
-    data={"spec": json.dumps({
-        "banners": ["gender", "region"],
-        "stubs": ["_all_"],
-        "include_means": True,
-        "significance_level": 0.95,
-    })}
-)
-with open("tabulation.xlsx", "wb") as f:
-    f.write(resp.content)
-print(f"{resp.headers['X-Stubs-Success']} tables generated")</code></pre>
-
-        <h3 class="font-semibold text-gray-800 mt-4 mb-2">Node.js</h3>
-        <pre class="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-xs"><code>const fs = require("fs");
-const FormData = require("form-data");
-
-const form = new FormData();
-form.append("file", fs.createReadStream("survey.sav"));
-form.append("spec", JSON.stringify({
-  banners: ["gender", "region"],
-  stubs: ["_all_"],
-  include_means: true,
-  significance_level: 0.95,
-}));
-
-const resp = await fetch("https://spss.insightgenius.io/v1/tabulate", {
-  method: "POST",
-  headers: { Authorization: "Bearer YOUR_API_KEY", ...form.getHeaders() },
-  body: form,
-});
-fs.writeFileSync("tabulation.xlsx", Buffer.from(await resp.arrayBuffer()));
-console.log(`${resp.headers.get("X-Stubs-Success")} tables generated`);</code></pre>
-
-        <p class="mt-4 text-xs text-gray-500">Full interactive docs: <a href="/docs" target="_blank" class="text-blue-600 hover:underline">/docs</a> | <a href="/redoc" target="_blank" class="text-blue-600 hover:underline">/redoc</a></p>
-      </div>
-    </details>
-  </main>
-
-  <footer class="max-w-5xl mx-auto px-6 py-6 text-center text-xs text-gray-400">
-    SPSS InsightGenius &bull; Powered by QuantipyMRX &bull; Built by Genius Labs
-  </footer>
-
-<script>
-// ── State ──
-let savFile = null, docxFile = null, metadata = null, resultBlob = null, resultFilename = '';
-let selectedBanners = [];
-let mrsGroups = {};  // { "Brand Awareness": ["AWARE_A","AWARE_B"] }
-
-const API_KEY = 'sk_test_2a441a40c84ba0afe73efd47d6bb1066aac82ad5453360f3';
-const API_BASE = window.location.origin;
-
-// ── Drop zones ──
-function setupDropZone(dropId, inputId, labelId, iconId, onFile) {
-  const drop = document.getElementById(dropId), input = document.getElementById(inputId);
-  const label = document.getElementById(labelId), icon = document.getElementById(iconId);
-  drop.addEventListener('click', () => input.click());
-  input.addEventListener('change', e => { if (e.target.files[0]) onFile(e.target.files[0], label, icon); });
-  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
-  drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
-  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('dragover'); if (e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0], label, icon); });
-}
-setupDropZone('sav-drop', 'sav-input', 'sav-label', 'sav-icon', async (f, label, icon) => {
-  savFile = f; icon.textContent = '\u2705';
-  label.textContent = `${f.name} (${(f.size/1024).toFixed(0)} KB)`;
-  label.className = 'text-sm text-blue-700 font-medium';
-  await loadMetadata();
-});
-setupDropZone('docx-drop', 'docx-input', 'docx-label', 'docx-icon', (f, label, icon) => {
-  docxFile = f; icon.textContent = '\u2705';
-  label.textContent = `${f.name} (${(f.size/1024).toFixed(0)} KB)`;
-  label.className = 'text-sm text-blue-700 font-medium';
-});
-
-// ── Load metadata ──
-async function loadMetadata() {
-  const info = document.getElementById('file-info'), infoText = document.getElementById('file-info-text');
-  info.classList.remove('hidden'); infoText.textContent = 'Loading metadata...';
-  const form = new FormData(); form.append('file', savFile);
-  try {
-    const resp = await fetch(`${API_BASE}/v1/metadata`, { method: 'POST', headers: {'Authorization': `Bearer ${API_KEY}`}, body: form });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    metadata = (await resp.json()).data;
-    infoText.textContent = `${metadata.file_name} \u2014 ${metadata.n_cases.toLocaleString()} cases \u00d7 ${metadata.n_variables} variables`;
-    selectedBanners = []; mrsGroups = {}; gridGroups = {}; customGroups = [];
-    populateUI();
-    document.getElementById('auto-analyze-bar').classList.remove('hidden');
-    ['banners-section','stubs-section','options-section','custom-groups-section','generate-section'].forEach(id => document.getElementById(id).classList.remove('hidden'));
-  } catch (e) {
-    infoText.textContent = `Error: ${e.message}`; info.className = 'mt-4 p-3 bg-red-50 rounded-lg';
-  }
-}
-
-// ── Populate UI from metadata ──
-function populateUI() {
-  const chipsEl = document.getElementById('banner-chips');
-  const stubsSel = document.getElementById('stubs-select');
-  const weightSel = document.getElementById('weight-select');
-  const mrsSel = document.getElementById('mrs-members');
-  const gridSel = document.getElementById('grid-members');
-  chipsEl.innerHTML = ''; stubsSel.innerHTML = ''; mrsSel.innerHTML = ''; gridSel.innerHTML = '';
-  weightSel.innerHTML = '<option value="">None (unweighted)</option>';
-
-  // ── Smart banners: show suggested first, then separator, then rest ──
-  const suggestedVars = new Set((metadata.suggested_banners || []).map(b => b.variable));
-  const bannerVars = metadata.variables.filter(v => {
-    const vl = v.value_labels ? Object.keys(v.value_labels).length : 0;
-    return vl >= 2 && vl <= 15;
-  });
-  const suggested = bannerVars.filter(v => suggestedVars.has(v.name));
-  const rest = bannerVars.filter(v => !suggestedVars.has(v.name));
-
-  if (suggested.length > 0) {
-    const label = document.createElement('div');
-    label.className = 'w-full text-xs font-semibold text-green-700 mb-1';
-    label.textContent = 'Recommended banners';
-    chipsEl.appendChild(label);
-    for (const v of suggested) { chipsEl.appendChild(_makeBannerChip(v, true)); }
-    if (rest.length > 0) {
-      const sep = document.createElement('div');
-      sep.className = 'w-full border-t border-gray-200 my-2';
-      chipsEl.appendChild(sep);
-      const lbl2 = document.createElement('div');
-      lbl2.className = 'w-full text-xs text-gray-400 mb-1';
-      lbl2.textContent = 'Other variables';
-      chipsEl.appendChild(lbl2);
-    }
-  }
-  for (const v of rest) { chipsEl.appendChild(_makeBannerChip(v, false)); }
-
-  for (const v of metadata.variables) {
-    const label = v.label ? `${v.name} \u2014 ${v.label}` : v.name;
-    const vl = v.value_labels ? Object.keys(v.value_labels).length : 0;
-
-    // Stubs: all labeled variables
-    if (vl >= 2) {
-      const opt = document.createElement('option'); opt.value = v.name; opt.textContent = label;
-      stubsSel.appendChild(opt);
-    }
-
-    // MRS candidates: binary variables
-    if (vl === 2 || (v.type === 'numeric' && vl <= 2)) {
-      const opt = document.createElement('option'); opt.value = v.name; opt.textContent = label;
-      mrsSel.appendChild(opt);
-    }
-
-    // Grid candidates: scale variables (4+ value labels, numeric)
-    if (vl >= 4 && v.type === 'numeric') {
-      const opt = document.createElement('option'); opt.value = v.name; opt.textContent = label;
-      gridSel.appendChild(opt);
-    }
-  }
-
-  // ── Auto-detect weights from backend ──
-  const detectedWeights = metadata.detected_weights || [];
-  for (const v of metadata.variables) {
-    const label = v.label ? `${v.name} \u2014 ${v.label}` : v.name;
-    const lo = v.name.toLowerCase();
-    if (lo.includes('weight') || lo.includes('wt') || lo.includes('pond') || detectedWeights.includes(v.name)) {
-      const opt = document.createElement('option'); opt.value = v.name; opt.textContent = label;
-      weightSel.appendChild(opt);
-    }
-  }
-  // Auto-select first detected weight
-  if (detectedWeights.length > 0) {
-    weightSel.value = detectedWeights[0];
-  }
-
-  // ── Auto-populate MRS from detected_groups (awareness type) — user can remove ──
-  const detectedGroups = metadata.detected_groups || [];
-  const awarenessGroups = detectedGroups.filter(g => g.question_type === 'awareness');
-  if (awarenessGroups.length > 0) {
-    for (const g of awarenessGroups) {
-      const name = g.display_name || g.name || 'MRS Group';
-      const vars = g.variables || [];
-      if (vars.length >= 2) {
-        mrsGroups[name] = vars;
-      }
-    }
-    renderMrsGroups();
-    _showAutoDetectBadge('mrs-groups', `${awarenessGroups.length} MRS group(s) auto-detected`);
-  }
-
-  // ── Auto-populate Grids from detected_groups (scale type) — user can remove ──
-  const scaleGroups = detectedGroups.filter(g => g.question_type === 'scale');
-  if (scaleGroups.length > 0) {
-    for (const g of scaleGroups) {
-      const name = g.display_name || g.name || 'Grid';
-      const vars = g.variables || [];
-      if (vars.length >= 2) {
-        gridGroups[name] = { variables: vars, show: ['t2b', 'b2b', 'mean'] };
-      }
-    }
-    renderGridGroups();
-    _showAutoDetectBadge('grid-groups', `${scaleGroups.length} grid(s) auto-detected`);
-  }
-
-  // ── Auto-select first suggested banner (or first available) ──
-  const firstSuggested = suggested.length > 0 ? suggested[0] : (rest.length > 0 ? rest[0] : null);
-  if (firstSuggested) {
-    const chip = chipsEl.querySelector(`.chip[data-varname="${firstSuggested.name}"]`);
-    if (chip) toggleBanner(firstSuggested.name, chip);
-  }
-  updateSummary();
-}
-
-function _makeBannerChip(v, isSuggested) {
-  const vl = v.value_labels ? Object.keys(v.value_labels).length : 0;
-  const chip = document.createElement('button');
-  chip.className = 'chip';
-  const shortLabel = v.label || v.name;
-  const badge = isSuggested ? '<span class="ml-1 px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-semibold">AI</span>' : '';
-  chip.innerHTML = `<span class="font-medium">${shortLabel}</span> <span class="text-gray-400 text-xs">(${vl})</span>${badge}`;
-  chip.title = `${v.name}: ${v.label || ''} \u2014 ${vl} categories${isSuggested ? ' (recommended by AI)' : ''}`;
-  chip.dataset.varname = v.name;
-  chip.addEventListener('click', () => toggleBanner(v.name, chip));
-  return chip;
-}
-
-function _showAutoDetectBadge(containerId, text) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  const badge = document.createElement('div');
-  badge.className = 'text-xs text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5 flex items-center gap-1.5 mb-2 fade-in';
-  badge.innerHTML = `<span class="font-semibold">Auto-detected:</span> ${text}. You can edit or remove these.`;
-  container.parentNode.insertBefore(badge, container);
-}
-
-// ── Banner selection ──
-function toggleBanner(varName, chipEl) {
-  const idx = selectedBanners.indexOf(varName);
-  if (idx >= 0) {
-    selectedBanners.splice(idx, 1);
-    chipEl.classList.remove('selected');
-  } else {
-    selectedBanners.push(varName);
-    chipEl.classList.add('selected');
-  }
-  renderSelectedBanners();
-  updateSummary();
-}
-
-function renderSelectedBanners() {
-  const el = document.getElementById('selected-banners');
-  if (selectedBanners.length === 0) { el.innerHTML = '<span class="text-xs text-gray-400">No banners selected</span>'; return; }
-  el.innerHTML = selectedBanners.map((b, i) => {
-    const v = metadata.variables.find(v => v.name === b);
-    const label = v?.label || b;
-    const nCats = v?.value_labels ? Object.keys(v.value_labels).length : '?';
-    return `<span class="pill pill-blue">${label} <span class="text-blue-400 text-xs">(${nCats})</span> <span class="remove" onclick="removeBanner('${b}')">&times;</span></span>`;
-  }).join('');
-}
-
-function removeBanner(varName) {
-  selectedBanners = selectedBanners.filter(b => b !== varName);
-  document.querySelectorAll('.chip').forEach(c => { if (c.dataset.varname === varName) c.classList.remove('selected'); });
-  renderSelectedBanners(); updateSummary();
-}
-
-// ── Stub mode ──
-document.querySelectorAll('input[name="stub-mode"]').forEach(r => {
-  r.addEventListener('change', e => { document.getElementById('stubs-select').classList.toggle('hidden', e.target.value === 'all'); updateSummary(); });
-});
-
-// ── MRS groups ──
-function toggleMrsPanel() { document.getElementById('mrs-panel').classList.toggle('hidden'); }
-
-function addMrsGroup() {
-  const name = document.getElementById('mrs-name').value.trim();
-  const sel = document.getElementById('mrs-members');
-  const members = Array.from(sel.selectedOptions).map(o => o.value);
-  if (!name) { alert('Enter a group name'); return; }
-  if (members.length < 2) { alert('Select at least 2 variables'); return; }
-  mrsGroups[name] = members;
-  renderMrsGroups();
-  document.getElementById('mrs-name').value = '';
-  sel.selectedIndex = -1;
-  toggleMrsPanel();
-  updateSummary();
-}
-
-function removeMrsGroup(name) { delete mrsGroups[name]; renderMrsGroups(); updateSummary(); }
-
-function filterMrsMembers() {
-  const q = document.getElementById('mrs-filter').value.toLowerCase();
-  const sel = document.getElementById('mrs-members');
-  for (const opt of sel.options) {
-    opt.hidden = q && !opt.textContent.toLowerCase().includes(q) && !opt.value.toLowerCase().includes(q);
-  }
-}
-
-function updateMrsCount() {
-  const sel = document.getElementById('mrs-members');
-  const n = sel.selectedOptions.length;
-  document.getElementById('mrs-count').textContent = `(${n} selected)`;
-}
-
-function renderMrsGroups() {
-  const el = document.getElementById('mrs-groups');
-  const entries = Object.entries(mrsGroups);
-  if (entries.length === 0) { el.innerHTML = ''; return; }
-  el.innerHTML = entries.map(([name, members]) =>
-    `<div class="flex items-center gap-2"><span class="pill pill-purple">${name} (${members.length} vars) <span class="remove" onclick="removeMrsGroup('${name}')">&times;</span></span></div>`
-  ).join('');
-}
-
-// ── Grid/Battery Groups ──
-let gridGroups = {};  // {"Satisfaction Battery": {variables: [...], show: ["t2b","b2b","mean"]}}
-
-function toggleGridPanel() { document.getElementById('grid-panel').classList.toggle('hidden'); }
-
-function filterGridMembers() {
-  const q = document.getElementById('grid-filter').value.toLowerCase();
-  for (const opt of document.getElementById('grid-members').options) {
-    opt.hidden = q && !opt.textContent.toLowerCase().includes(q) && !opt.value.toLowerCase().includes(q);
-  }
-}
-
-function updateGridCount() {
-  document.getElementById('grid-count').textContent = `(${document.getElementById('grid-members').selectedOptions.length} selected)`;
-}
-
-function addGridGroup() {
-  const name = document.getElementById('grid-name').value.trim();
-  const members = Array.from(document.getElementById('grid-members').selectedOptions).map(o => o.value);
-  if (!name) { alert('Enter a group name'); return; }
-  if (members.length < 2) { alert('Select at least 2 variables'); return; }
-  const show = [];
-  if (document.getElementById('grid-show-t2b').checked) show.push('t2b');
-  if (document.getElementById('grid-show-b2b').checked) show.push('b2b');
-  if (document.getElementById('grid-show-mean').checked) show.push('mean');
-  if (show.length === 0) { alert('Select at least one metric to show'); return; }
-  gridGroups[name] = { variables: members, show };
-  renderGridGroups();
-  document.getElementById('grid-name').value = '';
-  document.getElementById('grid-members').selectedIndex = -1;
-  toggleGridPanel();
-  updateSummary();
-}
-
-function removeGridGroup(name) { delete gridGroups[name]; renderGridGroups(); updateSummary(); }
-
-function renderGridGroups() {
-  const el = document.getElementById('grid-groups');
-  const entries = Object.entries(gridGroups);
-  if (entries.length === 0) { el.innerHTML = ''; return; }
-  el.innerHTML = entries.map(([name, cfg]) => {
-    const metrics = cfg.show.map(s => ({t2b:'T2B', b2b:'B2B', mean:'Mean', median:'Median'}[s] || s)).join(', ');
-    return `<div class="flex items-start gap-2 p-2 bg-orange-50 rounded-lg border border-orange-200">
-      <div class="flex-1">
-        <span class="text-sm font-medium text-orange-900">${name}</span>
-        <p class="text-xs text-orange-600 mt-0.5">${cfg.variables.length} variables | Metrics: ${metrics}</p>
-      </div>
-      <button onclick="removeGridGroup('${name}')" class="text-orange-400 hover:text-orange-700 text-lg leading-none mt-0.5">&times;</button>
-    </div>`;
-  }).join('');
-}
-
-// ── Custom Groups ──
-let customGroups = [];  // [{name: "...", conditions: [{variable, operator, value}]}]
-
-function openCustomGroupBuilder() {
-  document.getElementById('cg-builder').classList.remove('hidden');
-  document.getElementById('cg-add-btn').classList.add('hidden');
-  document.getElementById('cg-name').value = '';
-  document.getElementById('cg-conditions').innerHTML = '';
-  addConditionRow();
-}
-
-function cancelCustomGroup() {
-  document.getElementById('cg-builder').classList.add('hidden');
-  document.getElementById('cg-add-btn').classList.remove('hidden');
-}
-
-function addConditionRow() {
-  const container = document.getElementById('cg-conditions');
-  const row = document.createElement('div');
-  row.className = 'flex gap-2 items-center';
-
-  // Variable select
-  let varOpts = '<option value="">-- Variable --</option>';
-  for (const v of metadata.variables) {
-    const label = v.label ? `${v.name} - ${v.label}` : v.name;
-    varOpts += `<option value="${v.name}">${label}</option>`;
-  }
-
-  row.innerHTML = `
-    <select class="cg-var flex-1 border border-gray-300 rounded px-2 py-1.5 text-xs" onchange="onCgVarChange(this)">${varOpts}</select>
-    <select class="cg-op w-20 border border-gray-300 rounded px-2 py-1.5 text-xs">
-      <option value="eq">=</option>
-      <option value="ne">!=</option>
-      <option value="gt">&gt;</option>
-      <option value="gte">&gt;=</option>
-      <option value="lt">&lt;</option>
-      <option value="lte">&lt;=</option>
-      <option value="in">in</option>
-    </select>
-    <select class="cg-val flex-1 border border-gray-300 rounded px-2 py-1.5 text-xs">
-      <option value="">-- Select variable first --</option>
-    </select>
-    <button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>
-  `;
-  container.appendChild(row);
-}
-
-function onCgVarChange(selectEl) {
-  const varName = selectEl.value;
-  const row = selectEl.parentElement;
-  const valSelect = row.querySelector('.cg-val');
-  valSelect.innerHTML = '';
-
-  if (!varName) { valSelect.innerHTML = '<option value="">--</option>'; return; }
-
-  const v = metadata.variables.find(x => x.name === varName);
-  if (v && v.value_labels) {
-    for (const [code, label] of Object.entries(v.value_labels)) {
-      const opt = document.createElement('option');
-      opt.value = code;
-      opt.textContent = `${label} (${code})`;
-      valSelect.appendChild(opt);
-    }
-  } else {
-    // Numeric input fallback
-    valSelect.outerHTML = `<input type="number" step="any" class="cg-val flex-1 border border-gray-300 rounded px-2 py-1.5 text-xs" placeholder="Value">`;
-  }
-}
-
-function saveCustomGroup() {
-  const name = document.getElementById('cg-name').value.trim();
-  if (!name) { alert('Enter a group name'); return; }
-
-  const rows = document.querySelectorAll('#cg-conditions > div');
-  const conditions = [];
-  for (const row of rows) {
-    const varSel = row.querySelector('.cg-var');
-    const opSel = row.querySelector('.cg-op');
-    const valEl = row.querySelector('.cg-val');
-    if (!varSel?.value) continue;
-
-    let value = valEl?.value;
-    // Try to parse as number
-    const num = parseFloat(value);
-    if (!isNaN(num)) value = num;
-
-    conditions.push({ variable: varSel.value, operator: opSel.value, value });
-  }
-
-  if (conditions.length === 0) { alert('Add at least one condition'); return; }
-
-  customGroups.push({ name, conditions });
-  renderCustomGroups();
-  cancelCustomGroup();
-  updateSummary();
-}
-
-function removeCustomGroup(idx) { customGroups.splice(idx, 1); renderCustomGroups(); updateSummary(); }
-
-function renderCustomGroups() {
-  const el = document.getElementById('custom-groups-list');
-  if (customGroups.length === 0) { el.innerHTML = ''; return; }
-  el.innerHTML = customGroups.map((g, i) => {
-    const condStr = g.conditions.map(c => {
-      const v = metadata.variables.find(x => x.name === c.variable);
-      const varLabel = v?.label || c.variable;
-      let valLabel = c.value;
-      if (v?.value_labels) {
-        const vl = v.value_labels[String(c.value)];
-        if (vl) valLabel = vl;
-      }
-      const opLabels = {eq:'=', ne:'!=', gt:'>', gte:'>=', lt:'<', lte:'<=', 'in':'in'};
-      return `${varLabel} ${opLabels[c.operator]||c.operator} ${valLabel}`;
-    }).join(' AND ');
-    return `<div class="flex items-start gap-2 p-2 bg-purple-50 rounded-lg border border-purple-200">
-      <div class="flex-1">
-        <span class="text-sm font-medium text-purple-900">${g.name}</span>
-        <p class="text-xs text-purple-600 mt-0.5">${condStr}</p>
-      </div>
-      <button onclick="removeCustomGroup(${i})" class="text-purple-400 hover:text-purple-700 text-lg leading-none mt-0.5">&times;</button>
-    </div>`;
-  }).join('');
-}
-
-// ── Summary bar ──
-function updateSummary() {
-  const el = document.getElementById('spec-summary');
-  if (!metadata || (selectedBanners.length === 0 && customGroups.length === 0)) { el.textContent = 'Select at least one banner or create a custom group to continue'; return; }
-  const stubMode = document.querySelector('input[name="stub-mode"]:checked')?.value || 'all';
-  const nStubs = stubMode === 'all' ? 'all' : document.getElementById('stubs-select').selectedOptions.length || 'all';
-  const nMrs = Object.keys(mrsGroups).length;
-  const nGrid = Object.keys(gridGroups).length;
-  const nCg = customGroups.length;
-  const parts = [];
-  if (selectedBanners.length > 0) parts.push(`Banners: ${selectedBanners.join(' + ')}`);
-  parts.push(`Stubs: ${nStubs}`);
-  if (nMrs > 0) parts.push(`MRS: ${nMrs}`);
-  if (nGrid > 0) parts.push(`Grids: ${nGrid}`);
-  if (nCg > 0) parts.push(`Custom: ${nCg}`);
-  el.textContent = parts.join(' | ');
-}
-
-// ── Scale detection ──
-function detectScaleVars() {
-  if (!metadata) return [];
-  return metadata.variables.filter(v => {
-    if (!v.value_labels) return false;
-    const n = Object.keys(v.value_labels).length;
-    if (n < 4 || n > 11) return false;
-    const vals = Object.keys(v.value_labels).map(Number).filter(x => !isNaN(x)).sort((a,b) => a-b);
-    return vals.length >= 4;
-  }).map(v => ({ name: v.name, values: Object.keys(v.value_labels).map(Number).filter(x => !isNaN(x)).sort((a,b) => a-b) }));
-}
-
-// ── Generate ──
-async function generate() {
-  if (selectedBanners.length === 0 && customGroups.length === 0) { alert('Select at least one banner or create a custom group'); return; }
-
-  const btn = document.getElementById('generate-btn');
-  const progress = document.getElementById('progress'), progressText = document.getElementById('progress-text');
-  const result = document.getElementById('result'), error = document.getElementById('error');
-
-  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Processing...';
-  progress.classList.remove('hidden'); result.classList.add('hidden'); error.classList.add('hidden');
-  progressText.textContent = 'Uploading file and running crosstabs...';
-
-  const stubMode = document.querySelector('input[name="stub-mode"]:checked').value;
-  let stubs = ['_all_'];
-  if (stubMode === 'select') {
-    stubs = Array.from(document.getElementById('stubs-select').selectedOptions).map(o => o.value);
-    if (stubs.length === 0) stubs = ['_all_'];
-  }
-
-  const outputMode = document.querySelector('input[name="output-mode"]:checked')?.value || 'multi_sheet';
-  const spec = {
-    stubs,
-    significance_level: parseFloat(document.getElementById('sig-select').value),
-    include_means: document.getElementById('opt-means').checked,
-    include_total_column: true,
-    output_mode: outputMode,
-    title: document.getElementById('title-input').value || undefined,
-  };
-
-  if (selectedBanners.length > 0) spec.banners = selectedBanners;
-  if (customGroups.length > 0) spec.custom_groups = customGroups;
-  if (Object.keys(gridGroups).length > 0) spec.grid_groups = gridGroups;
-
-  const weight = document.getElementById('weight-select').value;
-  if (weight) spec.weight = weight;
-
-  // Auto T2B/B2B — use preset_nets from backend when available, else local detection
-  if (document.getElementById('opt-t2b').checked) {
-    spec.nets = {};
-    const bannerSet = new Set(selectedBanners);
-    const presetNets = metadata.preset_nets || {};
-    if (Object.keys(presetNets).length > 0) {
-      // Use backend-detected nets (Likert-5, Likert-7, NPS scales)
-      for (const [varName, nets] of Object.entries(presetNets)) {
-        if (!bannerSet.has(varName)) spec.nets[varName] = nets;
-      }
-    }
-    // Also add any scales not covered by presets (local fallback)
-    const scales = detectScaleVars();
-    for (const s of scales) {
-      if (!spec.nets[s.name] && !bannerSet.has(s.name)) {
-        spec.nets[s.name] = { 'Top 2 Box': s.values.slice(-2), 'Bottom 2 Box': s.values.slice(0, 2) };
-      }
-    }
-    if (Object.keys(spec.nets).length === 0) delete spec.nets;
-  }
-
-  // MRS
-  if (Object.keys(mrsGroups).length > 0) spec.mrs_groups = mrsGroups;
-
-  const form = new FormData();
-  form.append('file', savFile);
-  form.append('spec', JSON.stringify(spec));
-  if (docxFile) form.append('ticket', docxFile);
-
-  try {
-    const start = performance.now();
-    const resp = await fetch(`${API_BASE}/v1/tabulate`, { method: 'POST', headers: {'Authorization': `Bearer ${API_KEY}`}, body: form });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ detail: { message: `HTTP ${resp.status}` } }));
-      throw new Error(err.detail?.message || err.detail || `HTTP ${resp.status}`);
-    }
-    const elapsed = Math.round(performance.now() - start);
-    resultBlob = await resp.blob();
-    const total = resp.headers.get('X-Stubs-Total') || '?';
-    const success = resp.headers.get('X-Stubs-Success') || '?';
-    const failed = resp.headers.get('X-Stubs-Failed') || '0';
-    const serverMs = resp.headers.get('X-Processing-Time-Ms') || '?';
-    const cd = resp.headers.get('Content-Disposition') || '';
-    const fn = cd.match(/filename="([^"]+)"/);
-    resultFilename = fn ? fn[1] : `tabulation.xlsx`;
-
-    progress.classList.add('hidden'); result.classList.remove('hidden');
-    document.getElementById('result-text').textContent = `${success}/${total} tables generated` + (parseInt(failed) > 0 ? ` (${failed} failed)` : '');
-    document.getElementById('result-meta').textContent = `${(resultBlob.size/1024).toFixed(0)} KB \u2014 ${serverMs}ms server / ${elapsed}ms total \u2014 ${selectedBanners.length} banner(s)`;
-  } catch (e) {
-    progress.classList.add('hidden'); error.classList.remove('hidden');
-    document.getElementById('error-text').textContent = `Error: ${e.message}`;
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg> Generate Excel';
-  }
-}
-
-function downloadResult() {
-  if (!resultBlob) return;
-  const a = document.createElement('a'); a.href = URL.createObjectURL(resultBlob); a.download = resultFilename; a.click(); URL.revokeObjectURL(a.href);
-}
-
-// ── Auto-Analyze ──
-let autoResultBlob = null, autoResultFilename = '';
-
-async function autoAnalyze() {
-  if (!savFile) { alert('Upload a .sav file first'); return; }
-  const btn = document.getElementById('auto-analyze-btn');
-  const prog = document.getElementById('auto-progress');
-  const progText = document.getElementById('auto-progress-text');
-  const res = document.getElementById('auto-result');
-
-  btn.disabled = true; btn.textContent = 'Processing...';
-  prog.classList.remove('hidden'); res.classList.add('hidden');
-  progText.textContent = 'AI is detecting banners, groups, nets and building your Excel...';
-
-  const form = new FormData();
-  form.append('file', savFile);
-  form.append('options', JSON.stringify({ output_mode: 'multi_sheet', significance_level: 0.95 }));
-
-  try {
-    const start = performance.now();
-    const resp = await fetch(`${API_BASE}/v1/auto-analyze`, { method: 'POST', headers: {'Authorization': `Bearer ${API_KEY}`}, body: form });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ detail: { message: `HTTP ${resp.status}` } }));
-      throw new Error(err.detail?.message || err.detail || `HTTP ${resp.status}`);
-    }
-    const elapsed = Math.round(performance.now() - start);
-    autoResultBlob = await resp.blob();
-    const total = resp.headers.get('X-Stubs-Total') || '?';
-    const success = resp.headers.get('X-Stubs-Success') || '?';
-    const banners = resp.headers.get('X-Banners') || '?';
-    const mrs = resp.headers.get('X-MRS-Groups') || '0';
-    const grids = resp.headers.get('X-Grid-Groups') || '0';
-    const cd = resp.headers.get('Content-Disposition') || '';
-    const fn = cd.match(/filename="([^"]+)"/);
-    autoResultFilename = fn ? fn[1] : 'auto_analysis.xlsx';
-
-    prog.classList.add('hidden'); res.classList.remove('hidden');
-    document.getElementById('auto-result-text').textContent =
-      `${success}/${total} tables | Banners: ${banners} | MRS: ${mrs} | Grids: ${grids} | ${(autoResultBlob.size/1024).toFixed(0)}KB | ${elapsed}ms`;
-  } catch (e) {
-    prog.classList.add('hidden');
-    alert(`Auto-analyze error: ${e.message}`);
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Auto-Analyze';
-  }
-}
-
-function downloadAutoResult() {
-  if (!autoResultBlob) return;
-  const a = document.createElement('a'); a.href = URL.createObjectURL(autoResultBlob); a.download = autoResultFilename; a.click(); URL.revokeObjectURL(a.href);
-}
-</script>
-</body>
-</html>
+<body class="bg-surface text-on-surface font-body selection:bg-primary-container selection:text-white">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md shadow-sm dark:shadow-none">
+<div class="flex justify-between items-center max-w-7xl mx-auto px-6 h-16">
+<div class="text-xl font-bold tracking-tighter text-slate-900 dark:text-white">InsightGenius</div>
+<div class="hidden md:flex items-center space-x-8">
+<a class="text-blue-600 dark:text-blue-400 font-semibold border-b-2 border-blue-600 font-sans text-sm tracking-tight py-1" href="#">Web UI</a>
+<a class="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-sans text-sm font-medium tracking-tight" href="#">API Docs</a>
+<a class="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-sans text-sm font-medium tracking-tight" href="#">MCP Docs</a>
+<a class="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-sans text-sm font-medium tracking-tight" href="#">Pricing</a>
+</div>
+<button class="bg-primary text-white px-5 py-2 rounded-md font-sans text-sm font-medium active:scale-95 duration-200 transition-all hover:bg-primary-container">Get Started</button>
+</div>
+</nav>
+<main>
+<!-- Section 1: Hero -->
+<section class="pt-32 pb-24 px-6 max-w-7xl mx-auto">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+<div>
+<h1 class="text-5xl md:text-6xl font-bold tracking-tight text-on-surface leading-[1.1] mb-6">
+                        Talk to your data — <br/><span class="text-primary">from wherever you work</span>
+</h1>
+<p class="text-lg text-on-surface-variant leading-relaxed mb-10 max-w-xl">
+                        Professional crosstabs with significance testing from your SPSS, CSV, or Excel files. Use the web for quick exports, Claude AI for conversational analysis, or the API for automated workflows. One engine, every interface.
+                    </p>
+<div class="flex flex-col sm:flex-row gap-4 mb-8">
+<button class="bg-primary text-white px-8 py-4 rounded-md font-semibold text-lg flex items-center justify-center gap-2 hover:bg-primary-container transition-all">
+                            Try it free — upload your file
+                        </button>
+<button class="bg-surface-container-highest text-on-surface px-8 py-4 rounded-md font-semibold text-lg flex items-center justify-center gap-2 hover:bg-surface-variant transition-all">
+                            Connect to Claude AI
+                        </button>
+</div>
+<div class="flex flex-wrap gap-6 text-sm text-outline font-medium">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary text-lg">check_circle</span> No signup required
+                        </div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary text-lg">history_toggle_off</span> Files auto-delete in 30 min
+                        </div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary text-lg">credit_card_off</span> No credit card needed
+                        </div>
+</div>
+</div>
+<div class="relative group">
+<div class="absolute -inset-1 bg-gradient-to-r from-primary/20 to-tertiary/20 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+<div class="relative bg-white border border-outline-variant/30 rounded-xl shadow-2xl overflow-hidden">
+<!-- Excel UI Mockup -->
+<div class="bg-[#217346] px-4 py-2 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-white text-sm">grid_on</span>
+<span class="text-white text-xs font-medium">Market_Research_Export.xlsx</span>
+</div>
+<div class="flex gap-2">
+<div class="w-2 h-2 rounded-full bg-white/30"></div>
+<div class="w-2 h-2 rounded-full bg-white/30"></div>
+</div>
+</div>
+<div class="p-1 bg-surface-container">
+<table class="w-full text-[11px] border-collapse bg-white">
+<thead>
+<tr class="bg-surface-container-low">
+<th class="border border-surface-variant w-10 py-1"></th>
+<th class="border border-surface-variant text-primary font-bold py-1">A</th>
+<th class="border border-surface-variant text-primary font-bold py-1">B</th>
+<th class="border border-surface-variant text-primary font-bold py-1">C</th>
+</tr>
+</thead>
+<tbody>
+<tr class="bg-tertiary/10 font-bold">
+<td class="border border-surface-variant px-2 bg-surface-container-low italic">NET: Top 2 Box</td>
+<td class="border border-surface-variant px-4 py-2 text-center">84% <span class="sig-letter">BC</span></td>
+<td class="border border-surface-variant px-4 py-2 text-center">62%</td>
+<td class="border border-surface-variant px-4 py-2 text-center">58%</td>
+</tr>
+<tr>
+<td class="border border-surface-variant px-2 bg-surface-container-low italic">Extremely Satisfied</td>
+<td class="border border-surface-variant px-4 py-2 text-center">45% <span class="sig-letter">B</span></td>
+<td class="border border-surface-variant px-4 py-2 text-center">31%</td>
+<td class="border border-surface-variant px-4 py-2 text-center">28%</td>
+</tr>
+<tr>
+<td class="border border-surface-variant px-2 bg-surface-container-low italic">Somewhat Satisfied</td>
+<td class="border border-surface-variant px-4 py-2 text-center">39%</td>
+<td class="border border-surface-variant px-4 py-2 text-center">31%</td>
+<td class="border border-surface-variant px-4 py-2 text-center">30%</td>
+</tr>
+<tr class="bg-surface-container-high/50 font-medium">
+<td class="border border-surface-variant px-2 bg-surface-container-low italic">Base (n)</td>
+<td class="border border-surface-variant px-4 py-2 text-center">500</td>
+<td class="border border-surface-variant px-4 py-2 text-center">485</td>
+<td class="border border-surface-variant px-4 py-2 text-center">512</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 2: Integrations -->
+<section class="py-12 bg-white border-y border-outline-variant/10">
+<div class="max-w-7xl mx-auto px-6">
+<p class="text-center text-outline text-sm font-medium uppercase tracking-widest mb-8">Works with your existing tools</p>
+<div class="flex flex-wrap justify-center items-center gap-12 opacity-50 grayscale">
+<div class="flex items-center gap-2 font-bold text-xl">Claude</div>
+<div class="flex items-center gap-2 font-bold text-xl">n8n.io</div>
+<div class="flex items-center gap-2 font-bold text-xl">Make</div>
+<div class="flex items-center gap-2 font-bold text-xl">Zapier</div>
+<div class="flex items-center gap-2 font-bold text-xl">Microsoft Excel</div>
+<div class="flex items-center gap-2 font-bold text-xl">IBM SPSS</div>
+</div>
+</div>
+</section>
+<!-- Section 3: Four ways to work -->
+<section class="py-24 px-6 max-w-7xl mx-auto">
+<h2 class="text-3xl font-bold text-center mb-16">Four ways to work with your data</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest p-8 rounded-xl flex flex-col justify-between border border-transparent hover:border-primary/20 transition-all group">
+<div>
+<div class="flex justify-between items-start mb-6">
+<span class="material-symbols-outlined text-primary text-4xl">upload_file</span>
+<span class="bg-surface-container px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">No signup required</span>
+</div>
+<h3 class="text-2xl font-bold mb-4">Quick Analysis — Web UI</h3>
+<p class="text-on-surface-variant mb-8">Upload a file and get instant crosstabs. Perfect for one-off research tasks and fast prototyping.</p>
+</div>
+<button class="text-primary font-bold flex items-center gap-2 group-hover:translate-x-1 transition-transform">
+                        Upload a file <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest p-8 rounded-xl border border-transparent hover:border-primary/20 transition-all group overflow-hidden relative">
+<div class="flex justify-between items-start mb-6">
+<span class="material-symbols-outlined text-primary text-4xl">chat_bubble</span>
+<div class="flex gap-2">
+<span class="bg-tertiary/10 text-tertiary px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">★ New</span>
+<span class="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">MCP Server</span>
+</div>
+</div>
+<h3 class="text-2xl font-bold mb-4">Conversational — Claude AI</h3>
+<p class="text-on-surface-variant mb-6">Chat with your datasets directly in Claude. Ask "What's the key driver of satisfaction for Gen Z?" and get a crosstab back.</p>
+<div class="bg-surface-container-low p-4 rounded-lg mb-6 border border-outline-variant/20">
+<div class="flex gap-3 items-start mb-3">
+<div class="w-6 h-6 rounded bg-[#D97757] flex-shrink-0"></div>
+<div class="bg-white p-3 rounded-lg text-xs shadow-sm">Show me the top 2 box satisfaction by gender.</div>
+</div>
+<div class="flex gap-3 items-start">
+<div class="w-6 h-6 rounded bg-primary flex-shrink-0"></div>
+<div class="bg-white p-3 rounded-lg text-xs shadow-sm border border-primary/20">
+<p class="mb-2 font-bold">Analysis generated:</p>
+<div class="grid grid-cols-2 gap-2">
+<div class="border-l-2 border-primary pl-2">Male: 62%</div>
+<div class="border-l-2 border-primary pl-2">Female: 71% (A)</div>
+</div>
+</div>
+</div>
+</div>
+<button class="text-primary font-bold flex items-center gap-2">
+                        Connect to Claude <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest p-8 rounded-xl flex flex-col justify-between border border-transparent hover:border-primary/20 transition-all group grayscale opacity-80">
+<div>
+<div class="flex justify-between items-start mb-6">
+<span class="material-symbols-outlined text-outline text-4xl">dashboard</span>
+<span class="bg-surface-variant px-3 py-1 rounded-full text-xs font-semibold">Coming Q2 2026</span>
+</div>
+<h3 class="text-2xl font-bold mb-4">Full Platform — Web App</h3>
+<p class="text-on-surface-variant mb-8">Manage projects, save banners, and build complex multi-wave reports with full data management suite.</p>
+</div>
+<button class="text-outline font-bold flex items-center gap-2">
+                        Join waitlist <span class="material-symbols-outlined">lock</span>
+</button>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest p-8 rounded-xl flex flex-col justify-between border border-transparent hover:border-primary/20 transition-all group">
+<div>
+<div class="flex justify-between items-start mb-6">
+<span class="material-symbols-outlined text-primary text-4xl">api</span>
+<span class="bg-surface-container px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">For agencies</span>
+</div>
+<h3 class="text-2xl font-bold mb-4">Automation — API &amp; Workflows</h3>
+<p class="text-on-surface-variant mb-8">Integrate statistical testing into your automated pipelines via Zapier, Make, or direct REST API calls.</p>
+</div>
+<button class="text-primary font-bold flex items-center gap-2 group-hover:translate-x-1 transition-transform">
+                        View API Docs <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Section 4: Client-ready Excel -->
+<section class="py-24 bg-surface-container-low">
+<div class="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+<div>
+<h2 class="text-4xl font-bold mb-8 leading-tight">Client-ready Excel <br/>in one click</h2>
+<ul class="space-y-6">
+<li class="flex gap-4">
+<span class="material-symbols-outlined text-primary bg-primary/10 p-2 rounded-lg h-fit">analytics</span>
+<div>
+<h4 class="font-bold text-lg mb-1">Significance Testing</h4>
+<p class="text-on-surface-variant">Automated column comparisons with red significance letters (A, B, C) standard in MR industry.</p>
+</div>
+</li>
+<li class="flex gap-4">
+<span class="material-symbols-outlined text-primary bg-primary/10 p-2 rounded-lg h-fit">auto_awesome</span>
+<div>
+<h4 class="font-bold text-lg mb-1">Smart Detection</h4>
+<p class="text-on-surface-variant">We automatically detect scale questions, multiple response sets, and demographics.</p>
+</div>
+</li>
+<li class="flex gap-4">
+<span class="material-symbols-outlined text-primary bg-primary/10 p-2 rounded-lg h-fit">table_view</span>
+<div>
+<h4 class="font-bold text-lg mb-1">Professional Format</h4>
+<p class="text-on-surface-variant">No messy formatting. Clean headers, bolded nets, and clear base rows ready for presentation.</p>
+</div>
+</li>
+</ul>
+</div>
+<div class="bg-white p-6 rounded-xl shadow-xl border border-outline-variant/20">
+<div class="space-y-4">
+<div class="flex gap-1 border-b border-surface-variant pb-2">
+<div class="w-24 h-4 bg-surface-container rounded"></div>
+<div class="w-16 h-4 bg-primary/20 rounded"></div>
+<div class="w-16 h-4 bg-primary/20 rounded"></div>
+<div class="w-16 h-4 bg-primary/20 rounded"></div>
+</div>
+<div class="grid grid-cols-4 gap-4 text-[10px] font-bold">
+<div>Category</div>
+<div class="text-center text-primary">A</div>
+<div class="text-center text-primary">B</div>
+<div class="text-center text-primary">C</div>
+</div>
+<div class="grid grid-cols-4 gap-4 items-center py-2 bg-tertiary/5 border-y border-tertiary/10">
+<div class="text-[10px] font-bold text-tertiary">NET: High Intent</div>
+<div class="text-center font-bold">78% <span class="sig-letter">C</span></div>
+<div class="text-center">64%</div>
+<div class="text-center">59%</div>
+</div>
+<div class="grid grid-cols-4 gap-4 items-center py-1">
+<div class="text-[10px] italic">Mean Score</div>
+<div class="text-center font-bold">4.2 <span class="sig-letter">BC</span></div>
+<div class="text-center">3.8</div>
+<div class="text-center">3.7</div>
+</div>
+<div class="grid grid-cols-4 gap-4 items-center py-1 text-outline font-medium">
+<div class="text-[10px]">Unweighted Base</div>
+<div class="text-center">1,200</div>
+<div class="text-center">1,150</div>
+<div class="text-center">1,180</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 5: Before & After -->
+<section class="py-24 px-6 max-w-7xl mx-auto">
+<h2 class="text-3xl font-bold text-center mb-16">Designed for Researchers</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+<div class="bg-red-50/50 p-10 rounded-2xl border border-red-100">
+<h4 class="text-error font-bold uppercase tracking-widest text-sm mb-6">The old way</h4>
+<ul class="space-y-4 text-on-surface-variant">
+<li class="flex gap-3"><span class="material-symbols-outlined text-error">close</span> Manual significance testing in Excel</li>
+<li class="flex gap-3"><span class="material-symbols-outlined text-error">close</span> Fighting with SPSS Chart Builder for hours</li>
+<li class="flex gap-3"><span class="material-symbols-outlined text-error">close</span> Exporting messy CSVs that need cleaning</li>
+<li class="flex gap-3"><span class="material-symbols-outlined text-error">close</span> No easy way to share interactive results</li>
+</ul>
+</div>
+<div class="bg-primary/5 p-10 rounded-2xl border border-primary/10">
+<h4 class="text-primary font-bold uppercase tracking-widest text-sm mb-6">With InsightGenius</h4>
+<ul class="space-y-4 text-on-surface">
+<li class="flex gap-3 font-semibold"><span class="material-symbols-outlined text-tertiary">check_circle</span> Automated testing in seconds</li>
+<li class="flex gap-3 font-semibold"><span class="material-symbols-outlined text-tertiary">check_circle</span> Instant production-ready exports</li>
+<li class="flex gap-3 font-semibold"><span class="material-symbols-outlined text-tertiary">check_circle</span> AI-driven insight generation</li>
+<li class="flex gap-3 font-semibold"><span class="material-symbols-outlined text-tertiary">check_circle</span> Seamless API &amp; Workflow integration</li>
+</ul>
+</div>
+</div>
+</section>
+<!-- Section 6: Feature Grid -->
+<section class="py-24 bg-white">
+<div class="max-w-7xl mx-auto px-6">
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-y-12 gap-x-8">
+<div class="text-center group">
+<span class="material-symbols-outlined text-primary text-3xl mb-3 block group-hover:scale-110 transition-transform">table_chart</span>
+<p class="font-bold text-sm">Crosstabs</p>
+</div>
+<div class="text-center group">
+<span class="material-symbols-outlined text-primary text-3xl mb-3 block group-hover:scale-110 transition-transform">view_column</span>
+<p class="font-bold text-sm">Multiple Banners</p>
+</div>
+<div class="text-center group">
+<span class="material-symbols-outlined text-primary text-3xl mb-3 block group-hover:scale-110 transition-transform">add_box</span>
+<p class="font-bold text-sm">Nets</p>
+</div>
+<div class="text-center group">
+<span class="material-symbols-outlined text-primary text-3xl mb-3 block group-hover:scale-110 transition-transform">calculate</span>
+<p class="font-bold text-sm">Means</p>
+</div>
+<div class="text-center group">
+<span class="material-symbols-outlined text-primary text-3xl mb-3 block group-hover:scale-110 transition-transform">group_work</span>
+<p class="font-bold text-sm">MRS Groups</p>
+</div>
+<div class="text-center group">
+<span class="material-symbols-outlined text-primary text-3xl mb-3 block group-hover:scale-110 transition-transform">grid_view</span>
+<p class="font-bold text-sm">Grid/Battery</p>
+</div>
+<div class="text-center group">
+<span class="material-symbols-outlined text-primary text-3xl mb-3 block group-hover:scale-110 transition-transform">psychology</span>
+<p class="font-bold text-sm">Auto-Analyze</p>
+</div>
+<div class="text-center group">
+<span class="material-symbols-outlined text-primary text-3xl mb-3 block group-hover:scale-110 transition-transform">balance</span>
+<p class="font-bold text-sm">Weight Support</p>
+</div>
+<div class="text-center group">
+<span class="material-symbols-outlined text-primary text-3xl mb-3 block group-hover:scale-110 transition-transform">scatter_plot</span>
+<p class="font-bold text-sm">Correlation</p>
+</div>
+<div class="text-center group">
+<span class="material-symbols-outlined text-primary text-3xl mb-3 block group-hover:scale-110 transition-transform">functions</span>
+<p class="font-bold text-sm">ANOVA</p>
+</div>
+<div class="text-center group">
+<span class="material-symbols-outlined text-primary text-3xl mb-3 block group-hover:scale-110 transition-transform">compare_arrows</span>
+<p class="font-bold text-sm">Gap Analysis</p>
+</div>
+<div class="text-center group">
+<span class="material-symbols-outlined text-primary text-3xl mb-3 block group-hover:scale-110 transition-transform">terminal</span>
+<p class="font-bold text-sm">MCP + API</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 7: Pricing -->
+<section class="py-24 bg-surface-container">
+<div class="max-w-7xl mx-auto px-6">
+<h2 class="text-4xl font-bold text-center mb-16">Transparent Pricing</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+<!-- Free -->
+<div class="bg-surface-container-lowest p-8 rounded-xl border border-outline-variant/30 flex flex-col">
+<h4 class="font-bold text-lg mb-2">Free</h4>
+<div class="text-4xl font-bold mb-6">$0</div>
+<p class="text-sm text-on-surface-variant mb-8">Quick one-off analyses for researchers.</p>
+<ul class="space-y-3 mb-8 text-sm flex-grow">
+<li class="flex gap-2"><span class="material-symbols-outlined text-tertiary text-lg">check</span> 3 files per day</li>
+<li class="flex gap-2"><span class="material-symbols-outlined text-tertiary text-lg">check</span> Basic Significance</li>
+<li class="flex gap-2"><span class="material-symbols-outlined text-tertiary text-lg">check</span> Claude MCP Access</li>
+</ul>
+<button class="w-full py-3 rounded border border-primary text-primary font-bold hover:bg-primary/5 transition-all">Start Free</button>
+</div>
+<!-- Growth -->
+<div class="bg-surface-container-lowest p-8 rounded-xl border-2 border-primary flex flex-col relative scale-105 shadow-xl">
+<div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">Popular</div>
+<h4 class="font-bold text-lg mb-2">Growth</h4>
+<div class="text-4xl font-bold mb-6">$29<span class="text-lg text-outline font-normal">/mo</span></div>
+<p class="text-sm text-on-surface-variant mb-8">For independent consultants and freelancers.</p>
+<ul class="space-y-3 mb-8 text-sm flex-grow">
+<li class="flex gap-2 font-semibold"><span class="material-symbols-outlined text-tertiary text-lg">check</span> Unlimited Files</li>
+<li class="flex gap-2 font-semibold"><span class="material-symbols-outlined text-tertiary text-lg">check</span> Custom Banners</li>
+<li class="flex gap-2 font-semibold"><span class="material-symbols-outlined text-tertiary text-lg">check</span> Advanced Weighting</li>
+</ul>
+<button class="w-full py-3 rounded bg-primary text-white font-bold hover:bg-primary-container transition-all">Go Growth</button>
+</div>
+<!-- Business -->
+<div class="bg-surface-container-lowest p-8 rounded-xl border border-outline-variant/30 flex flex-col">
+<h4 class="font-bold text-lg mb-2">Business</h4>
+<div class="text-4xl font-bold mb-6">$99<span class="text-lg text-outline font-normal">/mo</span></div>
+<p class="text-sm text-on-surface-variant mb-8">For research teams and small agencies.</p>
+<ul class="space-y-3 mb-8 text-sm flex-grow">
+<li class="flex gap-2"><span class="material-symbols-outlined text-tertiary text-lg">check</span> Full API Access</li>
+<li class="flex gap-2"><span class="material-symbols-outlined text-tertiary text-lg">check</span> Webhook Integration</li>
+<li class="flex gap-2"><span class="material-symbols-outlined text-tertiary text-lg">check</span> Priority Support</li>
+</ul>
+<button class="w-full py-3 rounded border border-primary text-primary font-bold hover:bg-primary/5 transition-all">Go Business</button>
+</div>
+<!-- Enterprise -->
+<div class="bg-surface-container-lowest p-8 rounded-xl border border-outline-variant/30 flex flex-col">
+<h4 class="font-bold text-lg mb-2">Enterprise</h4>
+<div class="text-4xl font-bold mb-6 text-xl">Custom</div>
+<p class="text-sm text-on-surface-variant mb-8">Scale-out solutions for large agencies.</p>
+<ul class="space-y-3 mb-8 text-sm flex-grow">
+<li class="flex gap-2"><span class="material-symbols-outlined text-tertiary text-lg">check</span> Dedicated Server</li>
+<li class="flex gap-2"><span class="material-symbols-outlined text-tertiary text-lg">check</span> Custom Stats Rules</li>
+<li class="flex gap-2"><span class="material-symbols-outlined text-tertiary text-lg">check</span> SLA &amp; Security</li>
+</ul>
+<button class="w-full py-3 rounded border border-primary text-primary font-bold hover:bg-primary/5 transition-all">Contact Us</button>
+</div>
+</div>
+<div class="bg-white p-8 rounded-xl text-center">
+<p class="text-outline-variant text-sm font-medium">Market Comparison</p>
+<div class="flex flex-col md:flex-row justify-center items-center gap-12 mt-6 font-bold">
+<div class="text-on-surface-variant">SPSS Statistics: <span class="text-on-surface">$99/mo per seat</span></div>
+<div class="text-on-surface-variant">WinCross: <span class="text-on-surface">$3,000-5,000/year</span></div>
+<div class="text-primary text-xl">InsightGenius: starts at $0.</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 8: Competitive Comparison Table -->
+<section class="py-24 px-6 max-w-7xl mx-auto">
+<h2 class="text-3xl font-bold text-center mb-16">The Market Landscape</h2>
+<div class="overflow-x-auto">
+<table class="w-full border-collapse">
+<thead>
+<tr class="bg-surface-container-low text-left">
+<th class="p-4 border-b border-surface-variant font-bold">Feature</th>
+<th class="p-4 border-b border-surface-variant font-bold text-primary">InsightGenius</th>
+<th class="p-4 border-b border-surface-variant font-medium">SPSS</th>
+<th class="p-4 border-b border-surface-variant font-medium">PSPP</th>
+<th class="p-4 border-b border-surface-variant font-medium">WinCross</th>
+<th class="p-4 border-b border-surface-variant font-medium">Displayr</th>
+</tr>
+</thead>
+<tbody class="text-sm">
+<tr>
+<td class="p-4 border-b border-surface-variant font-medium">Auto-Significance</td>
+<td class="p-4 border-b border-surface-variant text-tertiary font-bold"><span class="material-symbols-outlined">check_circle</span></td>
+<td class="p-4 border-b border-surface-variant">Complex</td>
+<td class="p-4 border-b border-surface-variant">No</td>
+<td class="p-4 border-b border-surface-variant">Yes</td>
+<td class="p-4 border-b border-surface-variant">Yes</td>
+</tr>
+<tr class="bg-surface-container-lowest">
+<td class="p-4 border-b border-surface-variant font-medium">Claude AI Integration</td>
+<td class="p-4 border-b border-surface-variant text-tertiary font-bold"><span class="material-symbols-outlined">check_circle</span></td>
+<td class="p-4 border-b border-surface-variant">No</td>
+<td class="p-4 border-b border-surface-variant">No</td>
+<td class="p-4 border-b border-surface-variant">No</td>
+<td class="p-4 border-b border-surface-variant">Limited</td>
+</tr>
+<tr>
+<td class="p-4 border-b border-surface-variant font-medium">API First Architecture</td>
+<td class="p-4 border-b border-surface-variant text-tertiary font-bold"><span class="material-symbols-outlined">check_circle</span></td>
+<td class="p-4 border-b border-surface-variant">Legacy</td>
+<td class="p-4 border-b border-surface-variant">No</td>
+<td class="p-4 border-b border-surface-variant">No</td>
+<td class="p-4 border-b border-surface-variant">Partial</td>
+</tr>
+<tr class="bg-surface-container-lowest">
+<td class="p-4 border-b border-surface-variant font-medium">Installation Needed</td>
+<td class="p-4 border-b border-surface-variant text-primary font-bold">None</td>
+<td class="p-4 border-b border-surface-variant">Desktop</td>
+<td class="p-4 border-b border-surface-variant">Desktop</td>
+<td class="p-4 border-b border-surface-variant">Desktop</td>
+<td class="p-4 border-b border-surface-variant">None</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<!-- Section 9: FAQ -->
+<section class="py-24 bg-surface-container-low">
+<div class="max-w-3xl mx-auto px-6">
+<h2 class="text-3xl font-bold text-center mb-16">Frequently Asked Questions</h2>
+<div class="space-y-6">
+<details class="bg-white p-6 rounded-lg shadow-sm border border-outline-variant/10 group">
+<summary class="list-none cursor-pointer flex justify-between items-center font-bold">
+                            Do I need to install SPSS to use this?
+                            <span class="material-symbols-outlined group-open:rotate-180 transition-transform">expand_more</span>
+</summary>
+<p class="mt-4 text-on-surface-variant text-sm leading-relaxed">No. InsightGenius reads .sav, .zsav, .csv, and .xlsx files natively. You don't need any local software installed. Everything happens in the cloud or via our API.</p>
+</details>
+<details class="bg-white p-6 rounded-lg shadow-sm border border-outline-variant/10 group">
+<summary class="list-none cursor-pointer flex justify-between items-center font-bold">
+                            Is my data safe?
+                            <span class="material-symbols-outlined group-open:rotate-180 transition-transform">expand_more</span>
+</summary>
+<p class="mt-4 text-on-surface-variant text-sm leading-relaxed">Security is our priority. For guest users, files are automatically purged from our servers 30 minutes after processing. All data is encrypted in transit and at rest.</p>
+</details>
+<details class="bg-white p-6 rounded-lg shadow-sm border border-outline-variant/10 group">
+<summary class="list-none cursor-pointer flex justify-between items-center font-bold">
+                            How does the Claude integration work?
+                            <span class="material-symbols-outlined group-open:rotate-180 transition-transform">expand_more</span>
+</summary>
+<p class="mt-4 text-on-surface-variant text-sm leading-relaxed">We provide a Model Context Protocol (MCP) server. You can add it to your Claude Desktop or Projects. Claude then calls InsightGenius's engine to perform statistical tests on your behalf.</p>
+</details>
+<details class="bg-white p-6 rounded-lg shadow-sm border border-outline-variant/10 group">
+<summary class="list-none cursor-pointer flex justify-between items-center font-bold">
+                            Can I automate this with Zapier?
+                            <span class="material-symbols-outlined group-open:rotate-180 transition-transform">expand_more</span>
+</summary>
+<p class="mt-4 text-on-surface-variant text-sm leading-relaxed">Yes. Our Business and Enterprise plans include full API access, which can be triggered via Zapier, Make.com, or custom code to create report pipelines.</p>
+</details>
+<details class="bg-white p-6 rounded-lg shadow-sm border border-outline-variant/10 group">
+<summary class="list-none cursor-pointer flex justify-between items-center font-bold">
+                            What statistical tests are supported?
+                            <span class="material-symbols-outlined group-open:rotate-180 transition-transform">expand_more</span>
+</summary>
+<p class="mt-4 text-on-surface-variant text-sm leading-relaxed">We support Independent T-Tests for means and Z-Tests for proportions, with customizable confidence levels (80%, 90%, 95%, 99%). We also handle ANOVA and correlation analysis.</p>
+</details>
+<details class="bg-white p-6 rounded-lg shadow-sm border border-outline-variant/10 group">
+<summary class="list-none cursor-pointer flex justify-between items-center font-bold">
+                            When is the full web app launching?
+                            <span class="material-symbols-outlined group-open:rotate-180 transition-transform">expand_more</span>
+</summary>
+<p class="mt-4 text-on-surface-variant text-sm leading-relaxed">The full project-management suite is scheduled for Q2 2026. Join our waitlist to get early beta access and founding member pricing.</p>
+</details>
+<details class="bg-white p-6 rounded-lg shadow-sm border border-outline-variant/10 group">
+<summary class="list-none cursor-pointer flex justify-between items-center font-bold">
+                            How do you compare to Displayr?
+                            <span class="material-symbols-outlined group-open:rotate-180 transition-transform">expand_more</span>
+</summary>
+<p class="mt-4 text-on-surface-variant text-sm leading-relaxed">Displayr is a great full-stack dashboard tool. InsightGenius is built for "interstitial" workflows—the quick analysis you need to do inside your existing tools like Claude or Excel, without moving your whole project to a new platform.</p>
+</details>
+</div>
+</div>
+</section>
+<!-- Section 10: Final CTA -->
+<section class="py-24 px-6">
+<div class="max-w-5xl mx-auto bg-primary rounded-3xl p-12 text-center text-white relative overflow-hidden shadow-2xl">
+<div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
+<div class="absolute bottom-0 left-0 w-64 h-64 bg-white/5 rounded-full -ml-32 -mb-32"></div>
+<h2 class="text-4xl md:text-5xl font-bold mb-6 relative z-10">Your first analysis is free. <br/>No signup required.</h2>
+<p class="text-white/80 text-lg mb-10 max-w-2xl mx-auto relative z-10">Stop wrestling with legacy statistics software. Get professional, client-ready crosstabs in seconds.</p>
+<div class="relative z-10">
+<button class="bg-white text-primary px-10 py-5 rounded-md font-bold text-xl hover:bg-surface-bright transition-all shadow-lg active:scale-95">
+                        Start analyzing
+                    </button>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-slate-50 dark:bg-slate-950 w-full border-t border-slate-200 dark:border-slate-800">
+<div class="max-w-7xl mx-auto px-6 py-12 flex flex-col md:flex-row justify-between items-center gap-8">
+<div class="flex flex-col gap-2">
+<div class="font-semibold text-slate-900 dark:text-slate-100 text-lg">InsightGenius</div>
+<p class="text-xs font-normal text-slate-500 dark:text-slate-400">© 2026 Genius Labs. Statistical Precision Guaranteed.</p>
+</div>
+<div class="flex flex-wrap justify-center gap-8">
+<a class="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-xs" href="#">GitHub</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-xs" href="#">Claude Directory</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-xs" href="#">Privacy Policy</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-xs" href="#">Terms of Service</a>
+</div>
+<div class="flex gap-4">
+<button class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center opacity-80 hover:opacity-100 transition-all">
+<span class="material-symbols-outlined text-sm">alternate_email</span>
+</button>
+<button class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center opacity-80 hover:opacity-100 transition-all">
+<span class="material-symbols-outlined text-sm">share</span>
+</button>
+</div>
+</div>
+</footer>
+</body></html>

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sign Up | InsightGenius</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "inverse-on-surface": "#eaf1ff",
+              "on-tertiary-container": "#faecff",
+              "background": "#f8f9ff",
+              "on-primary-container": "#eeefff",
+              "on-secondary-container": "#00217a",
+              "on-background": "#0b1c30",
+              "surface-dim": "#cbdbf5",
+              "on-secondary-fixed-variant": "#173bab",
+              "surface-container": "#e5eeff",
+              "tertiary": "#762fb3",
+              "on-primary-fixed-variant": "#003ea8",
+              "primary-fixed": "#dbe1ff",
+              "surface-container-high": "#dce9ff",
+              "inverse-surface": "#213145",
+              "secondary": "#3755c3",
+              "on-tertiary-fixed-variant": "#661aa3",
+              "secondary-container": "#708cfd",
+              "secondary-fixed-dim": "#b8c4ff",
+              "outline": "#737686",
+              "on-secondary-fixed": "#001453",
+              "tertiary-container": "#904bce",
+              "surface-bright": "#f8f9ff",
+              "primary-container": "#2563eb",
+              "tertiary-fixed": "#f1dbff",
+              "on-tertiary-fixed": "#2d0050",
+              "primary": "#004ac6",
+              "outline-variant": "#c3c6d7",
+              "error-container": "#ffdad6",
+              "on-surface-variant": "#434655",
+              "inverse-primary": "#b4c5ff",
+              "surface-tint": "#0053db",
+              "surface-container-highest": "#d3e4fe",
+              "tertiary-fixed-dim": "#dfb7ff",
+              "on-secondary": "#ffffff",
+              "on-primary": "#ffffff",
+              "primary-fixed-dim": "#b4c5ff",
+              "surface-container-lowest": "#ffffff",
+              "surface": "#f8f9ff",
+              "secondary-fixed": "#dde1ff",
+              "error": "#ba1a1a",
+              "on-surface": "#0b1c30",
+              "on-error-container": "#93000a",
+              "surface-variant": "#d3e4fe",
+              "surface-container-low": "#eff4ff",
+              "on-error": "#ffffff",
+              "on-primary-fixed": "#00174b",
+              "on-tertiary": "#ffffff"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .glass-effect {
+        background: rgba(248, 249, 255, 0.8);
+        backdrop-filter: blur(20px);
+      }
+      .btn-gradient {
+        background: linear-gradient(135deg, #004ac6 0%, #2563eb 100%);
+      }
+    </style>
+</head>
+<body class="bg-background font-body text-on-background min-h-screen flex flex-col">
+<!-- Top Navigation Bar - Derived from Shared Components -->
+<nav class="fixed top-0 w-full z-50 bg-[#f8f9ff]/80 backdrop-blur-xl">
+<div class="flex items-center justify-between px-8 py-4 max-w-7xl mx-auto w-full">
+<div class="flex items-center gap-2">
+<span class="text-xl font-bold tracking-tighter text-[#0b1c30]">InsightGenius</span>
+</div>
+<div class="flex items-center gap-6">
+<span class="text-[#0b1c30]/70 font-label text-sm">Already have an account?</span>
+<a class="text-primary font-semibold hover:text-primary-container transition-colors font-label text-sm" href="/login">Login</a>
+</div>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-grow flex items-center justify-center px-4 pt-20 pb-12">
+<div class="w-full max-w-lg">
+<!-- Signup Card -->
+<div class="bg-surface-container-lowest rounded-xl shadow-[0_10px_30px_-5px_rgba(11,28,48,0.06)] overflow-hidden">
+<div class="p-8 md:p-10">
+<!-- Header -->
+<div class="mb-8 text-center">
+<h1 class="text-3xl font-extrabold tracking-tight text-on-surface mb-2">Create your account</h1>
+<p class="text-on-surface-variant text-sm">Start architecting your data with precision today.</p>
+</div>
+<!-- Social Auth -->
+<div class="mb-8">
+<button class="w-full flex items-center justify-center gap-3 px-4 py-3 bg-surface-container-high hover:bg-surface-container-highest text-on-surface rounded-lg transition-all duration-200 active:scale-[0.98] font-medium border border-outline-variant/20">
+<img alt="" class="w-5 h-5" data-alt="Google G logo with standard brand colors on a transparent background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAVcT_wZYd7BzI7S9YcWTHG0xyBzQNonqYjcLZEsFx0ZsgL7F-3lDJHp69QCCoZmfOlvkAB4MG8GBUOyitMy0YNJfVio6ONw5cHjbwGxheYLZ7RgQ7sdxgNyP58EmzeT_vKUmWd0RhahEofZxhfXPAk0gKyrTqY0-Sg6nhoNbPTZPPNCgCfelOeS1Zzxzf70fBpHwD_sEP37JshN3B2m_I9OjB3eNJkzpcKS87YmUFcxS8nkIf7D3Q-uNhBjue1jum4q5QVkDcDEL1_"/>
+<span>Continue with Google</span>
+</button>
+</div>
+<div class="relative mb-8">
+<div class="absolute inset-0 flex items-center">
+<div class="w-full border-t border-outline-variant/20"></div>
+</div>
+<div class="relative flex justify-center text-xs uppercase tracking-widest">
+<span class="bg-surface-container-lowest px-4 text-outline font-label">Or continue with email</span>
+</div>
+</div>
+<!-- Signup Form -->
+<form class="space-y-5">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="space-y-1.5">
+<label class="block text-xs font-bold uppercase tracking-wider text-outline" for="name">Full Name</label>
+<input class="w-full px-4 py-3 bg-surface-container-low border-none focus:ring-2 focus:ring-primary/20 rounded-lg text-on-surface placeholder:text-outline-variant transition-all" id="name" placeholder="John Doe" type="text"/>
+</div>
+<div class="space-y-1.5">
+<label class="block text-xs font-bold uppercase tracking-wider text-outline" for="role">Professional Role</label>
+<select class="w-full px-4 py-3 bg-surface-container-low border-none focus:ring-2 focus:ring-primary/20 rounded-lg text-on-surface appearance-none transition-all" id="role">
+<option value="Researcher">Researcher</option>
+<option value="Analyst">Analyst</option>
+<option value="Director">Director</option>
+<option value="Developer">Developer</option>
+<option value="Other">Other</option>
+</select>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="block text-xs font-bold uppercase tracking-wider text-outline" for="email">Email Address</label>
+<input class="w-full px-4 py-3 bg-surface-container-low border-none focus:ring-2 focus:ring-primary/20 rounded-lg text-on-surface placeholder:text-outline-variant transition-all" id="email" placeholder="name@company.com" type="email"/>
+</div>
+<div class="space-y-1.5">
+<label class="block text-xs font-bold uppercase tracking-wider text-outline" for="company">Company <span class="text-[10px] opacity-50 font-normal italic">(Optional)</span></label>
+<input class="w-full px-4 py-3 bg-surface-container-low border-none focus:ring-2 focus:ring-primary/20 rounded-lg text-on-surface placeholder:text-outline-variant transition-all" id="company" placeholder="Organization name" type="text"/>
+</div>
+<div class="space-y-1.5">
+<label class="block text-xs font-bold uppercase tracking-wider text-outline" for="password">Password</label>
+<div class="relative">
+<input class="w-full px-4 py-3 bg-surface-container-low border-none focus:ring-2 focus:ring-primary/20 rounded-lg text-on-surface placeholder:text-outline-variant transition-all" id="password" placeholder="••••••••" type="password"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 text-outline-variant hover:text-outline transition-colors" type="button">
+<span class="material-symbols-outlined text-xl">visibility</span>
+</button>
+</div>
+<p class="text-[10px] text-outline italic mt-1">Minimum 8 characters with at least one number.</p>
+</div>
+<div class="pt-4">
+<button class="btn-gradient w-full py-4 text-white font-bold rounded-lg shadow-lg shadow-primary/20 active:scale-[0.98] transition-all duration-200" type="submit">
+                                Create Account
+                            </button>
+</div>
+</form>
+<!-- Terms -->
+<div class="mt-8 text-center">
+<p class="text-[10px] text-outline-variant font-label leading-relaxed">
+                            By creating an account, you agree to our <a class="underline hover:text-primary transition-colors" href="#">Terms of Service</a> and <a class="underline hover:text-primary transition-colors" href="#">Privacy Policy</a>.
+                        </p>
+</div>
+</div>
+</div>
+<!-- Side Branding / Social Proof (Minimal) -->
+<div class="mt-8 flex justify-center items-center gap-8 opacity-40 grayscale contrast-125">
+<span class="material-symbols-outlined text-2xl" data-icon="leaderboard">leaderboard</span>
+<span class="material-symbols-outlined text-2xl" data-icon="biotech">biotech</span>
+<span class="material-symbols-outlined text-2xl" data-icon="monitoring">monitoring</span>
+<span class="material-symbols-outlined text-2xl" data-icon="insights">insights</span>
+</div>
+</div>
+</main>
+<!-- Footer - Derived from Shared Components -->
+<footer class="bg-[#eff4ff] w-full py-12 border-t border-[#0b1c30]/5">
+<div class="max-w-7xl mx-auto px-8 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+<div>
+<p class="font-['Inter'] text-xs uppercase tracking-widest text-[#0b1c30]/50">
+                    © 2024 InsightGenius. Statistical Precision Guaranteed.
+                </p>
+</div>
+<div class="flex flex-wrap gap-6 md:justify-end">
+<a class="font-['Inter'] text-xs uppercase tracking-widest text-[#0b1c30]/50 hover:text-[#004ac6] transition-opacity" href="#">Privacy Policy</a>
+<a class="font-['Inter'] text-xs uppercase tracking-widest text-[#0b1c30]/50 hover:text-[#004ac6] transition-opacity" href="#">Terms of Service</a>
+<a class="font-['Inter'] text-xs uppercase tracking-widest text-[#0b1c30]/50 hover:text-[#004ac6] transition-opacity" href="#">Support</a>
+<a class="font-['Inter'] text-xs uppercase tracking-widest text-[#0b1c30]/50 hover:text-[#004ac6] transition-opacity" href="#">API Status</a>
+</div>
+</div>
+</footer>
+<!-- Background Decorative Elements -->
+<div class="fixed top-0 left-0 w-full h-full -z-10 pointer-events-none overflow-hidden">
+<div class="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px]"></div>
+<div class="absolute bottom-[-5%] left-[-5%] w-[30%] h-[30%] bg-secondary/5 rounded-full blur-[100px]"></div>
+</div>
+</body></html>
