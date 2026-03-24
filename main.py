@@ -191,13 +191,8 @@ def create_application() -> FastAPI:
     # SSE transport (deprecated, kept for backwards compatibility)
     app.mount("/mcp", get_mcp_asgi_app())
 
-    # SSE deprecation header
-    @app.middleware("http")
-    async def mcp_deprecation_header(request: Request, call_next):
-        response = await call_next(request)
-        if request.url.path.startswith("/mcp/sse"):
-            response.headers["X-MCP-Deprecated"] = "Use /mcp/http instead. SSE will be removed 2026-06-01."
-        return response
+    # NOTE: SSE deprecation header REMOVED — middleware breaks SSE streaming responses.
+    # Deprecation will be communicated via spss_get_server_info tool response instead.
 
     # Serve frontend + static pages
     public_dir = Path(__file__).parent / "public"

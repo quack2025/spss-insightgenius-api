@@ -32,6 +32,7 @@ class UsageLoggerMiddleware:
     """Pure ASGI middleware that logs usage after each authenticated request."""
 
     SKIP_PATHS = {"/v1/health", "/docs", "/redoc", "/openapi.json", "/"}
+    SKIP_PREFIXES = ("/mcp",)  # SSE/MCP streams break with send wrappers
 
     def __init__(self, app: ASGIApp):
         self.app = app
@@ -42,7 +43,7 @@ class UsageLoggerMiddleware:
             return
 
         path = scope.get("path", "")
-        if path in self.SKIP_PATHS:
+        if path in self.SKIP_PATHS or any(path.startswith(p) for p in self.SKIP_PREFIXES):
             await self.app(scope, receive, send)
             return
 
