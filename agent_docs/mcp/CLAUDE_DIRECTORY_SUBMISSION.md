@@ -13,14 +13,16 @@
 Talk2Data InsightGenius
 ```
 
-### Server URL (SSE endpoint)
+### Server URL (Streamable HTTP endpoint)
 ```
-https://spss.insightgenius.io/mcp/sse
+https://spss.insightgenius.io/mcp/
 ```
+
+SSE fallback (backwards compat): `https://spss.insightgenius.io/mcp/sse`
 
 ### Brief Description (1-2 sentences)
 ```
-Professional SPSS data processing and market research analysis MCP server. Upload survey data files (.sav, .csv, .xlsx), get crosstabs with significance testing, auto-detected question types, correlation, ANOVA, gap analysis, and publication-ready Excel exports — all through natural conversation with Claude.
+Analyze survey data (.sav, .csv, .xlsx) through Claude — crosstabs with significance testing, ANOVA, correlation, gap analysis, and publication-ready Excel exports. Upload once, analyze unlimited.
 ```
 
 ### Detailed Description
@@ -57,12 +59,17 @@ File sessions: upload once, analyze many times. No re-uploading 50MB files on ev
 
 ### Authentication Type
 ```
-API Key (passed as api_key parameter in each tool call)
+API Key (Bearer token for Streamable HTTP, or api_key parameter for SSE)
 ```
 
 ### Authentication Details
 ```
-API keys in format sk_test_... or sk_live_... passed as the api_key parameter in each tool call. The SSE transport does not use Authorization headers — instead, every tool accepts api_key as a required parameter. Keys are SHA256-hashed server-side — raw keys are never stored. Users obtain keys at https://spss.insightgenius.io
+API keys in format sk_test_... or sk_live_... Keys are SHA256-hashed server-side — raw keys never stored.
+
+Streamable HTTP: Authorization: Bearer sk_live_... header on the HTTP connection.
+SSE transport: api_key passed as parameter in each tool call (SSE has no header support).
+
+Users obtain keys at https://spss.insightgenius.io. The api_key parameter pattern on SSE is a deliberate design choice due to SSE transport limitations — SSE connections don't support custom headers in all MCP clients.
 ```
 
 ### Test Credentials (for Anthropic QA team)
@@ -71,17 +78,36 @@ API Key: sk_test_2a441a40c84ba0afe73efd47d6bb1066aac82ad5453360f3
 Plan: Pro (60 requests/min, 50MB max file)
 Scopes: All (metadata, frequency, crosstab, process, convert, parse_ticket)
 
-SSE endpoint: https://spss.insightgenius.io/mcp/sse
+Streamable HTTP: POST https://spss.insightgenius.io/mcp/ with Authorization: Bearer header
+SSE fallback: https://spss.insightgenius.io/mcp/sse (api_key as tool parameter)
 Health check: https://spss.insightgenius.io/v1/health
 
 To test with MCP Inspector:
   npx @anthropic-ai/mcp-inspector https://spss.insightgenius.io/mcp/sse
 
+Quick test: call spss_get_server_info with api_key to verify connectivity.
 The server accepts CSV and Excel files for testing without SPSS software.
-A simple test: call spss_get_server_info with api_key to verify connectivity.
+
+Note: This test key has strict rate limits (60/min) and is revocable.
 ```
 
 ### Connection Instructions (for Claude Desktop / Claude.ai)
+
+Streamable HTTP (recommended):
+```json
+{
+  "mcpServers": {
+    "talk2data_insightgenius": {
+      "url": "https://spss.insightgenius.io/mcp/",
+      "headers": {
+        "Authorization": "Bearer YOUR_API_KEY"
+      }
+    }
+  }
+}
+```
+
+SSE fallback:
 ```json
 {
   "mcpServers": {
@@ -91,12 +117,12 @@ A simple test: call spss_get_server_info with api_key to verify connectivity.
   }
 }
 ```
-
-Note: This server uses SSE transport. The api_key is passed as a parameter in each tool call, not as a connection header.
+Note: SSE transport passes api_key as parameter in each tool call (SSE limitation).
 
 For Claude Code:
 ```bash
-claude mcp add --transport sse talk2data_insightgenius https://spss.insightgenius.io/mcp/sse
+claude mcp add --transport http talk2data_insightgenius https://spss.insightgenius.io/mcp/ \
+  --header "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ### Tools List (13 tools)
@@ -203,9 +229,15 @@ https://spss.insightgenius.io/privacy
 https://spss.insightgenius.io/docs/mcp
 ```
 
+## Repository URL
+```
+Private repository — source code available upon request for review.
+GitHub: quack2025/spss-insightgenius-api (private)
+```
+
 ## Support Contact
 ```
-support@surveycoder.io
+support@insightgenius.io
 ```
 
 ## Company / Vendor
@@ -225,14 +257,18 @@ data-analysis, market-research, spss, survey-data, crosstabs, significance-testi
 
 - [x] Privacy policy page is live at https://spss.insightgenius.io/privacy
 - [x] MCP docs page is live at https://spss.insightgenius.io/docs/mcp
+- [x] Streamable HTTP endpoint: POST https://spss.insightgenius.io/mcp/
 - [x] SSE endpoint responds: `curl -s https://spss.insightgenius.io/mcp/sse` → 200 OK text/event-stream
 - [x] Test key works — verified via MCP Inspector (13 tools loaded, tool calls return results)
 - [x] Health check returns OK: `curl https://spss.insightgenius.io/v1/health`
-- [x] server.json in repo root with SSE transport URL
+- [x] server.json in repo root with correct transport URL
 - [x] Tool annotations on all 13 tools (readOnlyHint, destructiveHint, idempotentHint, openWorldHint)
 - [x] SSE stream delivers responses end-to-end (initialize → tools/list → tools/call)
+- [x] Auth explanation for api_key parameter pattern documented (SSE limitation)
+- [x] Test key has strict rate limits and is revocable
 - [ ] Reviewed Anthropic MCP Directory Policy
 - [ ] Reviewed Anthropic MCP Directory Terms
+- [ ] Configure support@insightgenius.io email
 - [ ] Submitted form
 
 ---

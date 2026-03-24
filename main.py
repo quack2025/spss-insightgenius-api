@@ -179,17 +179,20 @@ def create_application() -> FastAPI:
     # MCP server — dual transport
     from routers.mcp_server import get_mcp_asgi_app, mcp as mcp_server
 
-    # Streamable HTTP (MCP standard 2025-11) — primary transport
-    # mcp.http_app() returns a Starlette ASGI app with /mcp endpoint
+    # SSE transport (backwards compat)
+    app.mount("/mcp/sse", get_mcp_asgi_app())
+
+    # Streamable HTTP (MCP standard 2025-11)
+    # http_app(path="/") creates route at "/" inside the Starlette sub-app
+    # Mounted at "/mcp" → final path is POST /mcp/
     try:
-        mcp_http = mcp_server.http_app()
-        app.mount("/mcp/http", mcp_http)
-        logger.info("MCP Streamable HTTP mounted at /mcp/http")
+        mcp_http = mcp_server.http_app(path="/")
+        app.mount("/mcp", mcp_http)
+        logger.info("MCP Streamable HTTP mounted at /mcp (POST /mcp/)")
     except Exception as e:
         logger.warning("MCP Streamable HTTP failed to mount: %s", e)
-
-    # SSE transport (deprecated, kept for backwards compatibility)
-    app.mount("/mcp", get_mcp_asgi_app())
+        # Fallback: mount SSE at /mcp if HTTP fails
+        app.mount("/mcp", get_mcp_asgi_app())
 
     # NOTE: SSE deprecation header REMOVED — middleware breaks SSE streaming responses.
     # Deprecation will be communicated via spss_get_server_info tool response instead.

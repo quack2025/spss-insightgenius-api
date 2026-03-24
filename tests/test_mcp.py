@@ -285,7 +285,7 @@ def test_mcp_sse_endpoint_exists(client):
     We verify the route exists (not 404) without opening a persistent SSE
     connection, which would block the test runner indefinitely.
     """
-    # POST to the messages endpoint (non-streaming) as a proxy route-existence check
-    response = client.post("/mcp/messages/", json={})
-    # Any response except 404 confirms the MCP ASGI app is mounted at /mcp/
+    # POST to the SSE messages endpoint as a proxy route-existence check
+    response = client.post("/mcp/sse/messages/", json={})
+    # Any response except 404 confirms the MCP SSE app is mounted at /mcp/sse/
     assert response.status_code != 404
