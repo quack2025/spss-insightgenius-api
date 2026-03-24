@@ -211,6 +211,10 @@ def create_application() -> FastAPI:
         async def app_page():
             return FileResponse(public_dir / "app.html")
 
+        @app.get("/export", include_in_schema=False)
+        async def export_page():
+            return FileResponse(public_dir / "app.html")
+
         @app.get("/app/dashboard", include_in_schema=False)
         async def dashboard_page():
             return FileResponse(public_dir / "dashboard.html")
