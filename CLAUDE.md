@@ -100,7 +100,16 @@ quantipro-api/
 │   ├── processing.py               # run_in_executor with concurrency control + timeout
 │   └── usage_logger.py             # [USAGE] logs for billing
 ├── tests/                          # 68 tests (pytest)
-├── agent_docs/                     # Product docs (pricing, roadmap, UX evaluation)
+├── agent_docs/
+│   ├── mcp/                        # MCP v2 technical docs
+│   │   ├── README.md               # Architecture, transports, file sessions, response envelope
+│   │   ├── tools_reference.md      # 14 tools: params, responses, annotations
+│   │   └── examples.md             # 7 usage examples (freq, crosstab, auto, Gamma, n8n)
+│   ├── mcp_v2_sprint_plan.md       # Sprint plan (5 sprints, all completed)
+│   ├── product_roadmap.md          # Product roadmap + competitive analysis
+│   ├── pricing.md                  # Pricing tiers + margin analysis
+│   └── ux_evaluation_prompt.md     # UX evaluation template
+├── server.json                     # MCP Registry manifest (streamable-http)
 ├── Dockerfile                      # Multi-stage: builder (git+wheels) → runtime (slim)
 ├── railway.toml                    # Railway deploy config (4 replicas)
 └── requirements.txt                # All dependencies
@@ -130,24 +139,30 @@ quantipro-api/
 | GET | `/` | None | Embedded frontend |
 | GET | `/docs` | None | Swagger UI |
 
-## MCP Server (12 tools)
+## MCP Server v2 (14 tools)
 
-Mounted at `/mcp/sse` (SSE transport). All tools require `api_key` parameter. Files passed as base64.
+Server name: `spss_mcp` | Dual transport: Streamable HTTP (`/mcp/http`) + SSE (`/mcp/sse`, deprecated)
 
-| Tool | Wraps | Description |
-|------|-------|-------------|
-| `get_spss_metadata` | `/v1/metadata` | Variable metadata + auto-detect |
-| `get_variable_info` | — | Single variable detail |
-| `analyze_frequencies` | `/v1/frequency` | Frequency table |
-| `analyze_crosstabs` | `/v1/crosstab` | Crosstab with sig letters |
-| `export_data` | `/v1/convert` | Format conversion |
-| `create_tabulation` | `/v1/tabulate` | Full tabulation → Excel (base64) |
-| `list_files` | — | Available tools listing |
-| `analyze_correlation` | `/v1/correlation` | Correlation matrix |
-| `analyze_anova` | `/v1/anova` | ANOVA + Tukey HSD |
-| `analyze_gap` | `/v1/gap-analysis` | Gap analysis |
-| `summarize_satisfaction` | `/v1/satisfaction-summary` | Satisfaction summary |
-| `auto_analyze` | `/v1/auto-analyze` | Zero-config → Excel (base64) |
+**Full docs**: `agent_docs/mcp/` (README, tools_reference, examples)
+
+| Tool | Category | Conditional | Description |
+|------|----------|-------------|-------------|
+| `spss_get_server_info` | System | — | Engine status, available tools, plan limits |
+| `spss_upload_file` | Session | — | Upload .sav/.csv/.xlsx → file_id (30-min Redis session) |
+| `spss_get_metadata` | Explore | — | Variables, labels, suggested_banners, detected_groups, preset_nets |
+| `spss_describe_variable` | Explore | — | Deep single-variable profile |
+| `spss_analyze_frequencies` | Analysis | — | Batch frequency (1-50 vars) |
+| `spss_analyze_crosstab` | Analysis | — | Crosstab + sig letters + chi2 |
+| `spss_analyze_correlation` | Analysis | MRX only | Correlation matrix (Pearson/Spearman/Kendall) |
+| `spss_analyze_anova` | Analysis | MRX only | ANOVA + Tukey HSD |
+| `spss_analyze_gap` | Analysis | MRX only | Importance-Performance gap |
+| `spss_summarize_satisfaction` | Analysis | MRX only | Compact T2B/B2B/Mean |
+| `spss_auto_analyze` | Output | — | Zero-config → Excel + download_url |
+| `spss_create_tabulation` | Output | — | Full tabulation → Excel + download_url + tables_summary |
+| `spss_export_data` | Output | — | Convert to xlsx/csv/parquet/dta + download_url |
+| `spss_list_tools` | System | — | List available tools |
+
+**Key v2 features**: file sessions (upload once, analyze many), content_blocks (composable with Gamma/PPTX/Canva), insight_summary (deterministic), download_url (5-min TTL), multi-format (.sav/.csv/.xlsx), Pydantic models, MCP annotations, conditional registration.
 
 ---
 
@@ -300,11 +315,26 @@ Test .sav files:
 - Redis rate limiter, Gunicorn multi-worker, concurrency control, timeouts
 - MCP server with SSE transport — 7 tools
 
-### Sprint 6: Complete Features (Mar 23 2026)
+### Sprint 6: Complete Features + UX (Mar 23 2026)
 - Response schemas synced (chi2, mean/std/median, metadata smart fields)
 - 4 new analysis endpoints: correlation, anova, gap-analysis, satisfaction-summary
 - Auto-analyze endpoint (zero-config SPSS → Excel with smart grouping)
-- 5 new MCP tools (total: 12)
 - AI features: executive summary service, ticket → tabulate wiring
-- 10 UX quick wins from external evaluation (tooltips, examples, error recovery, brand unification)
+- 10 UX quick wins from external evaluation
 - 68 tests total
+
+### Sprint 7: MCP v2 (Mar 23-24 2026)
+- **Complete MCP rewrite** — 14 tools (was 12), server name `spss_mcp`
+- Pydantic input models with Field descriptions and validators
+- MCP annotations on all tools (readOnlyHint, destructiveHint, idempotentHint, openWorldHint)
+- **File sessions**: upload once → file_id → reuse across tools (Redis, 30-min sliding TTL)
+- **Multi-format**: .sav, .csv, .tsv, .xlsx, .xls with auto-detect
+- **Response envelope**: insight_summary + content_blocks (composable with Gamma/PPTX/Canva)
+- **Download URLs**: Redis-backed 5-min TTL for Excel files (no auth, token is secret)
+- **Streamable HTTP** transport at `/mcp/http` (MCP standard 2025-11)
+- SSE deprecated at `/mcp/sse` (X-MCP-Deprecated header, removed 2026-06-01)
+- `auth_from_header()` for transport-level Bearer auth
+- Conditional tool registration (MRX-dependent tools only if engine available)
+- `spss_get_server_info` tool: engine status, available tools, plan limits
+- `server.json` manifest for MCP Registry / Claude Directory
+- Technical docs in `agent_docs/mcp/` (README, tools_reference, examples)
