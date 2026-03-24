@@ -13,12 +13,14 @@
 Talk2Data InsightGenius
 ```
 
-### Server URL (Streamable HTTP endpoint)
+### Server URL (SSE endpoint)
 ```
-https://spss.insightgenius.io/mcp/
+https://spss.insightgenius.io/mcp/sse
 ```
 
-SSE fallback (backwards compat): `https://spss.insightgenius.io/mcp/sse`
+Note: SSE transport. Streamable HTTP is not yet supported due to a FastMCP limitation
+when mounting as sub-app in FastAPI (anyio task group not initialized). Migration planned
+when FastMCP adds standalone-mount support.
 
 ### Brief Description (1-2 sentences)
 ```
@@ -78,8 +80,7 @@ API Key: sk_test_2a441a40c84ba0afe73efd47d6bb1066aac82ad5453360f3
 Plan: Pro (60 requests/min, 50MB max file)
 Scopes: All (metadata, frequency, crosstab, process, convert, parse_ticket)
 
-Streamable HTTP: POST https://spss.insightgenius.io/mcp/ with Authorization: Bearer header
-SSE fallback: https://spss.insightgenius.io/mcp/sse (api_key as tool parameter)
+SSE endpoint: https://spss.insightgenius.io/mcp/sse (api_key as tool parameter)
 Health check: https://spss.insightgenius.io/v1/health
 
 To test with MCP Inspector:
@@ -93,21 +94,6 @@ Note: This test key has strict rate limits (60/min) and is revocable.
 
 ### Connection Instructions (for Claude Desktop / Claude.ai)
 
-Streamable HTTP (recommended):
-```json
-{
-  "mcpServers": {
-    "talk2data_insightgenius": {
-      "url": "https://spss.insightgenius.io/mcp/",
-      "headers": {
-        "Authorization": "Bearer YOUR_API_KEY"
-      }
-    }
-  }
-}
-```
-
-SSE fallback:
 ```json
 {
   "mcpServers": {
@@ -117,12 +103,13 @@ SSE fallback:
   }
 }
 ```
-Note: SSE transport passes api_key as parameter in each tool call (SSE limitation).
+Note: SSE transport — api_key is passed as parameter in each tool call.
+This is a deliberate design choice: SSE connections don't support custom
+headers in all MCP clients, so auth is at the tool-call level.
 
 For Claude Code:
 ```bash
-claude mcp add --transport http talk2data_insightgenius https://spss.insightgenius.io/mcp/ \
-  --header "Authorization: Bearer YOUR_API_KEY"
+claude mcp add --transport sse talk2data_insightgenius https://spss.insightgenius.io/mcp/sse
 ```
 
 ### Tools List (13 tools)
@@ -257,7 +244,7 @@ data-analysis, market-research, spss, survey-data, crosstabs, significance-testi
 
 - [x] Privacy policy page is live at https://spss.insightgenius.io/privacy
 - [x] MCP docs page is live at https://spss.insightgenius.io/docs/mcp
-- [x] Streamable HTTP endpoint: POST https://spss.insightgenius.io/mcp/
+- [ ] Streamable HTTP: deferred (FastMCP anyio task group limitation when mounted as sub-app)
 - [x] SSE endpoint responds: `curl -s https://spss.insightgenius.io/mcp/sse` → 200 OK text/event-stream
 - [x] Test key works — verified via MCP Inspector (13 tools loaded, tool calls return results)
 - [x] Health check returns OK: `curl https://spss.insightgenius.io/v1/health`

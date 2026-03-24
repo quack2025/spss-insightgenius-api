@@ -11,11 +11,11 @@
   "repository": "https://github.com/quack2025/spss-insightgenius-api",
   "license": "proprietary",
   "remote": {
-    "type": "streamable-http",
-    "url": "https://spss.insightgenius.io/mcp/",
+    "type": "sse",
+    "url": "https://spss.insightgenius.io/mcp/sse",
     "authorization": {
       "type": "bearer",
-      "description": "API key (sk_live_... or sk_test_...). Get one at https://spss.insightgenius.io"
+      "description": "API key (sk_live_... or sk_test_...) passed as api_key parameter in each tool call. Get one at https://spss.insightgenius.io"
     }
   },
   "tools": [

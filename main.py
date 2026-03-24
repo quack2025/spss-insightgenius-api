@@ -176,23 +176,15 @@ def create_application() -> FastAPI:
     app.include_router(auto_analyze_router)
     app.include_router(downloads_router)
 
-    # MCP server — dual transport
-    from routers.mcp_server import get_mcp_asgi_app, mcp as mcp_server
-
-    # SSE transport (backwards compat)
-    app.mount("/mcp/sse", get_mcp_asgi_app())
-
-    # Streamable HTTP (MCP standard 2025-11)
-    # http_app(path="/") creates route at "/" inside the Starlette sub-app
-    # Mounted at "/mcp" → final path is POST /mcp/
-    try:
-        mcp_http = mcp_server.http_app(path="/")
-        app.mount("/mcp", mcp_http)
-        logger.info("MCP Streamable HTTP mounted at /mcp (POST /mcp/)")
-    except Exception as e:
-        logger.warning("MCP Streamable HTTP failed to mount: %s", e)
-        # Fallback: mount SSE at /mcp if HTTP fails
-        app.mount("/mcp", get_mcp_asgi_app())
+    # MCP server — SSE transport
+    # NOTE: Streamable HTTP (http_app) CANNOT be mounted as FastAPI sub-app —
+    # it requires run() to initialize an anyio task group, which doesn't happen
+    # when mounted. See Railway logs: "Task group is not initialized."
+    # Streamable HTTP requires running FastMCP as standalone server, not embedded.
+    # When FastMCP fixes this, re-enable at /mcp with http_app(path="/").
+    from routers.mcp_server import get_mcp_asgi_app
+    app.mount("/mcp", get_mcp_asgi_app())
+    logger.info("MCP SSE mounted at /mcp/sse")
 
     # NOTE: SSE deprecation header REMOVED — middleware breaks SSE streaming responses.
     # Deprecation will be communicated via spss_get_server_info tool response instead.
