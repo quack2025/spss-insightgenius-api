@@ -169,17 +169,35 @@ async def _resolve_file(
 
 
 def _load_data(file_bytes: bytes, format_str: str, filename: str) -> SPSSData:
-    """Load file bytes into SPSSData. Sprint 2: only .sav is supported.
+    """Load file bytes into SPSSData. Supports .sav, .csv, .tsv, .xlsx, .xls.
 
     CPU-bound — call via run_in_executor.
     """
-    if format_str != "sav":
+    if format_str == "sav":
+        return QuantiProEngine.load_spss(file_bytes, filename)
+    elif format_str in ("csv", "tsv"):
+        import csv as csv_mod
+        import io
+        import pandas as pd
+        sep = "\t" if format_str == "tsv" else ","
+        try:
+            sample = file_bytes[:8192].decode("utf-8", errors="replace")
+            dialect = csv_mod.Sniffer().sniff(sample)
+            sep = dialect.delimiter
+        except Exception:
+            pass
+        df = pd.read_csv(io.BytesIO(file_bytes), sep=sep)
+        return SPSSData(df=df, meta=None, mrx_dataset=None, file_name=filename)
+    elif format_str in ("xlsx", "xls"):
+        import io
+        import pandas as pd
+        df = pd.read_excel(io.BytesIO(file_bytes))
+        return SPSSData(df=df, meta=None, mrx_dataset=None, file_name=filename)
+    else:
         raise ToolError(
-            f"Format '.{format_str}' is not yet supported. "
-            "Currently only .sav (SPSS) files are accepted. "
-            "CSV/Excel support comes in Sprint 3."
+            f"Unsupported format '.{format_str}'. "
+            "Supported: .sav (SPSS), .csv, .tsv, .xlsx, .xls"
         )
-    return QuantiProEngine.load_spss(file_bytes, filename)
 
 
 def _extract_tables_summary(sheets: list) -> list[dict[str, Any]]:
@@ -255,8 +273,8 @@ async def spss_upload_file(
     Stores the file in Redis with a 30-minute sliding TTL. Returns a file_id
     that you pass to all subsequent tools instead of re-uploading.
 
-    Supported formats (Sprint 2): .sav only.
-    Planned (Sprint 3): .csv, .tsv, .xlsx, .xls.
+    Supported formats: .sav (SPSS), .csv, .tsv, .xlsx, .xls.
+    For CSV/Excel: metadata is inferred from column names and dtypes (no SPSS labels).
 
     Args:
         api_key:     Your API key (sk_test_... or sk_live_...).
@@ -311,10 +329,12 @@ async def spss_upload_file(
             pass
         raise ToolError(f"Failed to store file session: {e}")
 
+    metadata_inferred = fmt != "sav"
     return {
         "file_id": file_id,
         "filename": filename,
-        "format": fmt,
+        "format_detected": fmt,
+        "metadata_inferred": metadata_inferred,
         "n_cases": len(data.df),
         "n_variables": len(data.df.columns),
         "size_bytes": len(file_bytes),
@@ -322,6 +342,7 @@ async def spss_upload_file(
         "message": (
             f"File uploaded. Use file_id='{file_id}' in subsequent tool calls. "
             f"Session expires after {ttl // 60} minutes of inactivity."
+            + (" Note: metadata is inferred from column names (no SPSS labels)." if metadata_inferred else "")
         ),
     }
 
