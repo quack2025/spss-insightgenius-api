@@ -79,7 +79,7 @@ ANALYSIS_TOOLS = [
     },
     {
         "name": "run_tabulate",
-        "description": "Generate full Excel tabulation with multiple stubs crossed by banners. Returns a download URL.",
+        "description": "Generate full Excel tabulation with multiple stubs crossed by banners. Returns a download URL. Use this when the user asks for an Excel, a tabulation, or a full report.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -88,6 +88,11 @@ ANALYSIS_TOOLS = [
                 "weight": {"type": "string", "description": "Weight variable (optional)"},
                 "include_means": {"type": "boolean", "default": True},
                 "significance_level": {"type": "number", "default": 0.95},
+                "include_summary": {"type": "boolean", "default": False, "description": "Add AI executive summary as first Excel sheet"},
+                "filters": {"type": "array", "items": {"type": "object"}, "description": "Filters: [{variable, operator, value}]"},
+                "nets": {"type": "object", "description": "Nets per variable: {var: {net_name: [codes]}}"},
+                "mrs_groups": {"type": "object", "description": "MRS groups: {group_name: [member_vars]}"},
+                "output_mode": {"type": "string", "enum": ["multi_sheet", "single_sheet"], "default": "multi_sheet"},
             },
             "required": ["banners", "stubs"],
         },
@@ -235,6 +240,11 @@ async def _execute_tool(tool_name: str, tool_input: dict, data: SPSSData) -> dic
                 weight=tool_input.get("weight"),
                 include_means=tool_input.get("include_means", True),
                 significance_level=tool_input.get("significance_level", 0.95),
+                include_summary=tool_input.get("include_summary", False),
+                filters=tool_input.get("filters"),
+                nets=tool_input.get("nets"),
+                mrs_groups=tool_input.get("mrs_groups"),
+                output_mode=tool_input.get("output_mode", "multi_sheet"),
             )
             result = build_tabulation(data, spec)
 
@@ -280,11 +290,15 @@ RULES:
 - Run multiple analyses when needed to give a complete answer
 - Use show_chart to visualize important findings (bar charts for comparisons, heatmaps for correlations)
 - When showing crosstab results, highlight significant differences (sig letters)
-- If the user asks for an Excel, use run_tabulate
+- If the user asks for an Excel, tabulation, report, or "genera un Excel": use run_tabulate
+- When using run_tabulate, include banners from the confirmed demographics, stubs from user request (or '_all_'), and include_means=true
+- If user describes what they want in natural language, translate it to run_tabulate parameters (this is the "Prompt to Excel" feature)
+- For filters: if user says "only women" or "filtered to London", add filters parameter
 - Be concise but insightful. Lead with the key finding, then support with data
 - Speak the language of market research: T2B, NPS, significance, base sizes
 - If a variable doesn't exist, suggest similar ones from the metadata
 - Answer in the same language as the user's question
+- When generating tabulations, set include_summary=true for comprehensive reports
 
 CHART DATA FORMAT for show_chart:
 {
