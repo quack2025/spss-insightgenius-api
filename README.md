@@ -4,6 +4,8 @@
 
 **Live**: [spss.insightgenius.io](https://spss.insightgenius.io) | **API Docs**: [spss.insightgenius.io/docs](https://spss.insightgenius.io/docs) | **MCP**: `spss.insightgenius.io/mcp/sse`
 
+[![Talk2Data InsightGenius MCP server](https://glama.ai/mcp/servers/quack2025/spss-insightgenius-api/badges/card.svg)](https://glama.ai/mcp/servers/quack2025/spss-insightgenius-api)
+
 ---
 
 ## Quick Start
