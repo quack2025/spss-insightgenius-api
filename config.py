@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     # Redis (for distributed rate limiting + MCP file sessions — optional)
     redis_url: str = ""
 
+    # Demo API key for embedded frontend (not in repo — set in Railway env vars)
+    demo_api_key: str = ""
+
     # MCP file sessions
     spss_session_ttl_seconds: int = 1800  # 30 minutes sliding window
     redis_max_file_size_mb: int = 100

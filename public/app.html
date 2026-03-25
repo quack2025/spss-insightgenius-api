@@ -382,13 +382,15 @@ console.log(`${resp.headers.get("X-Stubs-Success")} tables generated`);</code></
     SPSS InsightGenius &bull; Powered by QuantipyMRX &bull; Built by Genius Labs
   </footer>
 
+<script src="/static/config.js"></script>
 <script>
 // ── State ──
 let savFile = null, docxFile = null, metadata = null, resultBlob = null, resultFilename = '';
 let selectedBanners = [];
 let mrsGroups = {};  // { "Brand Awareness": ["AWARE_A","AWARE_B"] }
 
-const API_KEY = 'sk_test_2a441a40c84ba0afe73efd47d6bb1066aac82ad5453360f3';
+// Demo API key — loaded at deploy time. For your own key, visit https://spss.insightgenius.io/account
+const API_KEY = window.__INSIGHTGENIUS_DEMO_KEY__ || 'demo';
 const API_BASE = window.location.origin;
 
 // ── Drop zones ──

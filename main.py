@@ -205,6 +205,16 @@ def create_application() -> FastAPI:
     # NOTE: SSE deprecation header REMOVED — middleware breaks SSE streaming responses.
     # Deprecation will be communicated via spss_get_server_info tool response instead.
 
+    # Demo key injection — served as JS so the key isn't in the git repo
+    @app.get("/static/config.js", include_in_schema=False)
+    async def demo_config():
+        demo_key = settings.demo_api_key or "demo"
+        from starlette.responses import Response
+        return Response(
+            content=f"window.__INSIGHTGENIUS_DEMO_KEY__ = '{demo_key}';",
+            media_type="application/javascript",
+        )
+
     # Serve frontend + static pages
     public_dir = Path(__file__).parent / "public"
     if public_dir.exists():

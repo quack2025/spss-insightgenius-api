@@ -76,7 +76,7 @@ Users obtain keys at https://spss.insightgenius.io. The api_key parameter patter
 
 ### Test Credentials (for Anthropic QA team)
 ```
-API Key: sk_test_2a441a40c84ba0afe73efd47d6bb1066aac82ad5453360f3
+API Key: Contact support@insightgenius.io for a test key
 Plan: Pro (60 requests/min, 50MB max file)
 Scopes: All (metadata, frequency, crosstab, process, convert, parse_ticket)
 
