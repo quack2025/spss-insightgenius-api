@@ -63,7 +63,75 @@
     </div>
   </div>
 
-  <!-- Chat area (shown after file loaded) -->
+  <!-- Data Prep panel (shown after upload, before chat) -->
+  <div id="prep-panel" class="hidden flex-1 overflow-y-auto p-6">
+    <div class="max-w-2xl mx-auto">
+      <div class="mb-6">
+        <h2 class="text-lg font-bold text-gray-900">Data Preparation</h2>
+        <p class="text-sm text-gray-500 mt-1">We auto-detected the structure of your file. Review and adjust before analyzing.</p>
+      </div>
+
+      <!-- MRS Groups -->
+      <div id="prep-mrs" class="mb-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-6 h-6 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center text-xs font-bold">M</span>
+          <h3 class="text-sm font-semibold text-gray-800">Multiple Response Sets</h3>
+          <span id="prep-mrs-count" class="text-xs text-gray-400"></span>
+        </div>
+        <div id="prep-mrs-list" class="space-y-1"></div>
+      </div>
+
+      <!-- Grid Batteries -->
+      <div id="prep-grids" class="mb-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-6 h-6 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-xs font-bold">G</span>
+          <h3 class="text-sm font-semibold text-gray-800">Grid / Scale Batteries</h3>
+          <span id="prep-grids-count" class="text-xs text-gray-400"></span>
+        </div>
+        <div id="prep-grids-list" class="space-y-1"></div>
+      </div>
+
+      <!-- Demographics / Banners -->
+      <div id="prep-demos" class="mb-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-6 h-6 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xs font-bold">D</span>
+          <h3 class="text-sm font-semibold text-gray-800">Demographics (suggested banners)</h3>
+        </div>
+        <div id="prep-demos-list" class="space-y-1"></div>
+      </div>
+
+      <!-- Weight -->
+      <div id="prep-weight" class="mb-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-6 h-6 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center text-xs font-bold">W</span>
+          <h3 class="text-sm font-semibold text-gray-800">Weight Variable</h3>
+        </div>
+        <div id="prep-weight-info" class="text-sm text-gray-500 ml-8"></div>
+      </div>
+
+      <!-- Nets -->
+      <div id="prep-nets" class="mb-6">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-6 h-6 bg-orange-100 text-orange-700 rounded-full flex items-center justify-center text-xs font-bold">N</span>
+          <h3 class="text-sm font-semibold text-gray-800">Auto-detected Nets</h3>
+          <span id="prep-nets-count" class="text-xs text-gray-400"></span>
+        </div>
+        <div id="prep-nets-info" class="text-sm text-gray-500 ml-8"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex gap-3 pt-4 border-t">
+        <button onclick="confirmPrep()" class="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl font-medium text-sm hover:bg-blue-700">
+          Confirm & Start Chat
+        </button>
+        <button onclick="skipPrep()" class="px-4 py-3 text-gray-600 border border-gray-300 rounded-xl text-sm hover:bg-gray-50">
+          Skip
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat area (shown after prep confirmed) -->
   <div id="chat-area" class="hidden flex-1 flex flex-col">
     <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
 
@@ -91,7 +159,9 @@ const API_BASE = window.location.origin;
 
 let currentFileId = null;
 let currentFileName = null;
+let currentFile = null;  // raw File object for metadata call
 let chatHistory = [];
+let prepContext = null;  // {mrs_groups, grid_groups, demographics, weight, nets}
 
 // ── File Upload ─────────────────────────────────────────────────
 
@@ -119,12 +189,30 @@ async function handleFile(file) {
     });
     const data = await resp.json();
 
-    // Response can be {file_id, ...} or {success, data: {file_id, ...}}
     const fileData = data.data || data;
     if (fileData.file_id) {
       currentFileId = fileData.file_id;
       currentFileName = file.name;
-      showChat(fileData);
+      currentFile = file;
+
+      // Fetch metadata for prep panel
+      status.textContent = 'Analyzing structure...';
+      const metaForm = new FormData();
+      metaForm.append('file', file);
+      try {
+        const metaResp = await fetch(`${API_BASE}/v1/metadata`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${API_KEY}` },
+          body: metaForm,
+        });
+        const metaData = await metaResp.json();
+        const meta = metaData.data || metaData;
+        showPrepPanel(fileData, meta);
+      } catch (metaErr) {
+        // Metadata failed — skip prep, go to chat
+        console.warn('Metadata fetch failed, skipping prep:', metaErr);
+        showChat(fileData);
+      }
     } else {
       status.textContent = `Error: ${data.error?.message || fileData.error || 'Upload failed'}`;
       status.classList.add('text-red-600');
@@ -135,8 +223,115 @@ async function handleFile(file) {
   }
 }
 
+let _fileInfo = null;
+
+function showPrepPanel(fileInfo, meta) {
+  _fileInfo = fileInfo;
+  document.getElementById('upload-zone').classList.add('hidden');
+  document.getElementById('prep-panel').classList.remove('hidden');
+
+  // Show file badge
+  const badge = document.getElementById('file-badge');
+  badge.classList.remove('hidden');
+  badge.classList.add('flex');
+  document.getElementById('file-badge-text').textContent =
+    `${currentFileName} • ${fileInfo.n_cases} cases × ${fileInfo.n_variables} vars`;
+
+  // Parse detected groups
+  const groups = meta.detected_groups || [];
+  const mrsGroups = groups.filter(g => g.question_type === 'awareness' || g.question_type === 'top_of_mind');
+  const gridGroups = groups.filter(g => g.question_type === 'scale');
+  const banners = meta.suggested_banners || [];
+  const weights = meta.detected_weights || [];
+  const nets = meta.preset_nets || {};
+
+  // Initialize prepContext
+  prepContext = {
+    mrs_groups: mrsGroups.map(g => ({...g, enabled: true})),
+    grid_groups: gridGroups.map(g => ({...g, enabled: true})),
+    demographics: banners.map(b => ({...b, enabled: true})),
+    weight: weights.length > 0 ? weights[0] : null,
+    nets_count: Object.keys(nets).length,
+    all_variables: meta.variables || [],
+  };
+
+  // Also add all variables with ≤10 categories as potential demographics
+  const extraDemos = (meta.variables || []).filter(v => {
+    const nCats = v.value_labels ? Object.keys(v.value_labels).length : 0;
+    return nCats >= 2 && nCats <= 10 && !banners.some(b => b.variable === v.name);
+  }).slice(0, 10);
+  for (const v of extraDemos) {
+    prepContext.demographics.push({variable: v.name, label: v.label, n_categories: Object.keys(v.value_labels || {}).length, enabled: false});
+  }
+
+  // Render MRS
+  const mrsList = document.getElementById('prep-mrs-list');
+  document.getElementById('prep-mrs-count').textContent = `(${mrsGroups.length} detected)`;
+  mrsList.innerHTML = mrsGroups.length === 0
+    ? '<p class="text-sm text-gray-400 ml-8">No multiple response sets detected</p>'
+    : mrsGroups.map((g, i) => `
+      <label class="flex items-center gap-2 ml-8 py-1 text-sm cursor-pointer">
+        <input type="checkbox" checked data-type="mrs" data-idx="${i}" onchange="togglePrepItem('mrs',${i},this.checked)"
+               class="rounded text-purple-600 w-4 h-4">
+        <span class="text-gray-700">${g.display_name ? g.display_name.substring(0,60) : g.name}</span>
+        <span class="text-gray-400">(${g.variables.length} vars)</span>
+      </label>`).join('');
+
+  // Render Grids
+  const gridsList = document.getElementById('prep-grids-list');
+  document.getElementById('prep-grids-count').textContent = `(${gridGroups.length} detected)`;
+  gridsList.innerHTML = gridGroups.length === 0
+    ? '<p class="text-sm text-gray-400 ml-8">No grid batteries detected</p>'
+    : gridGroups.map((g, i) => `
+      <label class="flex items-center gap-2 ml-8 py-1 text-sm cursor-pointer">
+        <input type="checkbox" checked data-type="grid" data-idx="${i}" onchange="togglePrepItem('grid',${i},this.checked)"
+               class="rounded text-blue-600 w-4 h-4">
+        <span class="text-gray-700">${g.display_name ? g.display_name.substring(0,60) : g.name}</span>
+        <span class="text-gray-400">(${g.variables.length} vars)</span>
+      </label>`).join('');
+
+  // Render Demographics
+  const demosList = document.getElementById('prep-demos-list');
+  demosList.innerHTML = prepContext.demographics.map((d, i) => `
+    <label class="flex items-center gap-2 ml-8 py-1 text-sm cursor-pointer">
+      <input type="checkbox" ${d.enabled ? 'checked' : ''} data-type="demo" data-idx="${i}" onchange="togglePrepItem('demo',${i},this.checked)"
+             class="rounded text-green-600 w-4 h-4">
+      <span class="text-gray-700">${d.variable}</span>
+      <span class="text-gray-400">${d.label || ''} (${d.n_categories || '?'} cats)</span>
+    </label>`).join('');
+
+  // Weight
+  document.getElementById('prep-weight-info').textContent = prepContext.weight
+    ? `Detected: ${prepContext.weight}`
+    : 'None detected. You can create one from the chat.';
+
+  // Nets
+  document.getElementById('prep-nets-count').textContent = `(${prepContext.nets_count} variables)`;
+  document.getElementById('prep-nets-info').textContent = prepContext.nets_count > 0
+    ? `T2B/B2B auto-detected for ${prepContext.nets_count} Likert/NPS variables`
+    : 'No Likert or NPS scales detected';
+}
+
+function togglePrepItem(type, idx, checked) {
+  if (type === 'mrs') prepContext.mrs_groups[idx].enabled = checked;
+  else if (type === 'grid') prepContext.grid_groups[idx].enabled = checked;
+  else if (type === 'demo') prepContext.demographics[idx].enabled = checked;
+}
+
+function confirmPrep() {
+  document.getElementById('prep-panel').classList.add('hidden');
+  showChat(_fileInfo);
+}
+
+function skipPrep() {
+  prepContext = null;
+  document.getElementById('prep-panel').classList.add('hidden');
+  showChat(_fileInfo);
+}
+
 function showChat(fileInfo) {
   document.getElementById('upload-zone').classList.add('hidden');
+  document.getElementById('prep-panel').classList.add('hidden');
   document.getElementById('chat-area').classList.remove('hidden');
   document.getElementById('chat-area').classList.add('flex');
 
@@ -147,13 +342,29 @@ function showChat(fileInfo) {
   document.getElementById('file-badge-text').textContent =
     `${currentFileName} • ${fileInfo.n_cases} cases × ${fileInfo.n_variables} vars`;
 
-  // Welcome message
+  // Build context summary for welcome
+  let contextLines = [];
+  if (prepContext) {
+    const mrs = prepContext.mrs_groups.filter(g => g.enabled);
+    const grids = prepContext.grid_groups.filter(g => g.enabled);
+    const demos = prepContext.demographics.filter(d => d.enabled);
+    if (mrs.length) contextLines.push(`- **${mrs.length} MRS groups** (awareness/multi-response)`);
+    if (grids.length) contextLines.push(`- **${grids.length} Grid batteries** (scale questions)`);
+    if (demos.length) contextLines.push(`- **Demographics**: ${demos.map(d=>d.variable).join(', ')}`);
+    if (prepContext.weight) contextLines.push(`- **Weight**: ${prepContext.weight}`);
+    if (prepContext.nets_count) contextLines.push(`- **${prepContext.nets_count} auto-detected nets** (T2B/B2B)`);
+  }
+
+  const contextStr = contextLines.length > 0
+    ? `\n\nData structure detected:\n${contextLines.join('\n')}\n`
+    : '\n';
+
   addMessage('assistant', `**${currentFileName}** loaded successfully!\n\n` +
-    `${fileInfo.n_cases} cases × ${fileInfo.n_variables} variables.\n\n` +
+    `${fileInfo.n_cases} cases × ${fileInfo.n_variables} variables.${contextStr}\n` +
     `Ask me anything — for example:\n` +
     `- "What are the main demographics?"\n` +
-    `- "Cross satisfaction by region with significance testing"\n` +
-    `- "Generate a full Excel tabulation by age and gender"\n` +
+    `- "Cross all satisfaction questions by age and city"\n` +
+    `- "Generate a full Excel tabulation"\n` +
     `- "What drives overall satisfaction?"`
   );
 
@@ -180,6 +391,14 @@ async function sendMessage(e) {
   formData.append('message', msg);
   formData.append('file_id', currentFileId);
   formData.append('history', JSON.stringify(chatHistory.slice(-10)));
+  if (prepContext) {
+    formData.append('prep_context', JSON.stringify({
+      mrs_groups: prepContext.mrs_groups.filter(g => g.enabled).map(g => ({name: g.display_name || g.name, variables: g.variables})),
+      grid_groups: prepContext.grid_groups.filter(g => g.enabled).map(g => ({name: g.display_name || g.name, variables: g.variables})),
+      demographics: prepContext.demographics.filter(d => d.enabled).map(d => d.variable),
+      weight: prepContext.weight,
+    }));
+  }
 
   try {
     const resp = await fetch(`${API_BASE}/v1/chat`, {

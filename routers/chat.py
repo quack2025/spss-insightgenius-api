@@ -22,6 +22,7 @@ async def chat_endpoint(
     file_id: str = Form(None),
     file: UploadFile = File(None),
     history: str = Form("[]"),
+    prep_context: str = Form(""),
 ):
     """Send a natural language query about your survey data.
 
@@ -102,6 +103,14 @@ async def chat_endpoint(
     except json.JSONDecodeError:
         history_parsed = []
 
+    # Parse prep context
+    prep_ctx = None
+    if prep_context:
+        try:
+            prep_ctx = json.loads(prep_context)
+        except json.JSONDecodeError:
+            pass
+
     # Run chat
     from services.chat_service import ChatService
     try:
@@ -110,6 +119,7 @@ async def chat_endpoint(
             message=message,
             data=data,
             history=history_parsed,
+            prep_context=prep_ctx,
         )
     except Exception as e:
         logger.error("Chat error: %s", e, exc_info=True)

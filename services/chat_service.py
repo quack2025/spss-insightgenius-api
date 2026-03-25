@@ -301,6 +301,7 @@ class ChatService:
         data: SPSSData,
         history: list[dict] | None = None,
         max_tool_rounds: int = 5,
+        prep_context: dict | None = None,
     ) -> dict:
         """Process a chat message. Returns {response, charts, downloads, tool_calls}.
 
@@ -309,10 +310,33 @@ class ChatService:
             data: Loaded SPSSData from file session
             history: Previous messages [{role, content}] for context
             max_tool_rounds: Max Sonnet→tool→Sonnet loops
+            prep_context: User-confirmed data structure {mrs_groups, grid_groups, demographics, weight}
         """
         metadata_context = _build_metadata_context(data)
 
-        system = SYSTEM_PROMPT + f"\n\nDATASET CONTEXT:\n{metadata_context}"
+        # Add prep context if available
+        prep_section = ""
+        if prep_context:
+            lines = ["\n\nUSER-CONFIRMED DATA STRUCTURE:"]
+            mrs = prep_context.get("mrs_groups", [])
+            if mrs:
+                lines.append(f"\nMRS Groups ({len(mrs)} — treat each as a single multi-response question, NOT individual variables):")
+                for g in mrs:
+                    lines.append(f"  - {g.get('name','?')}: {g.get('variables',[])} (% can exceed 100%)")
+            grids = prep_context.get("grid_groups", [])
+            if grids:
+                lines.append(f"\nGrid Batteries ({len(grids)} — same scale, analyze as battery/summary table):")
+                for g in grids:
+                    lines.append(f"  - {g.get('name','?')}: {g.get('variables',[])}")
+            demos = prep_context.get("demographics", [])
+            if demos:
+                lines.append(f"\nDemographics (use as banners/cross-tab columns): {demos}")
+            wt = prep_context.get("weight")
+            if wt:
+                lines.append(f"\nWeight variable: {wt} (apply to all analyses unless user says otherwise)")
+            prep_section = "\n".join(lines)
+
+        system = SYSTEM_PROMPT + f"\n\nDATASET CONTEXT:\n{metadata_context}{prep_section}"
 
         # Build messages
         messages = []
