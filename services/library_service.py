@@ -189,23 +189,26 @@ class LibraryService:
             label = v.get("label", "")
             vl = v.get("value_labels", {})
             sample = list(vl.values())[:3] if vl else []
-            vars_desc.append(f"{v['name']}: {label} ({len(vl)} cats){f' [{', '.join(str(s) for s in sample)}]' if sample else ''}")
+            sample_str = " [" + ", ".join(str(s) for s in sample) + "]" if sample else ""
+            vars_desc.append(f"{v['name']}: {label} ({len(vl)} cats){sample_str}")
 
         groups = metadata.get("detected_groups", [])
         groups_desc = [f"{g.get('question_type','?')}: {g.get('display_name','')[:50]} ({len(g.get('variables',[]))} vars)" for g in groups[:10]]
 
-        prompt = f"""Describe this survey dataset in 2-3 sentences. Include: topic/industry, country if detectable, key question themes, and notable demographics. Write in English even if labels are in another language.
+        vars_text = "\n".join(vars_desc)
+        groups_text = "\n".join(groups_desc) if groups_desc else "none"
 
-File: {metadata.get('file_name', 'unknown')}
-Cases: {metadata.get('n_cases', 0)} | Variables: {metadata.get('n_variables', 0)}
-File label: {metadata.get('file_label', 'none')}
-
-Variables (first 50):
-{chr(10).join(vars_desc)}
-
-Detected groups: {chr(10).join(groups_desc) if groups_desc else 'none'}
-
-Also generate 10 relevant search keywords (English + original language if not English), comma-separated."""
+        prompt = (
+            "Describe this survey dataset in 2-3 sentences. Include: topic/industry, "
+            "country if detectable, key question themes, and notable demographics. "
+            "Write in English even if labels are in another language.\n\n"
+            f"File: {metadata.get('file_name', 'unknown')}\n"
+            f"Cases: {metadata.get('n_cases', 0)} | Variables: {metadata.get('n_variables', 0)}\n"
+            f"File label: {metadata.get('file_label', 'none')}\n\n"
+            f"Variables (first 50):\n{vars_text}\n\n"
+            f"Detected groups: {groups_text}\n\n"
+            "Also generate 10 relevant search keywords (English + original language if not English), comma-separated."
+        )
 
         try:
             from anthropic import AsyncAnthropic
