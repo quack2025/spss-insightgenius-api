@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.quack2025/talk2data-insightgenius",
   "title": "Talk2Data InsightGenius",
-  "description": "Analyze survey data (.sav, .csv, .xlsx) through Claude — crosstabs with significance testing, ANOVA, correlation, gap analysis, and publication-ready Excel exports. Upload once, analyze unlimited. Deterministic results: same data + same spec = same output, every time.",
+  "description": "Survey data analysis: crosstabs with significance, ANOVA, correlation, Excel exports.",
   "version": "1.0.0",
   "repository": {
     "url": "https://github.com/quack2025/spss-insightgenius-api",
