@@ -50,10 +50,11 @@ def test_list_files_invalid_key():
         run(list_files(api_key="sk_test_bad_key"))
 
 
-def test_list_files_missing_key():
-    from fastmcp.exceptions import ToolError
-    with pytest.raises(ToolError, match="invalid_api_key"):
-        run(list_files(api_key=""))
+def test_list_files_missing_key_returns_oauth_free():
+    """Empty api_key now returns free-tier access (OAuth users)."""
+    result = run(list_files(api_key=""))
+    assert result["key_name"] == "oauth_user"
+    assert result["plan"] == "free"
 
 
 def test_list_files_bad_prefix():
