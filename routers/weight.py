@@ -2,8 +2,6 @@
 
 import json
 import logging
-import tempfile
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.responses import JSONResponse
@@ -26,18 +24,11 @@ async def weight_preview(
 
     Returns counts and percentages per value, with labels from SPSS metadata.
     """
-    contents = await file.read()
-    suffix = Path(file.filename or "upload.sav").suffix
+    file_bytes = await file.read()
+    filename = file.filename or "upload.sav"
 
     def _preview():
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(contents)
-            tmp_path = tmp.name
-
-        engine = QuantiProEngine()
-        data = engine.load_spss(tmp_path)
-        Path(tmp_path).unlink(missing_ok=True)
-
+        data = QuantiProEngine.load_spss(file_bytes, filename)
         df = data.df
         if variable not in df.columns:
             return {"error": f"Variable '{variable}' not found."}
@@ -109,8 +100,8 @@ async def weight_compute(
     Each variable's targets must sum to ~100%.
     Returns weight statistics, convergence info, and before/after distributions.
     """
-    contents = await file.read()
-    suffix = Path(file.filename or "upload.sav").suffix
+    file_bytes = await file.read()
+    filename = file.filename or "upload.sav"
 
     try:
         targets_parsed = json.loads(targets)
@@ -123,12 +114,7 @@ async def weight_compute(
     def _compute():
         from services.rim_weighter import WeightTarget, compute_rim_weight
 
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(contents)
-            tmp_path = tmp.name
-
-        engine = QuantiProEngine()
-        data = engine.load_spss(tmp_path)
+        data = QuantiProEngine.load_spss(file_bytes, filename)
 
         # Build WeightTarget objects
         weight_targets = []
@@ -164,8 +150,6 @@ async def weight_compute(
                 val = row["value"]
                 fval = float(val) if val.replace(".", "").replace("-", "").isdigit() else val
                 row["label"] = str(vl.get(fval, vl.get(int(fval) if isinstance(fval, float) else fval, val)))
-
-        Path(tmp_path).unlink(missing_ok=True)
 
         return {
             "converged": result.converged,
