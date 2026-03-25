@@ -46,20 +46,38 @@
 <!-- Main -->
 <main class="flex-1 flex flex-col max-w-4xl mx-auto w-full">
 
-  <!-- Upload zone (shown when no file loaded) -->
-  <div id="upload-zone" class="flex-1 flex items-center justify-center p-8">
-    <div id="dropzone" class="w-full max-w-lg border-2 border-dashed border-gray-300 rounded-2xl p-12 text-center cursor-pointer hover:border-blue-400 transition-colors"
-         ondragover="event.preventDefault(); this.classList.add('dropzone-active')"
-         ondragleave="this.classList.remove('dropzone-active')"
-         ondrop="handleDrop(event)"
-         onclick="document.getElementById('file-input').click()">
-      <input id="file-input" type="file" accept=".sav,.por,.zsav,.csv,.tsv,.xlsx,.xls" class="hidden" onchange="handleFile(this.files[0])">
-      <svg class="mx-auto w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-      </svg>
-      <p class="text-lg font-medium text-gray-700">Drop your file here</p>
-      <p class="text-sm text-gray-500 mt-1">.sav, .csv, .xlsx — up to 50MB</p>
-      <p id="upload-status" class="text-sm text-blue-600 mt-3 hidden"></p>
+  <!-- Upload zone + Library (shown when no file loaded) -->
+  <div id="upload-zone" class="flex-1 overflow-y-auto p-6">
+    <div class="max-w-2xl mx-auto">
+      <!-- Upload -->
+      <div id="dropzone" class="w-full border-2 border-dashed border-gray-300 rounded-2xl p-10 text-center cursor-pointer hover:border-blue-400 transition-colors mb-6"
+           ondragover="event.preventDefault(); this.classList.add('dropzone-active')"
+           ondragleave="this.classList.remove('dropzone-active')"
+           ondrop="handleDrop(event)"
+           onclick="document.getElementById('file-input').click()">
+        <input id="file-input" type="file" accept=".sav,.por,.zsav,.csv,.tsv,.xlsx,.xls" class="hidden" onchange="handleFile(this.files[0])">
+        <svg class="mx-auto w-10 h-10 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+        </svg>
+        <p class="text-base font-medium text-gray-700">Drop your file here</p>
+        <p class="text-sm text-gray-500 mt-1">.sav, .csv, .xlsx — up to 50MB</p>
+        <p id="upload-status" class="text-sm text-blue-600 mt-3 hidden"></p>
+      </div>
+
+      <!-- Library -->
+      <div id="library-section">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-gray-700">My Files</h2>
+          <div class="flex gap-2">
+            <input id="library-search" type="text" placeholder="Search variables..."
+                   oninput="searchLibrary(this.value)"
+                   class="text-xs border border-gray-200 rounded-lg px-3 py-1.5 w-48 focus:outline-none focus:ring-1 focus:ring-blue-500">
+          </div>
+        </div>
+        <div id="library-list" class="space-y-2">
+          <p class="text-sm text-gray-400 text-center py-4">Loading library...</p>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -578,6 +596,147 @@ function simpleMarkdown(text) {
     .replace(/\n/g, '<br>')
     .replace(/^/, '<p>').replace(/$/, '</p>');
 }
+
+// ── Library ─────────────────────────────────────────────────────
+
+let libraryFiles = [];
+
+async function loadLibrary() {
+  try {
+    const resp = await fetch(`${API_BASE}/v1/library/files`);
+    const data = await resp.json();
+    libraryFiles = (data.data?.files) || [];
+    renderLibrary(libraryFiles);
+  } catch (e) {
+    document.getElementById('library-list').innerHTML =
+      '<p class="text-sm text-gray-400 text-center py-4">Could not load library</p>';
+  }
+}
+
+function renderLibrary(files) {
+  const container = document.getElementById('library-list');
+  if (files.length === 0) {
+    container.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">No files yet. Upload one above.</p>';
+    return;
+  }
+  container.innerHTML = files.map(f => {
+    const date = new Date(f.created_at).toLocaleDateString();
+    const sizeMB = (f.size_bytes / 1024 / 1024).toFixed(1);
+    return `
+    <div class="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-xl hover:border-blue-300 transition-colors group">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+          <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <p class="text-sm font-medium text-gray-800 truncate">${f.filename}</p>
+          <p class="text-xs text-gray-400">${f.n_cases} cases × ${f.n_variables} vars • ${sizeMB} MB • ${date}</p>
+        </div>
+      </div>
+      <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button onclick="loadLibraryFile('${f.id}','${f.filename}',${f.n_cases},${f.n_variables})"
+                class="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700">
+          Analyze
+        </button>
+        <button onclick="deleteLibraryFile('${f.id}')"
+                class="px-2 py-1.5 text-gray-400 hover:text-red-500 text-xs">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function loadLibraryFile(libraryId, filename, nCases, nVars) {
+  const status = document.getElementById('upload-status');
+  status.textContent = `Loading ${filename}...`;
+  status.classList.remove('hidden');
+
+  try {
+    // Load into Redis
+    const resp = await fetch(`${API_BASE}/v1/library/${libraryId}/load`, {method: 'POST'});
+    const data = await resp.json();
+    if (data.success) {
+      currentFileId = data.data.file_id;
+      currentFileName = filename;
+
+      // Fetch metadata for prep panel
+      status.textContent = 'Analyzing structure...';
+      const metaForm = new FormData();
+      // We need the file for metadata — re-download from library
+      const dlResp = await fetch(`${API_BASE}/v1/library/${libraryId}`);
+      const dlData = await dlResp.json();
+      if (dlData.success) {
+        // Use the metadata already stored in library
+        const meta = {
+          detected_groups: JSON.parse(dlData.data.detected_groups || '[]'),
+          suggested_banners: JSON.parse(dlData.data.suggested_banners || '[]'),
+          preset_nets: JSON.parse(dlData.data.preset_nets || '{}'),
+          detected_weights: dlData.data.detected_weights || [],
+          variables: [],  // We'd need to fetch these separately
+        };
+        // Fetch variables
+        const varResp = await fetch(`${API_BASE}/v1/library/${libraryId}/variables`);
+        const varData = await varResp.json();
+        if (varData.success) {
+          meta.variables = varData.data.variables.map(v => ({
+            name: v.name,
+            label: v.label,
+            type: v.var_type,
+            value_labels: v.value_labels ? (typeof v.value_labels === 'string' ? JSON.parse(v.value_labels) : v.value_labels) : {},
+            n_valid: v.n_valid || 0,
+            n_missing: v.n_missing || 0,
+          }));
+        }
+        showPrepPanel({n_cases: nCases, n_variables: nVars, file_id: currentFileId}, meta);
+      } else {
+        showChat({n_cases: nCases, n_variables: nVars});
+      }
+    } else {
+      status.textContent = `Error: ${data.error?.message || 'Load failed'}`;
+      status.classList.add('text-red-600');
+    }
+  } catch (e) {
+    status.textContent = `Error: ${e.message}`;
+    status.classList.add('text-red-600');
+  }
+}
+
+async function deleteLibraryFile(libraryId) {
+  if (!confirm('Delete this file permanently?')) return;
+  try {
+    await fetch(`${API_BASE}/v1/library/${libraryId}`, {method: 'DELETE'});
+    loadLibrary();
+  } catch (e) {
+    alert('Delete failed: ' + e.message);
+  }
+}
+
+let searchTimeout = null;
+async function searchLibrary(query) {
+  clearTimeout(searchTimeout);
+  if (!query.trim()) {
+    renderLibrary(libraryFiles);
+    return;
+  }
+  searchTimeout = setTimeout(async () => {
+    try {
+      const resp = await fetch(`${API_BASE}/v1/library/search/files?q=${encodeURIComponent(query)}`);
+      const data = await resp.json();
+      const results = data.data?.results || [];
+      renderLibrary(results);
+    } catch (e) {
+      renderLibrary([]);
+    }
+  }, 300);
+}
+
+// Load library on page init
+loadLibrary();
 </script>
 </body>
 </html>
