@@ -174,6 +174,7 @@ def create_application() -> FastAPI:
     from routers.downloads import router as downloads_router
     from routers.file_upload import router as file_upload_router
     from routers.weight import router as weight_router
+    from routers.chat import router as chat_router
 
     app.include_router(health_router)
     app.include_router(metadata_router)
@@ -191,6 +192,7 @@ def create_application() -> FastAPI:
     app.include_router(downloads_router)
     app.include_router(file_upload_router)
     app.include_router(weight_router)
+    app.include_router(chat_router)
 
     # MCP server — SSE transport
     # NOTE: Streamable HTTP (http_app) CANNOT be mounted as FastAPI sub-app —
@@ -240,6 +242,10 @@ def create_application() -> FastAPI:
         @app.get("/export", include_in_schema=False)
         async def export_page():
             return FileResponse(public_dir / "app.html")
+
+        @app.get("/export-mcp", include_in_schema=False)
+        async def export_mcp_page():
+            return FileResponse(public_dir / "chat.html")
 
         @app.get("/upload", include_in_schema=False)
         async def upload_page():

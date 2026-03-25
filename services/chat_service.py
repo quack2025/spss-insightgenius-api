@@ -1,0 +1,396 @@
+"""Chat service: Sonnet orchestrates analysis, engine executes, Sonnet interprets.
+
+Flow:
+1. User sends natural language query + file_id
+2. Sonnet receives query + file metadata → decides which analyses to run
+3. Backend executes analyses via QuantiProEngine (deterministic)
+4. Sonnet receives results → generates interpretation + chart specs
+5. Frontend renders charts + narrative
+
+Cost: ~$0.01-0.03 per conversation turn (Sonnet input + output).
+"""
+
+import json
+import logging
+import math
+from typing import Any
+
+from anthropic import AsyncAnthropic
+
+from config import get_settings
+from services.quantipy_engine import QuantiProEngine, SPSSData
+
+logger = logging.getLogger(__name__)
+
+# Tools that Sonnet can call (mapped to engine functions)
+ANALYSIS_TOOLS = [
+    {
+        "name": "run_frequency",
+        "description": "Run frequency analysis for one or more variables. Returns counts, percentages, mean, std, median.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "variables": {"type": "array", "items": {"type": "string"}, "description": "Variable names to analyze"},
+                "weight": {"type": "string", "description": "Weight variable name (optional)"},
+            },
+            "required": ["variables"],
+        },
+    },
+    {
+        "name": "run_crosstab",
+        "description": "Run cross-tabulation with significance testing (Z-test, A/B/C letters). Best for comparing a question across demographics.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "row": {"type": "string", "description": "Row variable (the question)"},
+                "col": {"type": "string", "description": "Column variable (the demographic/banner)"},
+                "weight": {"type": "string", "description": "Weight variable (optional)"},
+                "significance_level": {"type": "number", "default": 0.95},
+            },
+            "required": ["row", "col"],
+        },
+    },
+    {
+        "name": "run_correlation",
+        "description": "Compute correlation matrix between numeric variables. Returns r-values and p-values.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "variables": {"type": "array", "items": {"type": "string"}, "description": "2+ numeric variables"},
+                "method": {"type": "string", "enum": ["pearson", "spearman", "kendall"], "default": "pearson"},
+            },
+            "required": ["variables"],
+        },
+    },
+    {
+        "name": "run_anova",
+        "description": "One-way ANOVA with Tukey HSD post-hoc. Tests if a numeric variable differs across groups.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "dependent": {"type": "string", "description": "Numeric dependent variable"},
+                "factor": {"type": "string", "description": "Grouping variable (categorical)"},
+                "post_hoc": {"type": "boolean", "default": True},
+            },
+            "required": ["dependent", "factor"],
+        },
+    },
+    {
+        "name": "run_tabulate",
+        "description": "Generate full Excel tabulation with multiple stubs crossed by banners. Returns a download URL.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "banners": {"type": "array", "items": {"type": "string"}, "description": "Banner/demographic variables"},
+                "stubs": {"type": "array", "items": {"type": "string"}, "description": "Stub variables to analyze (use ['_all_'] for all)"},
+                "weight": {"type": "string", "description": "Weight variable (optional)"},
+                "include_means": {"type": "boolean", "default": True},
+                "significance_level": {"type": "number", "default": 0.95},
+            },
+            "required": ["banners", "stubs"],
+        },
+    },
+    {
+        "name": "show_chart",
+        "description": "Display a chart to the user. Use this to visualize analysis results.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "chart_type": {
+                    "type": "string",
+                    "enum": ["bar", "horizontal_bar", "stacked_bar", "heatmap", "line", "scatter", "pie"],
+                },
+                "title": {"type": "string"},
+                "data": {
+                    "type": "object",
+                    "description": "Chart data: {labels: [...], datasets: [{label, values, color}]}",
+                },
+                "options": {
+                    "type": "object",
+                    "description": "Optional: {show_values: bool, percentage: bool, sort: 'asc'|'desc'}",
+                },
+            },
+            "required": ["chart_type", "title", "data"],
+        },
+    },
+]
+
+
+def _sanitize_for_json(obj: Any) -> Any:
+    """Replace NaN/Inf with None for JSON serialization."""
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return round(obj, 4)
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_for_json(v) for v in obj]
+    return obj
+
+
+def _build_metadata_context(data: SPSSData) -> str:
+    """Build a compact metadata summary for Sonnet's system prompt."""
+    engine = QuantiProEngine()
+    meta = engine.extract_metadata(data)
+
+    lines = [
+        f"File: {data.file_name} | {meta['n_cases']} cases x {meta['n_variables']} variables",
+        "",
+        "Variables (name: label [type, N categories]):",
+    ]
+
+    for v in meta.get("variables", [])[:100]:  # Cap at 100 vars for prompt
+        vl = v.get("value_labels") or {}
+        n_labels = len(vl)
+        label = v.get("label", "")
+        vtype = v.get("type", "")
+        cats = f", {n_labels} cats" if n_labels > 0 else ""
+        sample_labels = list(vl.values())[:4]
+        sample_str = f" → {sample_labels}" if sample_labels else ""
+        lines.append(f"  {v['name']}: {label} [{vtype}{cats}]{sample_str}")
+
+    if len(meta.get("variables", [])) > 100:
+        lines.append(f"  ... +{len(meta['variables']) - 100} more variables")
+
+    # Suggested banners
+    banners = meta.get("suggested_banners") or []
+    if banners:
+        lines.append(f"\nSuggested banners (demographics): {[b['variable'] for b in banners]}")
+
+    # Detected groups
+    groups = meta.get("detected_groups") or []
+    if groups:
+        lines.append(f"\nDetected groups ({len(groups)}):")
+        for g in groups[:10]:
+            lines.append(f"  [{g['question_type']}] {g['display_name'][:60]} ({len(g['variables'])} vars)")
+
+    # Detected weights
+    weights = meta.get("detected_weights") or []
+    if weights:
+        lines.append(f"\nDetected weight variables: {weights}")
+
+    return "\n".join(lines)
+
+
+async def _execute_tool(tool_name: str, tool_input: dict, data: SPSSData) -> dict:
+    """Execute an analysis tool against the loaded data."""
+    engine = QuantiProEngine()
+
+    try:
+        if tool_name == "run_frequency":
+            results = []
+            for var in tool_input["variables"]:
+                try:
+                    result = engine.frequency(data, var, weight=tool_input.get("weight"))
+                    results.append(_sanitize_for_json(result))
+                except Exception as e:
+                    results.append({"variable": var, "error": str(e)})
+            return {"frequencies": results}
+
+        elif tool_name == "run_crosstab":
+            result = engine.crosstab_with_significance(
+                data,
+                row=tool_input["row"],
+                col=tool_input["col"],
+                weight=tool_input.get("weight"),
+                sig_level=tool_input.get("significance_level", 0.95),
+            )
+            return _sanitize_for_json(result)
+
+        elif tool_name == "run_correlation":
+            result = engine.correlation_matrix(
+                data,
+                variables=tool_input["variables"],
+                method=tool_input.get("method", "pearson"),
+            )
+            return _sanitize_for_json(result)
+
+        elif tool_name == "run_anova":
+            result = engine.anova(
+                data,
+                dependent=tool_input["dependent"],
+                factor=tool_input["factor"],
+                post_hoc=tool_input.get("post_hoc", True),
+            )
+            return _sanitize_for_json(result)
+
+        elif tool_name == "run_tabulate":
+            from services.tabulation_builder import TabulateSpec, build_tabulation
+
+            spec = TabulateSpec(
+                banners=tool_input["banners"],
+                stubs=tool_input.get("stubs", ["_all_"]),
+                weight=tool_input.get("weight"),
+                include_means=tool_input.get("include_means", True),
+                significance_level=tool_input.get("significance_level", 0.95),
+            )
+            result = build_tabulation(data, spec)
+
+            # Store the Excel for download
+            from routers.downloads import store_download
+            download_id = store_download(
+                result.excel_bytes,
+                filename=f"tabulation_{data.file_name.replace('.sav', '')}.xlsx",
+            )
+            settings = get_settings()
+            base_url = settings.base_url or "https://spss.insightgenius.io"
+            download_url = f"{base_url}/v1/downloads/{download_id}"
+
+            return {
+                "download_url": download_url,
+                "stubs_total": result.stubs_total,
+                "stubs_success": result.stubs_success,
+                "stubs_failed": result.stubs_failed,
+            }
+
+        elif tool_name == "show_chart":
+            # Charts are rendered by the frontend, we just pass through the spec
+            return {"chart": tool_input, "rendered": True}
+
+        else:
+            return {"error": f"Unknown tool: {tool_name}"}
+
+    except Exception as e:
+        logger.error("Tool execution error [%s]: %s", tool_name, e, exc_info=True)
+        return {"error": str(e)}
+
+
+SYSTEM_PROMPT = """You are a senior market research analyst using Talk2Data InsightGenius.
+You have access to a survey dataset and powerful analysis tools. Your job is to:
+
+1. Understand the user's question
+2. Decide which analyses to run (call tools)
+3. Interpret the results with professional insight
+4. Visualize key findings with charts (call show_chart)
+
+RULES:
+- Always use the analysis tools — NEVER invent or estimate numbers
+- Run multiple analyses when needed to give a complete answer
+- Use show_chart to visualize important findings (bar charts for comparisons, heatmaps for correlations)
+- When showing crosstab results, highlight significant differences (sig letters)
+- If the user asks for an Excel, use run_tabulate
+- Be concise but insightful. Lead with the key finding, then support with data
+- Speak the language of market research: T2B, NPS, significance, base sizes
+- If a variable doesn't exist, suggest similar ones from the metadata
+- Answer in the same language as the user's question
+
+CHART DATA FORMAT for show_chart:
+{
+  "labels": ["London", "South East", "North West"],
+  "datasets": [
+    {"label": "T2B Satisfaction", "values": [68.6, 62.3, 57.7], "color": "#2563eb"},
+    {"label": "Mean", "values": [3.85, 3.72, 3.42], "color": "#10b981"}
+  ]
+}
+"""
+
+
+class ChatService:
+    """Orchestrates Sonnet + Engine for conversational analysis."""
+
+    def __init__(self):
+        settings = get_settings()
+        if not settings.anthropic_api_key:
+            raise ValueError("ANTHROPIC_API_KEY required for chat service")
+        self.client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+
+    async def chat(
+        self,
+        message: str,
+        data: SPSSData,
+        history: list[dict] | None = None,
+        max_tool_rounds: int = 5,
+    ) -> dict:
+        """Process a chat message. Returns {response, charts, downloads, tool_calls}.
+
+        Args:
+            message: User's natural language query
+            data: Loaded SPSSData from file session
+            history: Previous messages [{role, content}] for context
+            max_tool_rounds: Max Sonnet→tool→Sonnet loops
+        """
+        metadata_context = _build_metadata_context(data)
+
+        system = SYSTEM_PROMPT + f"\n\nDATASET CONTEXT:\n{metadata_context}"
+
+        # Build messages
+        messages = []
+        if history:
+            for h in history[-10:]:  # Keep last 10 exchanges for context
+                messages.append(h)
+        messages.append({"role": "user", "content": message})
+
+        charts = []
+        downloads = []
+        tool_calls_log = []
+
+        # Sonnet tool-use loop
+        for round_num in range(max_tool_rounds):
+            response = await self.client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4096,
+                system=system,
+                tools=ANALYSIS_TOOLS,
+                messages=messages,
+            )
+
+            # Collect text blocks and tool use blocks
+            text_parts = []
+            tool_uses = []
+
+            for block in response.content:
+                if block.type == "text":
+                    text_parts.append(block.text)
+                elif block.type == "tool_use":
+                    tool_uses.append(block)
+
+            # If no tool calls, we're done
+            if not tool_uses:
+                break
+
+            # Execute all tool calls
+            messages.append({"role": "assistant", "content": response.content})
+
+            tool_results = []
+            for tool_use in tool_uses:
+                tool_name = tool_use.name
+                tool_input = tool_use.input
+
+                logger.info("Chat tool call: %s(%s)", tool_name, json.dumps(tool_input)[:200])
+                tool_calls_log.append({"tool": tool_name, "input": tool_input})
+
+                if tool_name == "show_chart":
+                    charts.append(tool_input)
+                    result_content = json.dumps({"rendered": True})
+                else:
+                    result = await _execute_tool(tool_name, tool_input, data)
+                    if "download_url" in result:
+                        downloads.append(result["download_url"])
+                    result_content = json.dumps(result, default=str)
+
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_use.id,
+                    "content": result_content[:50000],  # Cap at 50K to avoid context overflow
+                })
+
+            messages.append({"role": "user", "content": tool_results})
+
+        # Final text response
+        final_text = ""
+        if response.stop_reason == "end_turn":
+            for block in response.content:
+                if block.type == "text":
+                    final_text += block.text
+        elif text_parts:
+            final_text = "\n".join(text_parts)
+
+        return {
+            "response": final_text,
+            "charts": charts,
+            "downloads": downloads,
+            "tool_calls": tool_calls_log,
+            "model": "claude-sonnet-4-20250514",
+            "rounds": round_num + 1 if 'round_num' in dir() else 1,
+        }

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talk2Data InsightGenius — AI Analysis</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="/static/config.js"></script>
+<style>
+  .chat-msg { animation: fadeIn 0.3s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .dropzone-active { border-color: #2563eb !important; background: #eff6ff !important; }
+  .typing-indicator span { animation: blink 1.4s infinite both; }
+  .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,80%,100% { opacity: 0; } 40% { opacity: 1; } }
+  pre { white-space: pre-wrap; word-break: break-word; }
+  .markdown-content h3 { font-weight: 700; margin-top: 1rem; margin-bottom: 0.25rem; }
+  .markdown-content p { margin-bottom: 0.5rem; }
+  .markdown-content ul { list-style: disc; padding-left: 1.5rem; margin-bottom: 0.5rem; }
+  .markdown-content strong { font-weight: 700; }
+</style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+
+<!-- Header -->
+<header class="bg-white border-b px-6 py-3 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+    <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+      <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+      </svg>
+    </div>
+    <div>
+      <h1 class="text-lg font-bold text-gray-900">Talk2Data InsightGenius</h1>
+      <p class="text-xs text-gray-500">AI-powered survey analysis • Deterministic results</p>
+    </div>
+  </div>
+  <div id="file-badge" class="hidden items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full">
+    <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+    <span id="file-badge-text" class="text-sm text-green-700"></span>
+  </div>
+</header>
+
+<!-- Main -->
+<main class="flex-1 flex flex-col max-w-4xl mx-auto w-full">
+
+  <!-- Upload zone (shown when no file loaded) -->
+  <div id="upload-zone" class="flex-1 flex items-center justify-center p-8">
+    <div id="dropzone" class="w-full max-w-lg border-2 border-dashed border-gray-300 rounded-2xl p-12 text-center cursor-pointer hover:border-blue-400 transition-colors"
+         ondragover="event.preventDefault(); this.classList.add('dropzone-active')"
+         ondragleave="this.classList.remove('dropzone-active')"
+         ondrop="handleDrop(event)"
+         onclick="document.getElementById('file-input').click()">
+      <input id="file-input" type="file" accept=".sav,.por,.zsav,.csv,.tsv,.xlsx,.xls" class="hidden" onchange="handleFile(this.files[0])">
+      <svg class="mx-auto w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+      </svg>
+      <p class="text-lg font-medium text-gray-700">Drop your file here</p>
+      <p class="text-sm text-gray-500 mt-1">.sav, .csv, .xlsx — up to 50MB</p>
+      <p id="upload-status" class="text-sm text-blue-600 mt-3 hidden"></p>
+    </div>
+  </div>
+
+  <!-- Chat area (shown after file loaded) -->
+  <div id="chat-area" class="hidden flex-1 flex flex-col">
+    <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
+
+    <!-- Input -->
+    <div class="border-t bg-white p-4">
+      <form onsubmit="sendMessage(event)" class="flex gap-3">
+        <input id="chat-input" type="text" placeholder="Ask anything about your data..."
+               class="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+               autocomplete="off">
+        <button type="submit" id="send-btn"
+                class="px-5 py-3 bg-blue-600 text-white rounded-xl font-medium text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+          Send
+        </button>
+      </form>
+      <p class="text-xs text-gray-400 mt-2 text-center">
+        Powered by Claude Sonnet • Numbers computed by QuantipyMRX (deterministic)
+      </p>
+    </div>
+  </div>
+</main>
+
+<script>
+const API_KEY = window.__INSIGHTGENIUS_DEMO_KEY__ || 'demo';
+const API_BASE = window.location.origin;
+
+let currentFileId = null;
+let currentFileName = null;
+let chatHistory = [];
+
+// ── File Upload ─────────────────────────────────────────────────
+
+function handleDrop(e) {
+  e.preventDefault();
+  e.target.closest('#dropzone').classList.remove('dropzone-active');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+}
+
+async function handleFile(file) {
+  if (!file) return;
+  const status = document.getElementById('upload-status');
+  status.textContent = `Uploading ${file.name}...`;
+  status.classList.remove('hidden');
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    // Upload to get file_id
+    const resp = await fetch(`${API_BASE}/v1/files/upload`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${API_KEY}` },
+      body: formData,
+    });
+    const data = await resp.json();
+
+    if (data.success && data.data?.file_id) {
+      currentFileId = data.data.file_id;
+      currentFileName = file.name;
+      showChat(data.data);
+    } else {
+      status.textContent = `Error: ${data.error?.message || 'Upload failed'}`;
+      status.classList.add('text-red-600');
+    }
+  } catch (e) {
+    status.textContent = `Error: ${e.message}`;
+    status.classList.add('text-red-600');
+  }
+}
+
+function showChat(fileInfo) {
+  document.getElementById('upload-zone').classList.add('hidden');
+  document.getElementById('chat-area').classList.remove('hidden');
+  document.getElementById('chat-area').classList.add('flex');
+
+  // Show file badge
+  const badge = document.getElementById('file-badge');
+  badge.classList.remove('hidden');
+  badge.classList.add('flex');
+  document.getElementById('file-badge-text').textContent =
+    `${currentFileName} • ${fileInfo.n_cases} cases × ${fileInfo.n_variables} vars`;
+
+  // Welcome message
+  addMessage('assistant', `**${currentFileName}** loaded successfully!\n\n` +
+    `${fileInfo.n_cases} cases × ${fileInfo.n_variables} variables.\n\n` +
+    `Ask me anything — for example:\n` +
+    `- "What are the main demographics?"\n` +
+    `- "Cross satisfaction by region with significance testing"\n` +
+    `- "Generate a full Excel tabulation by age and gender"\n` +
+    `- "What drives overall satisfaction?"`
+  );
+
+  document.getElementById('chat-input').focus();
+}
+
+// ── Chat ────────────────────────────────────────────────────────
+
+async function sendMessage(e) {
+  e.preventDefault();
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg || !currentFileId) return;
+
+  input.value = '';
+  addMessage('user', msg);
+  chatHistory.push({ role: 'user', content: msg });
+
+  const sendBtn = document.getElementById('send-btn');
+  sendBtn.disabled = true;
+  showTyping();
+
+  const formData = new FormData();
+  formData.append('message', msg);
+  formData.append('file_id', currentFileId);
+  formData.append('history', JSON.stringify(chatHistory.slice(-10)));
+
+  try {
+    const resp = await fetch(`${API_BASE}/v1/chat`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${API_KEY}` },
+      body: formData,
+    });
+    const data = await resp.json();
+    hideTyping();
+
+    if (data.success) {
+      const d = data.data;
+
+      // Add text response
+      if (d.response) {
+        addMessage('assistant', d.response);
+        chatHistory.push({ role: 'assistant', content: d.response });
+      }
+
+      // Render charts
+      if (d.charts && d.charts.length > 0) {
+        for (const chart of d.charts) {
+          addChart(chart);
+        }
+      }
+
+      // Show download links
+      if (d.downloads && d.downloads.length > 0) {
+        for (const url of d.downloads) {
+          addDownload(url);
+        }
+      }
+    } else {
+      addMessage('assistant', `Error: ${data.error?.message || 'Something went wrong'}`);
+    }
+  } catch (e) {
+    hideTyping();
+    addMessage('assistant', `Connection error: ${e.message}`);
+  }
+
+  sendBtn.disabled = false;
+  input.focus();
+}
+
+// ── Message Rendering ───────────────────────────────────────────
+
+function addMessage(role, content) {
+  const container = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = `chat-msg flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+
+  const bubble = document.createElement('div');
+  bubble.className = role === 'user'
+    ? 'max-w-[80%] bg-blue-600 text-white rounded-2xl rounded-br-sm px-4 py-3 text-sm'
+    : 'max-w-[80%] bg-white border border-gray-200 rounded-2xl rounded-bl-sm px-4 py-3 text-sm text-gray-800 shadow-sm markdown-content';
+
+  bubble.innerHTML = simpleMarkdown(content);
+  div.appendChild(bubble);
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function addChart(chartSpec) {
+  const container = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'chat-msg flex justify-start';
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'max-w-[90%] bg-white border border-gray-200 rounded-2xl p-4 shadow-sm';
+  wrapper.innerHTML = `<p class="text-sm font-medium text-gray-700 mb-3">${chartSpec.title || 'Chart'}</p>`;
+
+  const canvas = document.createElement('canvas');
+  canvas.style.maxHeight = '300px';
+  wrapper.appendChild(canvas);
+  div.appendChild(wrapper);
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+
+  renderChart(canvas, chartSpec);
+}
+
+function addDownload(url) {
+  const container = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'chat-msg flex justify-start';
+  div.innerHTML = `
+    <a href="${url}" target="_blank"
+       class="inline-flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700 hover:bg-green-100">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+      Download Excel
+    </a>`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function showTyping() {
+  const container = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.id = 'typing';
+  div.className = 'chat-msg flex justify-start';
+  div.innerHTML = `
+    <div class="bg-white border border-gray-200 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
+      <div class="typing-indicator flex gap-1">
+        <span class="w-2 h-2 bg-gray-400 rounded-full"></span>
+        <span class="w-2 h-2 bg-gray-400 rounded-full"></span>
+        <span class="w-2 h-2 bg-gray-400 rounded-full"></span>
+      </div>
+    </div>`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function hideTyping() {
+  const el = document.getElementById('typing');
+  if (el) el.remove();
+}
+
+// ── Chart Rendering ─────────────────────────────────────────────
+
+function renderChart(canvas, spec) {
+  const data = spec.data || {};
+  const labels = data.labels || [];
+  const datasets = (data.datasets || []).map(ds => ({
+    label: ds.label,
+    data: ds.values,
+    backgroundColor: ds.color || '#2563eb',
+    borderColor: ds.color || '#2563eb',
+    borderWidth: 1,
+  }));
+
+  const typeMap = {
+    'bar': 'bar',
+    'horizontal_bar': 'bar',
+    'stacked_bar': 'bar',
+    'line': 'line',
+    'scatter': 'scatter',
+    'pie': 'pie',
+    'heatmap': 'bar',  // Approximate heatmap as grouped bar
+  };
+
+  const chartType = typeMap[spec.chart_type] || 'bar';
+  const isHorizontal = spec.chart_type === 'horizontal_bar';
+  const isStacked = spec.chart_type === 'stacked_bar';
+
+  new Chart(canvas, {
+    type: chartType,
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      indexAxis: isHorizontal ? 'y' : 'x',
+      plugins: {
+        legend: { display: datasets.length > 1 },
+      },
+      scales: chartType === 'pie' ? {} : {
+        x: { stacked: isStacked },
+        y: { stacked: isStacked, beginAtZero: true },
+      },
+    },
+  });
+}
+
+// ── Simple Markdown ─────────────────────────────────────────────
+
+function simpleMarkdown(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-xs">$1</code>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br>')
+    .replace(/^/, '<p>').replace(/$/, '</p>');
+}
+</script>
+</body>
+</html>
