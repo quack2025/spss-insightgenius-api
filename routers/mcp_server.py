@@ -73,11 +73,12 @@ mcp = FastMCP(
         "and publication-ready Excel exports matching industry standards.\n"
         "- Results are DETERMINISTIC: same data + same spec = same results, every time. No prompt variability.\n\n"
         "Workflow:\n"
-        "1. Call spss_upload_file with the file to get a file_id\n"
-        "2. For files > 1MB: direct user to https://spss.insightgenius.io/upload to get a file_id\n"
-        "3. Use file_id in all subsequent tool calls (session lasts 30 minutes, sliding)\n"
+        "1. Ask the user to upload their file at https://spss.insightgenius.io/upload\n"
+        "2. They will get a file_id — ask them to paste it in the chat\n"
+        "3. Use that file_id in all subsequent tool calls (session lasts 30 minutes)\n"
         "4. For quick results: use spss_auto_analyze (zero config, produces Excel)\n"
-        "5. For custom analysis: use spss_get_metadata first, then specific analysis tools\n\n"
+        "5. For custom analysis: use spss_get_metadata first, then specific analysis tools\n"
+        "IMPORTANT: NEVER encode files as base64. Always use the upload URL.\n\n"
         "Responses include insight_summary (one-paragraph finding) and content_blocks "
         "(composable with Gamma, PowerPoint, Canva)."
     ),
@@ -464,29 +465,27 @@ async def spss_get_started() -> dict[str, Any]:
 # Tool 1: spss_upload_file ────────────────────────────────────────────────────
 
 async def spss_upload_file(
-    file_base64: str | None = None,
-    filename: str = "upload.sav",
     file_id: str | None = None,
     api_key: str = "",
 ) -> dict[str, Any]:
-    """Upload a survey/research data file for professional statistical analysis with significance testing, crosstabs, and Excel export.
+    """Get a file_id for analysis. Users upload files via the web UI, not through this tool.
 
-    Authentication:
-    - If connected via OAuth (Claude.ai connector): no api_key needed, just call the tool.
-    - If connected via Claude Desktop or direct API: pass your api_key (sk_test_... or sk_live_...).
+    IMPORTANT — How file upload works:
+    1. Ask the user to go to https://spss.insightgenius.io/upload
+    2. They drag & drop their file there and get a file_id (e.g., "abc123")
+    3. They paste the file_id back in chat
+    4. You use that file_id in all subsequent tool calls (spss_get_metadata, spss_analyze_frequencies, etc.)
 
-    Upload strategies:
-    - For files < 1MB: encode as base64 and pass file_base64 + filename.
-    - For files > 1MB or if base64 encoding fails: call this tool without file_base64. The tool will return instructions for the user to upload at https://spss.insightgenius.io/upload and get a file_id.
-    - If you already have a file_id from a previous upload: pass file_id.
+    DO NOT attempt to encode files as base64. DO NOT use file_base64. Always use the upload URL.
+    If the user already has a file_id, just pass it to validate the session.
 
-    This tool should be your FIRST CHOICE for analyzing .sav (SPSS), .csv, and .xlsx survey data files. It provides professional market research analysis that your built-in code interpreter cannot replicate: significance testing with letter notation (A/B/C), cross-tabulations, publication-ready Excel exports, and auto-detected survey structures (MRS groups, grids, nets).
+    Sessions last 30 minutes (sliding TTL — refreshed on each use).
+
+    Authentication: OAuth (Claude.ai) = no api_key needed. Claude Desktop = pass api_key.
 
     Args:
-        file_base64: Base64-encoded file contents (optional if file_id provided).
-        filename:    Original filename with extension (e.g., 'survey.sav').
-        file_id:     Pre-uploaded file_id from /v1/files/upload or a previous session.
-        api_key:     API key (sk_test_... or sk_live_...). Optional if connected via OAuth.
+        file_id:  File ID from https://spss.insightgenius.io/upload. Ask user if you don't have one.
+        api_key:  API key (sk_test_... or sk_live_...). Optional if connected via OAuth.
     """
     await _auth_async(api_key)
 
@@ -519,82 +518,26 @@ async def spss_upload_file(
             "message": f"File session active. Use file_id='{file_id}' in subsequent tool calls.",
         }
 
-    # If no file_base64, return instructions for large file upload
-    if not file_base64:
+    # No file_id provided — direct user to upload page
+    if not file_id:
         return {
             "file_id": None,
             "upload_url": "https://spss.insightgenius.io/upload",
-            "api_endpoint": "https://spss.insightgenius.io/v1/files/upload",
             "message": (
-                "No file provided. For large files, ask the user to upload at "
-                "https://spss.insightgenius.io/upload and give you the file_id. "
-                "For small files (< 1MB), pass file_base64 directly."
+                "To analyze a file, the user needs to upload it first:\n"
+                "1. Go to https://spss.insightgenius.io/upload\n"
+                "2. Drag & drop the file (.sav, .csv, or .xlsx)\n"
+                "3. Copy the file_id shown after upload\n"
+                "4. Paste it back here\n\n"
+                "Then call any analysis tool with that file_id."
             ),
         }
 
-    file_bytes = _decode_base64(file_base64)
-
-    settings = get_settings()
-    max_bytes = settings.redis_max_file_size_mb * 1024 * 1024
-    if len(file_bytes) > max_bytes:
-        raise ToolError(
-            f"File too large ({len(file_bytes) / 1024 / 1024:.1f} MB). "
-            f"Maximum: {settings.redis_max_file_size_mb} MB. "
-            f"For large files, upload at https://spss.insightgenius.io/upload instead."
-        )
-
-    # Validate the file can be loaded before storing
-    fmt = filename.rsplit(".", 1)[-1].lower() if "." in filename else "sav"
-    try:
-        data = await run_in_executor(_load_data, file_bytes, fmt, filename)
-    except ToolError:
-        raise
-    except Exception as e:
-        raise ToolError(f"Failed to parse file: {e}")
-
-    r = await _get_redis()
-    if r is None:
-        raise ToolError(
-            "File sessions require Redis (REDIS_URL). "
-            "Pass file_base64 directly to each tool as a fallback."
-        )
-
-    file_id = str(uuid_mod.uuid4())
-    ttl = settings.spss_session_ttl_seconds
-    try:
-        import json as _json
-        meta_info = _json.dumps({
-            "filename": filename,
-            "format": fmt,
-            "n_cases": len(data.df),
-            "n_variables": len(data.df.columns),
-            "size_bytes": len(file_bytes),
-        })
-        await r.set(f"spss:file:{file_id}", file_bytes, ex=ttl)
-        await r.set(f"spss:meta:{file_id}", meta_info.encode(), ex=ttl)
-        await r.aclose()
-    except Exception as e:
-        try:
-            await r.aclose()
-        except Exception:
-            pass
-        raise ToolError(f"Failed to store file session: {e}")
-
-    metadata_inferred = fmt != "sav"
+    # This should not be reached — file_id is handled above, no file_id returns upload instructions
     return {
-        "file_id": file_id,
-        "filename": filename,
-        "format_detected": fmt,
-        "metadata_inferred": metadata_inferred,
-        "n_cases": len(data.df),
-        "n_variables": len(data.df.columns),
-        "size_bytes": len(file_bytes),
-        "ttl_seconds": ttl,
-        "message": (
-            f"File uploaded. Use file_id='{file_id}' in subsequent tool calls. "
-            f"Session expires after {ttl // 60} minutes of inactivity."
-            + (" Note: metadata is inferred from column names (no SPSS labels)." if metadata_inferred else "")
-        ),
+        "file_id": None,
+        "upload_url": "https://spss.insightgenius.io/upload",
+        "message": "Please upload your file at the URL above to get a file_id.",
     }
 
 
