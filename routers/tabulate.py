@@ -222,7 +222,7 @@ async def tabulate(
                 entry["significant_cells"] = sig_cells[:5]
                 summary_results.append(entry)
 
-            banner_labels = [b.label for b in result.banner_columns if b.label]
+            banner_labels = list(set(b.banner_label for b in result.banner_columns if b.banner_label))
             summary_text = await generate_executive_summary(
                 tabulation_results=summary_results,
                 banner_labels=banner_labels,
