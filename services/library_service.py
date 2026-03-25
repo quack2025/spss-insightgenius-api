@@ -187,10 +187,11 @@ class LibraryService:
         vars_desc = []
         for v in metadata.get("variables", [])[:50]:
             label = v.get("label", "")
-            vl = v.get("value_labels", {})
-            sample = list(vl.values())[:3] if vl else []
+            vl = v.get("value_labels") or {}
+            n_cats = len(vl) if isinstance(vl, dict) else 0
+            sample = list(vl.values())[:3] if isinstance(vl, dict) and vl else []
             sample_str = " [" + ", ".join(str(s) for s in sample) + "]" if sample else ""
-            vars_desc.append(f"{v['name']}: {label} ({len(vl)} cats){sample_str}")
+            vars_desc.append(f"{v['name']}: {label} ({n_cats} cats){sample_str}")
 
         groups = metadata.get("detected_groups", [])
         groups_desc = [f"{g.get('question_type','?')}: {g.get('display_name','')[:50]} ({len(g.get('variables',[]))} vars)" for g in groups[:10]]
