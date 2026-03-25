@@ -173,6 +173,7 @@ def create_application() -> FastAPI:
     from routers.auto_analyze import router as auto_analyze_router
     from routers.downloads import router as downloads_router
     from routers.file_upload import router as file_upload_router
+    from routers.weight import router as weight_router
 
     app.include_router(health_router)
     app.include_router(metadata_router)
@@ -189,6 +190,7 @@ def create_application() -> FastAPI:
     app.include_router(auto_analyze_router)
     app.include_router(downloads_router)
     app.include_router(file_upload_router)
+    app.include_router(weight_router)
 
     # MCP server — SSE transport
     # NOTE: Streamable HTTP (http_app) CANNOT be mounted as FastAPI sub-app —
