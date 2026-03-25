@@ -119,6 +119,39 @@ async def library_load(library_id: str):
         })
 
 
+@router.patch("/v1/library/{library_id}", summary="Update file metadata (rename, tags, description)")
+async def library_update(library_id: str, display_name: str = Form(None), description: str = Form(None), tags: str = Form(None)):
+    """Update file display name, description, or tags."""
+    from services.library_service import LibraryService
+    import httpx
+
+    try:
+        svc = LibraryService()
+        updates = {}
+        if display_name is not None:
+            updates["display_name"] = display_name
+        if description is not None:
+            updates["description"] = description
+        if tags is not None:
+            updates["tags"] = [t.strip() for t in tags.split(",") if t.strip()]
+
+        if not updates:
+            return JSONResponse(status_code=400, content={"success": False, "error": {"message": "No fields to update"}})
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.patch(
+                f"{svc.rest_url}/library_files?id=eq.{library_id}",
+                headers={**svc.headers, "Content-Type": "application/json", "Prefer": "return=representation"},
+                json=updates,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                return {"success": True, "data": data[0] if data else {}}
+            return JSONResponse(status_code=resp.status_code, content={"success": False, "error": {"message": resp.text[:200]}})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"success": False, "error": {"code": "LIBRARY_ERROR", "message": str(e)}})
+
+
 @router.delete("/v1/library/{library_id}", summary="Delete file from library")
 async def library_delete(library_id: str):
     """Delete a file from the library (storage + metadata)."""

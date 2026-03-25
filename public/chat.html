@@ -631,8 +631,8 @@ function renderLibrary(files) {
           </svg>
         </div>
         <div class="min-w-0">
-          <p class="text-sm font-medium text-gray-800 truncate">${f.filename}</p>
-          <p class="text-xs text-gray-400">${f.n_cases} cases × ${f.n_variables} vars • ${sizeMB} MB • ${date}</p>
+          <p class="text-sm font-medium text-gray-800 truncate" ondblclick="renameFile('${f.id}',this)" title="Double-click to rename">${f.display_name || f.filename}</p>
+          <p class="text-xs text-gray-400">${f.filename} • ${f.n_cases} cases × ${f.n_variables} vars • ${sizeMB} MB • ${date}</p>
         </div>
       </div>
       <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -713,6 +713,20 @@ async function deleteLibraryFile(libraryId) {
     loadLibrary();
   } catch (e) {
     alert('Delete failed: ' + e.message);
+  }
+}
+
+async function renameFile(libraryId, el) {
+  const current = el.textContent;
+  const newName = prompt('Rename file:', current);
+  if (!newName || newName === current) return;
+  try {
+    const form = new FormData();
+    form.append('display_name', newName);
+    await fetch(`${API_BASE}/v1/library/${libraryId}`, {method: 'PATCH', body: form});
+    el.textContent = newName;
+  } catch (e) {
+    alert('Rename failed: ' + e.message);
   }
 }
 

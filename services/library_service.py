@@ -94,6 +94,7 @@ class LibraryService:
             "user_id": user_id,
             "filename": filename,
             "original_name": filename,
+            "display_name": metadata.get("file_label") or filename.rsplit(".", 1)[0],
             "file_type": filename.rsplit(".", 1)[-1].lower() if "." in filename else "sav",
             "storage_path": storage_path,
             "size_bytes": len(file_bytes),
@@ -120,6 +121,13 @@ class LibraryService:
         variables = metadata.get("variables", [])
         if variables:
             await self._index_variables(library_id, variables)
+
+        # 5. Generate AI summary for better search (async, non-blocking)
+        try:
+            import asyncio
+            asyncio.create_task(self._generate_file_summary(library_id, metadata))
+        except Exception:
+            pass  # Non-critical — text search still works
 
         logger.info("[LIBRARY] Stored %s: %d cases × %d vars, library_id=%s",
                      filename, metadata.get("n_cases", 0), metadata.get("n_variables", 0), library_id)
@@ -168,6 +176,63 @@ class LibraryService:
                 )
                 if resp.status_code not in (200, 201):
                     logger.warning("Variable index failed for chunk %d: %s", i, resp.text[:200])
+
+    async def _generate_file_summary(self, library_id: str, metadata: dict):
+        """Generate an AI summary of the file for better search. Uses Haiku (~$0.001)."""
+        settings = get_settings()
+        if not settings.anthropic_api_key:
+            return
+
+        # Build a compact description of the file
+        vars_desc = []
+        for v in metadata.get("variables", [])[:50]:
+            label = v.get("label", "")
+            vl = v.get("value_labels", {})
+            sample = list(vl.values())[:3] if vl else []
+            vars_desc.append(f"{v['name']}: {label} ({len(vl)} cats){f' [{', '.join(str(s) for s in sample)}]' if sample else ''}")
+
+        groups = metadata.get("detected_groups", [])
+        groups_desc = [f"{g.get('question_type','?')}: {g.get('display_name','')[:50]} ({len(g.get('variables',[]))} vars)" for g in groups[:10]]
+
+        prompt = f"""Describe this survey dataset in 2-3 sentences. Include: topic/industry, country if detectable, key question themes, and notable demographics. Write in English even if labels are in another language.
+
+File: {metadata.get('file_name', 'unknown')}
+Cases: {metadata.get('n_cases', 0)} | Variables: {metadata.get('n_variables', 0)}
+File label: {metadata.get('file_label', 'none')}
+
+Variables (first 50):
+{chr(10).join(vars_desc)}
+
+Detected groups: {chr(10).join(groups_desc) if groups_desc else 'none'}
+
+Also generate 10 relevant search keywords (English + original language if not English), comma-separated."""
+
+        try:
+            from anthropic import AsyncAnthropic
+            client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+            resp = await client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=300,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            summary = resp.content[0].text
+
+            # Store summary in description + tags
+            # Parse keywords from last line
+            lines = summary.strip().split("\n")
+            keywords_line = lines[-1] if lines else ""
+            description = "\n".join(lines[:-1]).strip()
+            tags = [t.strip().lower() for t in keywords_line.split(",") if t.strip()][:15]
+
+            async with httpx.AsyncClient() as client:
+                await client.patch(
+                    f"{self.rest_url}/library_files?id=eq.{library_id}",
+                    headers={**self.headers, "Content-Type": "application/json"},
+                    json={"description": description, "tags": tags},
+                )
+            logger.info("[LIBRARY] AI summary generated for %s: %d tags", library_id, len(tags))
+        except Exception as e:
+            logger.warning("[LIBRARY] AI summary failed for %s: %s", library_id, e)
 
     # ── Retrieval ────────────────────────────────────────────────
 
@@ -297,14 +362,15 @@ class LibraryService:
     # ── Search ───────────────────────────────────────────────────
 
     async def search_files(self, user_id: str, query: str) -> list[dict]:
-        """Text search across files and variables."""
+        """Text search across files, descriptions, tags, and variables."""
         query_lower = query.lower().strip()
 
-        # Search in file names + descriptions
+        # Search in file names + descriptions + display_name + tags
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{self.rest_url}/library_files?user_id=eq.{user_id}"
-                f"&or=(filename.ilike.%25{query_lower}%25,description.ilike.%25{query_lower}%25)",
+                f"&or=(filename.ilike.%25{query_lower}%25,description.ilike.%25{query_lower}%25,"
+                f"display_name.ilike.%25{query_lower}%25,tags.cs.{{{query_lower}}})",
                 headers=self.headers,
             )
             file_results = resp.json() if resp.status_code == 200 else []
