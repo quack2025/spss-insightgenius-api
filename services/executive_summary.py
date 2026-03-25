@@ -62,16 +62,18 @@ async def generate_executive_summary(
             entry += f" | T2B: {r['t2b']}"
         findings.append(entry)
 
-    user_content = f"""<analysis_context>
-File: {file_name}
-Total cases: {n_cases}
-Banners: {', '.join(banner_labels)}
-Total stubs analyzed: {len(tabulation_results)}
-</analysis_context>
+    findings_text = "\n".join(findings) if findings else "No significant findings to summarize."
+    banners_text = ", ".join(banner_labels)
 
-<findings>
-{chr(10).join(findings) if findings else 'No significant findings to summarize.'}
-</findings>"""
+    user_content = (
+        f"<analysis_context>\n"
+        f"File: {file_name}\n"
+        f"Total cases: {n_cases}\n"
+        f"Banners: {banners_text}\n"
+        f"Total stubs analyzed: {len(tabulation_results)}\n"
+        f"</analysis_context>\n\n"
+        f"<findings>\n{findings_text}\n</findings>"
+    )
 
     if study_context:
         ctx_parts = []
@@ -80,10 +82,11 @@ Total stubs analyzed: {len(tabulation_results)}
         if study_context.get("target_audience"):
             ctx_parts.append(f"Target: {study_context['target_audience']}")
         if study_context.get("key_questions"):
-            ctx_parts.append(f"Key questions: {', '.join(study_context['key_questions'])}")
+            ctx_parts.append("Key questions: " + ", ".join(study_context["key_questions"]))
         if study_context.get("benchmarks"):
             ctx_parts.append(f"Benchmarks: {json.dumps(study_context['benchmarks'])}")
-        user_content += f"\n\n<study_context>\n{chr(10).join(ctx_parts)}\n</study_context>"
+        ctx_text = "\n".join(ctx_parts)
+        user_content += f"\n\n<study_context>\n{ctx_text}\n</study_context>"
 
     user_content += "\n\nWrite an executive summary of these analysis results."
 

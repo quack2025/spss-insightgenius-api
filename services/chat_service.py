@@ -26,19 +26,20 @@ logger = logging.getLogger(__name__)
 ANALYSIS_TOOLS = [
     {
         "name": "run_frequency",
-        "description": "Run frequency analysis for one or more variables. Returns counts, percentages, mean, std, median.",
+        "description": "Run frequency analysis for one or more variables. Returns counts, percentages, mean, std, median. Supports filters for sub-population analysis.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "variables": {"type": "array", "items": {"type": "string"}, "description": "Variable names to analyze"},
                 "weight": {"type": "string", "description": "Weight variable name (optional)"},
+                "filters": {"type": "array", "items": {"type": "object"}, "description": "Filters: [{variable, operator (eq/ne/gt/lt/gte/lte/in), value}]"},
             },
             "required": ["variables"],
         },
     },
     {
         "name": "run_crosstab",
-        "description": "Run cross-tabulation with significance testing (Z-test, A/B/C letters). Best for comparing a question across demographics.",
+        "description": "Run cross-tabulation with significance testing (Z-test, A/B/C letters). Best for comparing a question across demographics. Supports filters.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -46,6 +47,7 @@ ANALYSIS_TOOLS = [
                 "col": {"type": "string", "description": "Column variable (the demographic/banner)"},
                 "weight": {"type": "string", "description": "Weight variable (optional)"},
                 "significance_level": {"type": "number", "default": 0.95},
+                "filters": {"type": "array", "items": {"type": "object"}, "description": "Filters: [{variable, operator, value}]"},
             },
             "required": ["row", "col"],
         },
@@ -178,6 +180,15 @@ async def _execute_tool(tool_name: str, tool_input: dict, data: SPSSData) -> dic
     engine = QuantiProEngine()
 
     try:
+        # Apply filters if provided (Story #2)
+        filters = tool_input.get("filters")
+        if filters and isinstance(filters, list) and len(filters) > 0:
+            from services.tabulation_builder import _apply_group_mask
+            mask = _apply_group_mask(data.df, filters)
+            import pandas as pd
+            filtered_df = data.df[mask].copy()
+            data = type(data)(df=filtered_df, meta=data.meta, mrx_dataset=data.mrx_dataset, file_name=data.file_name)
+
         if tool_name == "run_frequency":
             results = []
             for var in tool_input["variables"]:

@@ -16,7 +16,7 @@ from fastapi.responses import StreamingResponse
 from auth import KeyConfig, require_scope
 from middleware.processing import run_in_executor
 from services.quantipy_engine import QuantiProEngine
-from services.tabulation_builder import TabulateSpec, build_tabulation
+from services.tabulation_builder import TabulateSpec, build_tabulation, _build_excel
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +147,10 @@ async def tabulate(
         output_mode=spec_dict.get("output_mode", "multi_sheet"),
         show_counts=spec_dict.get("show_counts", True),
         show_percentages=spec_dict.get("show_percentages", True),
+        show_chi2=spec_dict.get("show_chi2", True),
+        include_summary=spec_dict.get("include_summary", False),
+        study_context=spec_dict.get("study_context"),
+        filters=spec_dict.get("filters"),
         title=spec_dict.get("title", ""),
     )
 
@@ -196,6 +200,41 @@ async def tabulate(
     except Exception as e:
         logger.error("Tabulation failed [%s]: %s", request_id, e, exc_info=True)
         raise HTTPException(500, detail={"code": "PROCESSING_FAILED", "message": str(e)})
+
+    # ── Executive Summary (Story #4) ──
+    if tab_spec.include_summary and result.successful > 0:
+        try:
+            from services.executive_summary import generate_executive_summary
+            # Build condensed results for the summary
+            summary_results = []
+            for s in result.sheets:
+                if s.status != "success":
+                    continue
+                entry = {"variable": s.variable, "label": s.label, "status": s.status}
+                # Extract significant cells from first banner's crosstab
+                first_ct = list((s.crosstab_data or {}).values())[0] if s.crosstab_data else {}
+                sig_cells = []
+                for row in first_ct.get("table", []):
+                    for k, v in row.items():
+                        if isinstance(v, dict) and v.get("significance_letters"):
+                            sig_cells.append(f"{row.get('row_label','?')}:{k} {v['percentage']}% ({','.join(v['significance_letters'])})")
+                entry["significant_cells"] = sig_cells[:5]
+                summary_results.append(entry)
+
+            banner_labels = [b.label for b in result.banner_columns if b.label]
+            summary_text = await generate_executive_summary(
+                tabulation_results=summary_results,
+                banner_labels=banner_labels,
+                study_context=tab_spec.study_context,
+                file_name=data.file_name,
+                n_cases=len(data.df),
+            )
+            result.executive_summary = summary_text
+            # Rebuild Excel with summary sheet
+            result.excel_bytes = _build_excel(result, tab_spec, data)
+            logger.info("[TABULATE] Executive summary generated (%d chars)", len(summary_text))
+        except Exception as e:
+            logger.warning("[TABULATE] Executive summary failed: %s", e)
 
     elapsed = int((time.perf_counter() - start) * 1000)
     banners_str = "+".join(tab_spec.resolved_banners)
