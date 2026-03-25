@@ -210,7 +210,7 @@ async def _execute_tool(tool_name: str, tool_input: dict, data: SPSSData) -> dic
                 row=tool_input["row"],
                 col=tool_input["col"],
                 weight=tool_input.get("weight"),
-                sig_level=tool_input.get("significance_level", 0.95),
+                significance_level=tool_input.get("significance_level", 0.95),
             )
             return _sanitize_for_json(result)
 
@@ -246,7 +246,7 @@ async def _execute_tool(tool_name: str, tool_input: dict, data: SPSSData) -> dic
                 mrs_groups=tool_input.get("mrs_groups"),
                 output_mode=tool_input.get("output_mode", "multi_sheet"),
             )
-            result = build_tabulation(data, spec)
+            result = build_tabulation(QuantiProEngine, data, spec)
 
             # Store the Excel for download
             from routers.downloads import store_download
