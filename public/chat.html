@@ -119,12 +119,14 @@ async function handleFile(file) {
     });
     const data = await resp.json();
 
-    if (data.success && data.data?.file_id) {
-      currentFileId = data.data.file_id;
+    // Response can be {file_id, ...} or {success, data: {file_id, ...}}
+    const fileData = data.data || data;
+    if (fileData.file_id) {
+      currentFileId = fileData.file_id;
       currentFileName = file.name;
-      showChat(data.data);
+      showChat(fileData);
     } else {
-      status.textContent = `Error: ${data.error?.message || 'Upload failed'}`;
+      status.textContent = `Error: ${data.error?.message || fileData.error || 'Upload failed'}`;
       status.classList.add('text-red-600');
     }
   } catch (e) {
