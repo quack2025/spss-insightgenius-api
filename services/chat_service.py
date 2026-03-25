@@ -250,7 +250,7 @@ async def _execute_tool(tool_name: str, tool_input: dict, data: SPSSData) -> dic
 
             # Store the Excel for download
             from routers.downloads import store_download
-            download_id = store_download(
+            download_id = await store_download(
                 result.excel_bytes,
                 filename=f"tabulation_{data.file_name.replace('.sav', '')}.xlsx",
             )
@@ -260,9 +260,9 @@ async def _execute_tool(tool_name: str, tool_input: dict, data: SPSSData) -> dic
 
             return {
                 "download_url": download_url,
-                "stubs_total": result.stubs_total,
-                "stubs_success": result.stubs_success,
-                "stubs_failed": result.stubs_failed,
+                "stubs_total": result.total_stubs,
+                "stubs_success": result.successful,
+                "stubs_failed": result.failed,
             }
 
         elif tool_name == "show_chart":
