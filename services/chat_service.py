@@ -250,13 +250,10 @@ async def _execute_tool(tool_name: str, tool_input: dict, data: SPSSData) -> dic
 
             # Store the Excel for download
             from routers.downloads import store_download
-            download_id = await store_download(
+            download_id, download_url = await store_download(
                 result.excel_bytes,
                 filename=f"tabulation_{data.file_name.replace('.sav', '')}.xlsx",
             )
-            settings = get_settings()
-            base_url = settings.base_url or "https://spss.insightgenius.io"
-            download_url = f"{base_url}/v1/downloads/{download_id}"
 
             return {
                 "download_url": download_url,
