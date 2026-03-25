@@ -202,6 +202,7 @@ async def tabulate(
         raise HTTPException(500, detail={"code": "PROCESSING_FAILED", "message": str(e)})
 
     # ── Executive Summary (Story #4) ──
+    logger.info("[TABULATE] include_summary=%s successful=%d", tab_spec.include_summary, result.successful)
     if tab_spec.include_summary and result.successful > 0:
         try:
             from services.executive_summary import generate_executive_summary
