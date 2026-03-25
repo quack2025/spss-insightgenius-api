@@ -4,10 +4,10 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, Form, File, UploadFile
+from fastapi import APIRouter, Form, File, UploadFile
 from fastapi.responses import JSONResponse
 
-from auth import KeyConfig, require_auth
+from auth import KeyConfig
 from config import get_settings
 from middleware.processing import run_in_executor
 from services.quantipy_engine import QuantiProEngine
@@ -22,7 +22,6 @@ async def chat_endpoint(
     file_id: str = Form(None),
     file: UploadFile = File(None),
     history: str = Form("[]"),
-    key: KeyConfig = Depends(require_auth),
 ):
     """Send a natural language query about your survey data.
 

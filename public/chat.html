@@ -115,7 +115,6 @@ async function handleFile(file) {
     // Upload to get file_id
     const resp = await fetch(`${API_BASE}/v1/files/upload`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${API_KEY}` },
       body: formData,
     });
     const data = await resp.json();
@@ -183,7 +182,6 @@ async function sendMessage(e) {
   try {
     const resp = await fetch(`${API_BASE}/v1/chat`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${API_KEY}` },
       body: formData,
     });
     const data = await resp.json();

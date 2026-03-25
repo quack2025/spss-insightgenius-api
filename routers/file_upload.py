@@ -61,15 +61,14 @@ async def upload_file(
 ):
     """Upload a data file and get a file_id for use with MCP tools."""
 
-    # Auth — accept header or query param
+    # Auth — optional for demo mode
     key_str = x_api_key or api_key
-    if not key_str:
-        raise HTTPException(401, {"error": "Missing API key. Pass X-API-Key header or ?api_key= query param."})
-
-    try:
-        key_config = get_key_config(key_str)
-    except ValueError:
-        raise HTTPException(401, {"error": "Invalid API key."})
+    key_config = None
+    if key_str:
+        try:
+            key_config = get_key_config(key_str)
+        except ValueError:
+            pass  # Invalid key, proceed as demo user
 
     # Validate extension
     ext = _get_extension(file.filename or "")
@@ -136,7 +135,7 @@ async def upload_file(
 
     logger.info(
         "[UPLOAD] key=%s file=%s size=%.1fMB cases=%d vars=%d file_id=%s",
-        key_config.name, file.filename, size_mb, n_cases, n_variables, file_id,
+        key_config.name if key_config else "demo", file.filename, size_mb, n_cases, n_variables, file_id,
     )
 
     return {
