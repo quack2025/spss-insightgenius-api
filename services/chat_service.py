@@ -99,22 +99,27 @@ ANALYSIS_TOOLS = [
     },
     {
         "name": "show_chart",
-        "description": "Display a chart to the user. Use this to visualize analysis results.",
+        "description": """Display a chart. Choose the RIGHT chart type for market research:
+- nps_gauge: NPS score display. data: {score, promoters, passives, detractors}
+- t2b_bar: Top 2 Box horizontal bars (sorted, color-coded). data: {labels, datasets:[{values}], sig_letters}
+- correlation_heatmap: Correlation matrix. data: {labels, matrix: [[1.0, 0.8, ...], ...]}
+- likert_diverging: Likert scale diverging bars. data: {labels, categories:['SD','D','N','A','SA'], values:[[10,20,30,25,15],...]}
+- donut: Distribution (gender, region). data: {labels, datasets:[{values}]}
+- bar/horizontal_bar/stacked_bar/line/scatter/pie: Standard charts. data: {labels, datasets:[{label, values, color}]}
+
+RULES: Use nps_gauge for NPS, t2b_bar for satisfaction T2B comparisons, correlation_heatmap for correlation matrices, likert_diverging for Likert scale distributions, donut for simple distributions.""",
         "input_schema": {
             "type": "object",
             "properties": {
                 "chart_type": {
                     "type": "string",
-                    "enum": ["bar", "horizontal_bar", "stacked_bar", "heatmap", "line", "scatter", "pie"],
+                    "enum": ["bar", "horizontal_bar", "stacked_bar", "line", "scatter", "pie", "donut",
+                             "nps_gauge", "t2b_bar", "correlation_heatmap", "likert_diverging"],
                 },
                 "title": {"type": "string"},
                 "data": {
                     "type": "object",
-                    "description": "Chart data: {labels: [...], datasets: [{label, values, color}]}",
-                },
-                "options": {
-                    "type": "object",
-                    "description": "Optional: {show_values: bool, percentage: bool, sort: 'asc'|'desc'}",
+                    "description": "Chart data — structure depends on chart_type (see tool description)",
                 },
             },
             "required": ["chart_type", "title", "data"],
@@ -297,14 +302,17 @@ RULES:
 - Answer in the same language as the user's question
 - When generating tabulations, set include_summary=true for comprehensive reports
 
-CHART DATA FORMAT for show_chart:
-{
-  "labels": ["London", "South East", "North West"],
-  "datasets": [
-    {"label": "T2B Satisfaction", "values": [68.6, 62.3, 57.7], "color": "#2563eb"},
-    {"label": "Mean", "values": [3.85, 3.72, 3.42], "color": "#10b981"}
-  ]
-}
+CHART TYPE GUIDE (use the most appropriate for each analysis):
+- NPS analysis → nps_gauge: {score: 42, promoters: 55, passives: 25, detractors: 20}
+- T2B comparison across items → t2b_bar: {labels: ["Speed","Price","Comfort"], datasets:[{values:[68,55,72]}], sig_letters:["AB","","C"]}
+- Correlation matrix → correlation_heatmap: {labels: ["sat_speed","sat_price"], matrix: [[1.0, 0.65],[0.65, 1.0]]}
+- Likert distributions → likert_diverging: {labels:["Speed","Price"], categories:["Very dissatisfied","Dissatisfied","Neutral","Satisfied","Very satisfied"], values:[[5,10,20,40,25],[8,15,25,35,17]]}
+- Simple distribution (gender, region) → donut: {labels:["Male","Female"], datasets:[{values:[52,48]}]}
+- Comparison across groups → bar or horizontal_bar: {labels:[...], datasets:[{label, values, color}]}
+- Trends over time → line
+- Standard bar for everything else → bar
+
+ALWAYS choose the specialized chart type when it applies. Never use plain 'bar' for NPS, T2B comparisons, Likert scales, or correlations.
 """
 
 

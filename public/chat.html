@@ -762,25 +762,39 @@ function hideTyping() {
 
 // ── Chart Rendering ─────────────────────────────────────────────
 
+// MR color palette — professional, consistent, accessible
+const MR_COLORS = {
+  primary: '#2563eb', secondary: '#7c3aed', accent: '#0891b2',
+  positive: '#059669', negative: '#dc2626', neutral: '#6b7280',
+  scale: ['#dc2626','#f97316','#eab308','#84cc16','#059669'],  // Red→Green
+  series: ['#2563eb','#7c3aed','#0891b2','#f59e0b','#ec4899','#14b8a6','#8b5cf6','#f43f5e'],
+  nps: { detractor: '#dc2626', passive: '#f59e0b', promoter: '#059669 '},
+};
+
 function renderChart(canvas, spec) {
+  // Route to specialized renderers
+  if (spec.chart_type === 'nps_gauge') return renderNPSGauge(canvas, spec);
+  if (spec.chart_type === 'likert_diverging') return renderLikertDiverging(canvas, spec);
+  if (spec.chart_type === 'correlation_heatmap') return renderCorrelationHeatmap(canvas, spec);
+  if (spec.chart_type === 't2b_bar') return renderT2BBar(canvas, spec);
+  if (spec.chart_type === 'donut') return renderDonut(canvas, spec);
+
+  // Standard Chart.js charts
   const data = spec.data || {};
   const labels = data.labels || [];
-  const datasets = (data.datasets || []).map(ds => ({
+  const datasets = (data.datasets || []).map((ds, i) => ({
     label: ds.label,
     data: ds.values,
-    backgroundColor: ds.color || '#2563eb',
-    borderColor: ds.color || '#2563eb',
-    borderWidth: 1,
+    backgroundColor: ds.colors || ds.color || MR_COLORS.series[i % MR_COLORS.series.length],
+    borderColor: ds.borderColor || 'rgba(255,255,255,0.8)',
+    borderWidth: spec.chart_type === 'pie' ? 2 : 1,
+    borderRadius: 4,
+    barPercentage: 0.7,
   }));
 
   const typeMap = {
-    'bar': 'bar',
-    'horizontal_bar': 'bar',
-    'stacked_bar': 'bar',
-    'line': 'line',
-    'scatter': 'scatter',
-    'pie': 'pie',
-    'heatmap': 'bar',  // Approximate heatmap as grouped bar
+    'bar': 'bar', 'horizontal_bar': 'bar', 'stacked_bar': 'bar',
+    'line': 'line', 'scatter': 'scatter', 'pie': 'pie', 'radar': 'radar',
   };
 
   const chartType = typeMap[spec.chart_type] || 'bar';
@@ -795,13 +809,320 @@ function renderChart(canvas, spec) {
       maintainAspectRatio: true,
       indexAxis: isHorizontal ? 'y' : 'x',
       plugins: {
-        legend: { display: datasets.length > 1 },
+        legend: { display: datasets.length > 1, position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed[isHorizontal ? 'x' : 'y']}%` } },
       },
-      scales: chartType === 'pie' ? {} : {
-        x: { stacked: isStacked },
-        y: { stacked: isStacked, beginAtZero: true },
+      scales: (chartType === 'pie' || chartType === 'radar') ? {} : {
+        x: { stacked: isStacked, grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { stacked: isStacked, beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { font: { size: 10 } } },
       },
     },
+  });
+}
+
+// ── NPS Gauge ────────────────────────────────────────────────────
+// Semicircular gauge: -100 (red) to +100 (green)
+function renderNPSGauge(canvas, spec) {
+  const npsData = spec.data || {};
+  const score = npsData.score ?? 0;
+  const promoters = npsData.promoters ?? 0;
+  const passives = npsData.passives ?? 0;
+  const detractors = npsData.detractors ?? 0;
+
+  canvas.style.maxHeight = '220px';
+  canvas.height = 220;
+  canvas.width = 360;
+  const ctx = canvas.getContext('2d');
+  const cX = 180, cY = 160, radius = 120;
+
+  // Background arc
+  ctx.beginPath();
+  ctx.arc(cX, cY, radius, Math.PI, 0);
+  ctx.lineWidth = 30;
+  ctx.strokeStyle = '#f3f4f6';
+  ctx.stroke();
+
+  // Colored segments: detractors (red) → passives (yellow) → promoters (green)
+  const segments = [
+    { pct: detractors / 100, color: '#dc2626' },
+    { pct: passives / 100, color: '#f59e0b' },
+    { pct: promoters / 100, color: '#059669' },
+  ];
+  let startAngle = Math.PI;
+  for (const seg of segments) {
+    const sweepAngle = seg.pct * Math.PI;
+    ctx.beginPath();
+    ctx.arc(cX, cY, radius, startAngle, startAngle + sweepAngle);
+    ctx.lineWidth = 30;
+    ctx.strokeStyle = seg.color;
+    ctx.lineCap = 'butt';
+    ctx.stroke();
+    startAngle += sweepAngle;
+  }
+
+  // Needle
+  const normalizedScore = (score + 100) / 200; // 0 to 1
+  const needleAngle = Math.PI + normalizedScore * Math.PI;
+  ctx.beginPath();
+  ctx.moveTo(cX, cY);
+  ctx.lineTo(cX + Math.cos(needleAngle) * (radius - 20), cY + Math.sin(needleAngle) * (radius - 20));
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#1f2937';
+  ctx.stroke();
+
+  // Center dot
+  ctx.beginPath();
+  ctx.arc(cX, cY, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#1f2937';
+  ctx.fill();
+
+  // Score text
+  ctx.font = 'bold 36px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = score >= 50 ? '#059669' : score >= 0 ? '#f59e0b' : '#dc2626';
+  ctx.fillText(score.toFixed(0), cX, cY - 20);
+
+  ctx.font = '12px Inter, sans-serif';
+  ctx.fillStyle = '#6b7280';
+  ctx.fillText('NPS Score', cX, cY - 2);
+
+  // Labels
+  ctx.font = '11px Inter, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#dc2626';
+  ctx.fillText(`${detractors}% Detractors`, 20, 210);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#f59e0b';
+  ctx.fillText(`${passives}% Passives`, cX, 210);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#059669';
+  ctx.fillText(`${promoters}% Promoters`, 340, 210);
+}
+
+// ── T2B Horizontal Bar ───────────────────────────────────────────
+// Sorted horizontal bars with value labels and optional sig letters
+function renderT2BBar(canvas, spec) {
+  const data = spec.data || {};
+  const labels = data.labels || [];
+  const values = (data.datasets?.[0]?.values) || [];
+  const sigLetters = data.sig_letters || [];
+
+  // Sort by value descending
+  const items = labels.map((l, i) => ({ label: l, value: values[i] || 0, sig: sigLetters[i] || '' }));
+  items.sort((a, b) => b.value - a.value);
+
+  const sortedLabels = items.map(i => i.label);
+  const sortedValues = items.map(i => i.value);
+  const sortedColors = items.map(i => {
+    if (i.value >= 70) return '#059669';
+    if (i.value >= 50) return '#0891b2';
+    if (i.value >= 30) return '#f59e0b';
+    return '#dc2626';
+  });
+
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: sortedLabels,
+      datasets: [{
+        data: sortedValues,
+        backgroundColor: sortedColors,
+        borderRadius: 4,
+        barPercentage: 0.6,
+      }],
+    },
+    options: {
+      responsive: true,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `T2B: ${ctx.parsed.x}%${items[ctx.dataIndex]?.sig ? ' ' + items[ctx.dataIndex].sig : ''}` } },
+      },
+      scales: {
+        x: { min: 0, max: 100, grid: { color: '#f3f4f6' }, ticks: { callback: v => v + '%', font: { size: 10 } } },
+        y: { grid: { display: false }, ticks: { font: { size: 11 } } },
+      },
+    },
+    plugins: [{
+      id: 'valueLabels',
+      afterDatasetsDraw(chart) {
+        const ctx = chart.ctx;
+        chart.data.datasets[0].data.forEach((val, i) => {
+          const meta = chart.getDatasetMeta(0).data[i];
+          ctx.font = 'bold 11px Inter, sans-serif';
+          ctx.fillStyle = '#374151';
+          ctx.textAlign = 'left';
+          const sig = items[i]?.sig ? ` ${items[i].sig}` : '';
+          ctx.fillText(`${val}%${sig}`, meta.x + 6, meta.y + 4);
+        });
+      }
+    }],
+  });
+}
+
+// ── Correlation Heatmap ──────────────────────────────────────────
+// Real heatmap with color-coded cells and values
+function renderCorrelationHeatmap(canvas, spec) {
+  const data = spec.data || {};
+  const labels = data.labels || [];
+  const matrix = data.matrix || [];
+  const n = labels.length;
+
+  canvas.style.maxHeight = `${Math.max(250, n * 40 + 60)}px`;
+  canvas.height = n * 40 + 60;
+  canvas.width = n * 40 + 120;
+  const ctx = canvas.getContext('2d');
+  const offsetX = 100, offsetY = 10, cellSize = 38;
+
+  // Column headers
+  ctx.font = '10px Inter, sans-serif';
+  ctx.fillStyle = '#374151';
+  ctx.textAlign = 'center';
+  labels.forEach((label, i) => {
+    ctx.save();
+    ctx.translate(offsetX + i * cellSize + cellSize / 2, offsetY + n * cellSize + 15);
+    ctx.fillText(label.substring(0, 8), 0, 0);
+    ctx.restore();
+  });
+
+  // Row headers
+  ctx.textAlign = 'right';
+  labels.forEach((label, i) => {
+    ctx.fillText(label.substring(0, 12), offsetX - 6, offsetY + i * cellSize + cellSize / 2 + 4);
+  });
+
+  // Cells
+  for (let row = 0; row < n; row++) {
+    for (let col = 0; col < n; col++) {
+      const val = matrix[row]?.[col] ?? 0;
+      const x = offsetX + col * cellSize;
+      const y = offsetY + row * cellSize;
+
+      // Color: red (negative) → white (0) → blue (positive)
+      let r, g, b;
+      if (val >= 0) {
+        r = Math.round(255 - val * 218); // 255→37
+        g = Math.round(255 - val * 156); // 255→99
+        b = 235;
+      } else {
+        const av = Math.abs(val);
+        r = 235;
+        g = Math.round(255 - av * 199); // 255→56
+        b = Math.round(255 - av * 199);
+      }
+
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+
+      // Value text
+      ctx.font = `bold 10px Inter, sans-serif`;
+      ctx.fillStyle = Math.abs(val) > 0.5 ? '#fff' : '#374151';
+      ctx.textAlign = 'center';
+      ctx.fillText(val.toFixed(2), x + cellSize / 2, y + cellSize / 2 + 4);
+    }
+  }
+}
+
+// ── Likert Diverging Stacked Bar ─────────────────────────────────
+// Bars diverge from center: negative left, positive right
+function renderLikertDiverging(canvas, spec) {
+  const data = spec.data || {};
+  const labels = data.labels || [];
+  const categories = data.categories || ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'];
+  const values = data.values || []; // Array of arrays: [[10,20,30,25,15], ...]
+  const colors = ['#dc2626', '#f97316', '#9ca3af', '#84cc16', '#059669'];
+
+  // Calculate diverging offsets
+  const nCats = categories.length;
+  const midpoint = Math.floor(nCats / 2);
+  const hasMiddle = nCats % 2 === 1;
+
+  const datasets = categories.map((cat, ci) => {
+    const isNegative = ci < midpoint;
+    const isMiddle = hasMiddle && ci === midpoint;
+
+    return {
+      label: cat,
+      data: labels.map((_, li) => {
+        const row = values[li] || [];
+        const val = row[ci] || 0;
+        if (isNegative) return -val;
+        if (isMiddle) return val; // Split middle: half negative, half positive
+        return val;
+      }),
+      backgroundColor: colors[ci] || MR_COLORS.series[ci],
+      borderWidth: 0,
+      barPercentage: 0.7,
+      borderRadius: ci === 0 ? { topLeft: 4, bottomLeft: 4 } : ci === nCats - 1 ? { topRight: 4, bottomRight: 4 } : 0,
+    };
+  });
+
+  new Chart(canvas, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      indexAxis: 'y',
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${Math.abs(ctx.parsed.x)}%` } },
+      },
+      scales: {
+        x: {
+          stacked: true,
+          min: -100, max: 100,
+          grid: { color: ctx => ctx.tick.value === 0 ? '#374151' : '#f3f4f6' },
+          ticks: { callback: v => Math.abs(v) + '%', font: { size: 10 } },
+        },
+        y: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } },
+      },
+    },
+  });
+}
+
+// ── Donut Chart ──────────────────────────────────────────────────
+function renderDonut(canvas, spec) {
+  const data = spec.data || {};
+  const labels = data.labels || [];
+  const values = (data.datasets?.[0]?.values) || [];
+  const total = values.reduce((a, b) => a + b, 0);
+
+  new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: MR_COLORS.series.slice(0, labels.length),
+        borderColor: '#fff',
+        borderWidth: 2,
+        hoverOffset: 8,
+      }],
+    },
+    options: {
+      responsive: true,
+      cutout: '65%',
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 }, padding: 12 } },
+        tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed}% (n=${Math.round(ctx.parsed * total / 100)})` } },
+      },
+    },
+    plugins: [{
+      id: 'centerText',
+      beforeDraw(chart) {
+        const { ctx, width, height } = chart;
+        ctx.save();
+        ctx.font = 'bold 20px Inter, sans-serif';
+        ctx.fillStyle = '#1f2937';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`n=${total}`, width / 2, height / 2 - 8);
+        ctx.font = '11px Inter, sans-serif';
+        ctx.fillStyle = '#6b7280';
+        ctx.fillText('Total', width / 2, height / 2 + 12);
+        ctx.restore();
+      }
+    }],
   });
 }
 
