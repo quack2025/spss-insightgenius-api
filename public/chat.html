@@ -18,6 +18,8 @@
   .stream-status { animation: pulse 1.5s ease-in-out infinite; }
   @keyframes pulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
   pre { white-space: pre-wrap; word-break: break-word; }
+  .copy-btn { opacity: 0; transition: opacity 0.2s; cursor: pointer; z-index: 10; }
+  .group:hover .copy-btn { opacity: 1; }
   .markdown-content table { border: 1px solid #e5e7eb; border-radius: 8px; }
   .markdown-content th { font-size: 0.75rem; }
   .markdown-content td { font-size: 0.75rem; }
@@ -69,31 +71,15 @@
         <p id="upload-status" class="text-sm text-blue-600 mt-3 hidden"></p>
       </div>
 
-      <!-- Reporting Ticket (optional .docx) -->
-      <div id="ticket-section" class="hidden mb-6">
-        <div class="flex items-center gap-2 mb-2">
-          <span class="w-5 h-5 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center text-xs font-bold">T</span>
-          <h3 class="text-sm font-semibold text-gray-700">Reporting Ticket</h3>
-          <span class="text-xs text-gray-400">(optional — auto-generates tab spec from .docx)</span>
-        </div>
-        <div class="flex gap-2">
-          <div id="ticket-dropzone" class="flex-1 border border-dashed border-purple-200 rounded-lg p-3 text-center cursor-pointer hover:border-purple-400 transition-colors"
-               onclick="document.getElementById('ticket-input').click()">
-            <input id="ticket-input" type="file" accept=".docx" class="hidden" onchange="handleTicket(this.files[0])">
-            <p id="ticket-label" class="text-xs text-gray-500">Drop .docx reporting ticket or click to browse</p>
-          </div>
-          <button id="ticket-clear" class="hidden px-3 py-1 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50" onclick="clearTicket()">Clear</button>
-        </div>
-      </div>
-
       <!-- Library -->
       <div id="library-section">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-sm font-semibold text-gray-700">My Files</h2>
           <div class="flex gap-2">
-            <input id="library-search" type="text" placeholder="Search variables..."
+            <input id="library-search" type="text" placeholder="Search files & variables..."
                    oninput="searchLibrary(this.value)"
-                   class="text-xs border border-gray-200 rounded-lg px-3 py-1.5 w-48 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                   class="text-xs border border-gray-200 rounded-lg px-3 py-1.5 w-48 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                   autocomplete="off">
           </div>
         </div>
         <div id="library-list" class="space-y-2">
@@ -159,6 +145,23 @@
         <div id="prep-nets-info" class="text-sm text-gray-500 ml-8"></div>
       </div>
 
+      <!-- Reporting Ticket (optional .docx) -->
+      <div id="ticket-section" class="mb-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-5 h-5 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center text-xs font-bold">T</span>
+          <h3 class="text-sm font-semibold text-gray-700">Reporting Ticket</h3>
+          <span class="text-xs text-gray-400">(optional — AI parses your .docx tab spec)</span>
+        </div>
+        <div class="flex gap-2 ml-7">
+          <div id="ticket-dropzone" class="flex-1 border border-dashed border-purple-200 rounded-lg p-3 text-center cursor-pointer hover:border-purple-400 transition-colors"
+               onclick="document.getElementById('ticket-input').click()">
+            <input id="ticket-input" type="file" accept=".docx" class="hidden" onchange="handleTicket(this.files[0])">
+            <p id="ticket-label" class="text-xs text-gray-500">Drop .docx or click to browse</p>
+          </div>
+          <button id="ticket-clear" class="hidden px-3 py-1 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50" onclick="clearTicket()">Clear</button>
+        </div>
+      </div>
+
       <!-- Study Context -->
       <div id="prep-context" class="mb-6">
         <div class="flex items-center gap-2 mb-2">
@@ -215,6 +218,36 @@ let currentTicket = null;  // .docx reporting ticket
 let chatHistory = [];
 let prepContext = null;  // {mrs_groups, grid_groups, demographics, weight, nets, study_context}
 
+// ── Session Persistence ─────────────────────────────────────────
+function saveSession() {
+  try {
+    sessionStorage.setItem('ig_session', JSON.stringify({
+      fileId: currentFileId,
+      fileName: currentFileName,
+      chatHistory: chatHistory.slice(-20),
+      prepContext: prepContext,
+    }));
+  } catch (e) {}
+}
+
+function restoreSession() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('ig_session'));
+    if (saved && saved.fileId) {
+      currentFileId = saved.fileId;
+      currentFileName = saved.fileName;
+      chatHistory = saved.chatHistory || [];
+      prepContext = saved.prepContext;
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+function clearSession() {
+  sessionStorage.removeItem('ig_session');
+}
+
 // ── Reporting Ticket ────────────────────────────────────────────
 
 function handleTicket(file) {
@@ -269,9 +302,6 @@ async function handleFile(file) {
       currentFileId = fileData.file_id;
       currentFileName = file.name;
       currentFile = file;
-
-      // Show ticket section for optional .docx
-      document.getElementById('ticket-section').classList.remove('hidden');
 
       // Fetch metadata for prep panel
       status.textContent = 'Analyzing structure...';
@@ -489,6 +519,7 @@ async function sendMessage(e) {
   input.value = '';
   addMessage('user', msg);
   chatHistory.push({ role: 'user', content: msg });
+  saveSession();
 
   const sendBtn = document.getElementById('send-btn');
   sendBtn.disabled = true;
@@ -580,6 +611,7 @@ async function sendMessage(e) {
       removeStreamBubble(streamBubble);
       addMessage('assistant', finalData.response);
       chatHistory.push({ role: 'assistant', content: finalData.response });
+      saveSession();
 
       // Render any remaining charts/downloads from final
       for (const chart of (finalData.charts || [])) {
@@ -595,6 +627,7 @@ async function sendMessage(e) {
       removeStreamBubble(streamBubble);
       addMessage('assistant', streamedText);
       chatHistory.push({ role: 'assistant', content: streamedText });
+      saveSession();
     }
 
   } catch (e) {
@@ -608,6 +641,7 @@ async function sendMessage(e) {
       if (data.success) {
         addMessage('assistant', data.data.response);
         chatHistory.push({ role: 'assistant', content: data.data.response });
+        saveSession();
         for (const chart of (data.data.charts || [])) addChart(chart);
         for (const url of (data.data.downloads || [])) addDownload(url);
       } else {
@@ -634,7 +668,7 @@ function createStreamBubble() {
   bubble.innerHTML = '<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>';
 
   const status = document.createElement('div');
-  status.className = 'stream-status text-xs text-blue-500 mt-1 hidden';
+  status.className = 'stream-status text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 mt-2 hidden inline-block';
   bubble.appendChild(status);
 
   div.appendChild(bubble);
@@ -655,11 +689,14 @@ function updateStreamStatus(div, statusText) {
   const status = div.querySelector('.stream-status');
   if (!status) return;
   if (statusText) {
-    status.textContent = statusText;
+    status.textContent = '⚙ ' + statusText;
     status.classList.remove('hidden');
+    status.style.display = 'inline-block';
   } else {
     status.classList.add('hidden');
+    status.style.display = 'none';
   }
+  document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
 }
 
 function removeStreamBubble(div) {
@@ -687,7 +724,7 @@ function addMessage(role, content, rawHtml = false) {
   // Copy button for assistant messages (not raw HTML like suggestion buttons)
   if (role === 'assistant' && !rawHtml && content.length > 50) {
     const copyBtn = document.createElement('button');
-    copyBtn.className = 'absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-md hover:bg-gray-200 border border-gray-200';
+    copyBtn.className = 'copy-btn absolute top-2 right-2 px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-md hover:bg-gray-200 border border-gray-200';
     copyBtn.textContent = 'Copy';
     copyBtn.onclick = () => {
       navigator.clipboard.writeText(content).then(() => {
@@ -710,6 +747,7 @@ function addChart(chartSpec) {
 
   const wrapper = document.createElement('div');
   wrapper.className = 'max-w-[90%] bg-white border border-gray-200 rounded-2xl p-4 shadow-sm';
+  wrapper.setAttribute('data-chart-title', chartSpec.title || '');
   wrapper.innerHTML = `<p class="text-sm font-medium text-gray-700 mb-3">${chartSpec.title || 'Chart'}</p>`;
 
   const canvas = document.createElement('canvas');
@@ -1187,6 +1225,7 @@ function simpleMarkdown(text) {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`(.+?)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-xs">$1</code>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" class="text-blue-600 underline hover:text-blue-800">$1</a>')
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/^## (.+)$/gm, '<h2 class="text-base font-bold mt-3 mb-1">$1</h2>')
     .replace(/^# (.+)$/gm, '<h1 class="text-lg font-bold mt-3 mb-1">$1</h1>')
@@ -1382,7 +1421,22 @@ async function searchLibrary(query) {
   }, 300);
 }
 
-// Load library on page init
+// Page init — restore session or show upload
+if (restoreSession()) {
+  // Restore chat UI with previous conversation
+  document.getElementById('upload-zone').classList.add('hidden');
+  document.getElementById('chat-area').classList.remove('hidden');
+  document.getElementById('chat-area').classList.add('flex');
+  const badge = document.getElementById('file-badge');
+  badge.classList.remove('hidden');
+  badge.classList.add('flex');
+  document.getElementById('file-badge-text').textContent = currentFileName || 'Restored session';
+  // Replay chat history into UI
+  for (const msg of chatHistory) {
+    addMessage(msg.role === 'user' ? 'user' : 'assistant', msg.content);
+  }
+  document.getElementById('chat-input').focus();
+}
 loadLibrary();
 </script>
 </body>
