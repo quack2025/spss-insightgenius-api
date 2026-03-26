@@ -356,6 +356,9 @@ class ChatService:
             wt = prep_context.get("weight")
             if wt:
                 lines.append(f"\nWeight variable: {wt} (apply to all analyses unless user says otherwise)")
+            study_ctx = prep_context.get("study_context")
+            if study_ctx:
+                lines.append(f"\n\nSTUDY BRIEF / OBJECTIVES (provided by user — use this to guide your analysis, prioritize relevant variables, and contextualize findings):\n{study_ctx}")
             prep_section = "\n".join(lines)
 
         system = SYSTEM_PROMPT + f"\n\nDATASET CONTEXT:\n{metadata_context}{prep_section}"

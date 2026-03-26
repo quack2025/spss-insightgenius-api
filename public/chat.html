@@ -64,6 +64,23 @@
         <p id="upload-status" class="text-sm text-blue-600 mt-3 hidden"></p>
       </div>
 
+      <!-- Reporting Ticket (optional .docx) -->
+      <div id="ticket-section" class="hidden mb-6">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-5 h-5 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center text-xs font-bold">T</span>
+          <h3 class="text-sm font-semibold text-gray-700">Reporting Ticket</h3>
+          <span class="text-xs text-gray-400">(optional — auto-generates tab spec from .docx)</span>
+        </div>
+        <div class="flex gap-2">
+          <div id="ticket-dropzone" class="flex-1 border border-dashed border-purple-200 rounded-lg p-3 text-center cursor-pointer hover:border-purple-400 transition-colors"
+               onclick="document.getElementById('ticket-input').click()">
+            <input id="ticket-input" type="file" accept=".docx" class="hidden" onchange="handleTicket(this.files[0])">
+            <p id="ticket-label" class="text-xs text-gray-500">Drop .docx reporting ticket or click to browse</p>
+          </div>
+          <button id="ticket-clear" class="hidden px-3 py-1 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50" onclick="clearTicket()">Clear</button>
+        </div>
+      </div>
+
       <!-- Library -->
       <div id="library-section">
         <div class="flex items-center justify-between mb-3">
@@ -137,6 +154,17 @@
         <div id="prep-nets-info" class="text-sm text-gray-500 ml-8"></div>
       </div>
 
+      <!-- Study Context -->
+      <div id="prep-context" class="mb-6">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-6 h-6 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center text-xs font-bold">B</span>
+          <h3 class="text-sm font-semibold text-gray-800">Study Brief / Objectives</h3>
+          <span class="text-xs text-gray-400">(optional — improves AI analysis)</span>
+        </div>
+        <textarea id="prep-study-context" rows="3" placeholder="Paste your study brief or describe the objectives. Example: 'Evaluate EGO hair cream performance vs competitors among Colombian men 18-45. Key questions: satisfaction drivers, purchase channel optimization, NPS by demographic.'"
+          class="w-full ml-8 mr-4 p-3 text-sm border border-gray-200 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-indigo-300 placeholder:text-gray-400" style="width: calc(100% - 2rem);"></textarea>
+      </div>
+
       <!-- Actions -->
       <div class="flex gap-3 pt-4 border-t">
         <button onclick="confirmPrep()" class="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl font-medium text-sm hover:bg-blue-700">
@@ -178,8 +206,32 @@ const API_BASE = window.location.origin;
 let currentFileId = null;
 let currentFileName = null;
 let currentFile = null;  // raw File object for metadata call
+let currentTicket = null;  // .docx reporting ticket
 let chatHistory = [];
-let prepContext = null;  // {mrs_groups, grid_groups, demographics, weight, nets}
+let prepContext = null;  // {mrs_groups, grid_groups, demographics, weight, nets, study_context}
+
+// ── Reporting Ticket ────────────────────────────────────────────
+
+function handleTicket(file) {
+  if (!file || !file.name.endsWith('.docx')) {
+    alert('Please upload a .docx file');
+    return;
+  }
+  currentTicket = file;
+  document.getElementById('ticket-label').textContent = `✓ ${file.name}`;
+  document.getElementById('ticket-label').classList.add('text-purple-700', 'font-medium');
+  document.getElementById('ticket-label').classList.remove('text-gray-500');
+  document.getElementById('ticket-clear').classList.remove('hidden');
+}
+
+function clearTicket() {
+  currentTicket = null;
+  document.getElementById('ticket-input').value = '';
+  document.getElementById('ticket-label').textContent = 'Drop .docx reporting ticket or click to browse';
+  document.getElementById('ticket-label').classList.remove('text-purple-700', 'font-medium');
+  document.getElementById('ticket-label').classList.add('text-gray-500');
+  document.getElementById('ticket-clear').classList.add('hidden');
+}
 
 // ── File Upload ─────────────────────────────────────────────────
 
@@ -212,6 +264,9 @@ async function handleFile(file) {
       currentFileId = fileData.file_id;
       currentFileName = file.name;
       currentFile = file;
+
+      // Show ticket section for optional .docx
+      document.getElementById('ticket-section').classList.remove('hidden');
 
       // Fetch metadata for prep panel
       status.textContent = 'Analyzing structure...';
@@ -337,8 +392,24 @@ function togglePrepItem(type, idx, checked) {
 }
 
 function confirmPrep() {
+  // Capture study context
+  const ctx = document.getElementById('prep-study-context').value.trim();
+  if (ctx && prepContext) {
+    prepContext.study_context = ctx;
+  }
   document.getElementById('prep-panel').classList.add('hidden');
-  showChat(_fileInfo);
+
+  // If ticket uploaded, parse it and auto-send as first message
+  if (currentTicket) {
+    showChat(_fileInfo);
+    setTimeout(() => {
+      document.getElementById('chat-input').value =
+        'I have uploaded a Reporting Ticket (.docx). Please parse it and generate the Excel tabulation accordingly.';
+      document.querySelector('#chat-area form').dispatchEvent(new Event('submit'));
+    }, 500);
+  } else {
+    showChat(_fileInfo);
+  }
 }
 
 function skipPrep() {
@@ -377,16 +448,29 @@ function showChat(fileInfo) {
     ? `\n\nData structure detected:\n${contextLines.join('\n')}\n`
     : '\n';
 
+  const studyCtx = prepContext?.study_context ? `\n- **Study brief**: "${prepContext.study_context.substring(0,100)}${prepContext.study_context.length > 100 ? '...' : ''}"` : '';
+
   addMessage('assistant', `**${currentFileName}** loaded successfully!\n\n` +
-    `${fileInfo.n_cases} cases × ${fileInfo.n_variables} variables.${contextStr}\n` +
-    `Ask me anything — for example:\n` +
-    `- "What are the main demographics?"\n` +
-    `- "Cross all satisfaction questions by age and city"\n` +
-    `- "Generate a full Excel tabulation"\n` +
-    `- "What drives overall satisfaction?"`
+    `${fileInfo.n_cases} cases × ${fileInfo.n_variables} variables.${contextStr}${studyCtx}\n` +
+    `Ask me anything, or click a suggestion below:`
   );
 
+  // Smart Suggest buttons
+  const suggestHtml = `<div class="flex flex-wrap gap-2 mt-2">
+    <button onclick="runSuggestion('What are the key demographics and how is the sample distributed?')" class="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 rounded-full hover:bg-blue-100 border border-blue-200">📊 Demographics overview</button>
+    <button onclick="runSuggestion('Generate a complete Excel with all questions crossed by the main demographics, include T2B, means, and significance testing')" class="px-3 py-1.5 text-xs bg-green-50 text-green-700 rounded-full hover:bg-green-100 border border-green-200">📥 Full Excel tabulation</button>
+    <button onclick="runSuggestion('What are the most interesting findings in this dataset? Look for significant differences and unexpected patterns.')" class="px-3 py-1.5 text-xs bg-purple-50 text-purple-700 rounded-full hover:bg-purple-100 border border-purple-200">🔍 Key findings</button>
+    <button onclick="runSuggestion('Run a correlation analysis between all scale variables and tell me what drives overall satisfaction')" class="px-3 py-1.5 text-xs bg-amber-50 text-amber-700 rounded-full hover:bg-amber-100 border border-amber-200">📈 Satisfaction drivers</button>
+    <button onclick="runSuggestion('Suggest the 5 most relevant analyses for this dataset based on the variable types and study objectives')" class="px-3 py-1.5 text-xs bg-indigo-50 text-indigo-700 rounded-full hover:bg-indigo-100 border border-indigo-200">💡 Suggest analyses</button>
+  </div>`;
+  addMessage('assistant', suggestHtml, true);
+
   document.getElementById('chat-input').focus();
+}
+
+function runSuggestion(text) {
+  document.getElementById('chat-input').value = text;
+  document.querySelector('#chat-area form').dispatchEvent(new Event('submit'));
 }
 
 // ── Chat ────────────────────────────────────────────────────────
@@ -415,7 +499,12 @@ async function sendMessage(e) {
       grid_groups: prepContext.grid_groups.filter(g => g.enabled).map(g => ({name: g.display_name || g.name, variables: g.variables})),
       demographics: prepContext.demographics.filter(d => d.enabled).map(d => d.variable),
       weight: prepContext.weight,
+      study_context: prepContext.study_context || null,
     }));
+  }
+  if (currentTicket) {
+    formData.append('ticket', currentTicket);
+    currentTicket = null;  // Only send once
   }
 
   try {
@@ -462,7 +551,7 @@ async function sendMessage(e) {
 
 // ── Message Rendering ───────────────────────────────────────────
 
-function addMessage(role, content) {
+function addMessage(role, content, rawHtml = false) {
   const container = document.getElementById('messages');
   const div = document.createElement('div');
   div.className = `chat-msg flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
@@ -472,7 +561,7 @@ function addMessage(role, content) {
     ? 'max-w-[80%] bg-blue-600 text-white rounded-2xl rounded-br-sm px-4 py-3 text-sm'
     : 'max-w-[80%] bg-white border border-gray-200 rounded-2xl rounded-bl-sm px-4 py-3 text-sm text-gray-800 shadow-sm markdown-content';
 
-  bubble.innerHTML = simpleMarkdown(content);
+  bubble.innerHTML = rawHtml ? content : simpleMarkdown(content);
   div.appendChild(bubble);
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;

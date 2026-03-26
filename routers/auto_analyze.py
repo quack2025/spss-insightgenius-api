@@ -123,9 +123,28 @@ def _run_auto_analyze(file_bytes: bytes, filename: str, options: dict):
     # Step 7: Build tabulation
     result = build_tabulation(QuantiProEngine, data, spec)
 
+    # Build sheet summaries for executive summary
+    sheet_summaries = []
+    for s in result.sheets:
+        if s.status != "success":
+            continue
+        entry = {"variable": s.variable, "label": s.label, "status": s.status}
+        first_ct = list((s.crosstab_data or {}).values())[0] if s.crosstab_data else {}
+        sig_cells = []
+        for row in first_ct.get("table", []):
+            for k, v in row.items():
+                if isinstance(v, dict) and v.get("significance_letters"):
+                    sig_cells.append(f"{row.get('row_label','?')}:{k} {v['percentage']}% ({','.join(v['significance_letters'])})")
+        entry["significant_cells"] = sig_cells[:5]
+        sheet_summaries.append(entry)
+
     return {
         "excel_bytes": result.excel_bytes,
         "filename": f"auto_analysis_{filename.replace('.sav', '')}.xlsx",
+        "_tabulation_result": result,
+        "_spec": spec,
+        "_data": data,
+        "sheet_summaries": sheet_summaries,
         "summary": {
             "banners": banners,
             "banner_labels": [
@@ -138,6 +157,7 @@ def _run_auto_analyze(file_bytes: bytes, filename: str, options: dict):
             "mrs_groups": len(mrs_groups),
             "grid_groups": len(grid_groups),
             "nets_applied": len(nets),
+            "n_cases": meta.get("n_cases", 0),
             "processing_time_ms": 0,
         },
     }
@@ -176,9 +196,33 @@ async def auto_analyze(
 
     elapsed = int((time.perf_counter() - start) * 1000)
     summary = result["summary"]
+    excel_bytes = result["excel_bytes"]
+
+    # Executive Summary (#5) — add AI summary as first sheet if requested
+    include_summary = options_dict.get("include_summary", True)  # Default ON for auto-analyze
+    if include_summary:
+        try:
+            from services.executive_summary import generate_executive_summary
+            summary_text = await generate_executive_summary(
+                tabulation_results=result.get("sheet_summaries", []),
+                banner_labels=summary.get("banner_labels", []),
+                study_context=options_dict.get("study_context"),
+                file_name=result["filename"],
+                n_cases=summary.get("n_cases", 0),
+            )
+            if summary_text:
+                # Rebuild Excel with summary sheet prepended
+                from services.tabulation_builder import _build_excel
+                tab_result = result.get("_tabulation_result")
+                if tab_result:
+                    tab_result.executive_summary = summary_text
+                    excel_bytes = _build_excel(tab_result, result.get("_spec"), result.get("_data"))
+                    logger.info("[AUTO] Executive summary added (%d chars)", len(summary_text))
+        except Exception as e:
+            logger.warning("[AUTO] Executive summary failed (non-blocking): %s", e)
 
     return StreamingResponse(
-        io.BytesIO(result["excel_bytes"]),
+        io.BytesIO(excel_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
             "Content-Disposition": f'attachment; filename="{result["filename"]}"',

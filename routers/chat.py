@@ -21,6 +21,7 @@ async def chat_endpoint(
     message: str = Form(...),
     file_id: str = Form(None),
     file: UploadFile = File(None),
+    ticket: UploadFile = File(None),
     history: str = Form("[]"),
     prep_context: str = Form(""),
 ):
@@ -110,6 +111,22 @@ async def chat_endpoint(
             prep_ctx = json.loads(prep_context)
         except json.JSONDecodeError:
             pass
+
+    # Parse reporting ticket if provided
+    ticket_spec = None
+    if ticket and ticket.filename and ticket.filename.endswith('.docx'):
+        try:
+            ticket_bytes = await ticket.read()
+            from services.ticket_parser import TicketParser
+            parser = TicketParser()
+            meta = await run_in_executor(QuantiProEngine.extract_metadata, data)
+            var_list = [v["name"] for v in (meta.get("variables") or [])]
+            ticket_spec = await parser.parse(ticket_bytes, var_list)
+            logger.info("[CHAT] Ticket parsed: %d banners, %d stubs", len(ticket_spec.get("banners", [])), len(ticket_spec.get("stubs", [])))
+            # Append ticket info to message
+            message += f"\n\n[SYSTEM: Reporting Ticket parsed. Spec: banners={ticket_spec.get('banners')}, stubs={ticket_spec.get('stubs')}, sig_level={ticket_spec.get('sig_level')}, nets={ticket_spec.get('nets')}. Generate the Excel tabulation using this spec.]"
+        except Exception as e:
+            logger.warning("[CHAT] Ticket parsing failed: %s", e)
 
     # Run chat
     from services.chat_service import ChatService
