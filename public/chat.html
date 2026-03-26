@@ -670,13 +670,32 @@ function addMessage(role, content, rawHtml = false) {
   const div = document.createElement('div');
   div.className = `chat-msg flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
 
+  const wrapper = document.createElement('div');
+  wrapper.className = 'max-w-[80%] relative group';
+
   const bubble = document.createElement('div');
   bubble.className = role === 'user'
-    ? 'max-w-[80%] bg-blue-600 text-white rounded-2xl rounded-br-sm px-4 py-3 text-sm'
-    : 'max-w-[80%] bg-white border border-gray-200 rounded-2xl rounded-bl-sm px-4 py-3 text-sm text-gray-800 shadow-sm markdown-content';
+    ? 'bg-blue-600 text-white rounded-2xl rounded-br-sm px-4 py-3 text-sm'
+    : 'bg-white border border-gray-200 rounded-2xl rounded-bl-sm px-4 py-3 text-sm text-gray-800 shadow-sm markdown-content';
 
   bubble.innerHTML = rawHtml ? content : simpleMarkdown(content);
-  div.appendChild(bubble);
+  wrapper.appendChild(bubble);
+
+  // Copy button for assistant messages (not raw HTML like suggestion buttons)
+  if (role === 'assistant' && !rawHtml && content.length > 50) {
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-md hover:bg-gray-200 border border-gray-200';
+    copyBtn.textContent = 'Copy';
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(content).then(() => {
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+      });
+    };
+    wrapper.appendChild(copyBtn);
+  }
+
+  div.appendChild(wrapper);
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
 }
