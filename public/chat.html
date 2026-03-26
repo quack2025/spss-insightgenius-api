@@ -11,10 +11,12 @@
   .chat-msg { animation: fadeIn 0.3s ease-out; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   .dropzone-active { border-color: #2563eb !important; background: #eff6ff !important; }
-  .typing-indicator span { animation: blink 1.4s infinite both; }
-  .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-  .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+  .typing-indicator span, .typing-dots span { animation: blink 1.4s infinite both; font-size: 1.5em; }
+  .typing-indicator span:nth-child(2), .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-indicator span:nth-child(3), .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
   @keyframes blink { 0%,80%,100% { opacity: 0; } 40% { opacity: 1; } }
+  .stream-status { animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
   pre { white-space: pre-wrap; word-break: break-word; }
   .markdown-content h3 { font-weight: 700; margin-top: 1rem; margin-bottom: 0.25rem; }
   .markdown-content p { margin-bottom: 0.5rem; }
@@ -487,7 +489,9 @@ async function sendMessage(e) {
 
   const sendBtn = document.getElementById('send-btn');
   sendBtn.disabled = true;
-  showTyping();
+
+  // Create streaming bubble
+  const streamBubble = createStreamBubble();
 
   const formData = new FormData();
   formData.append('message', msg);
@@ -504,49 +508,159 @@ async function sendMessage(e) {
   }
   if (currentTicket) {
     formData.append('ticket', currentTicket);
-    currentTicket = null;  // Only send once
+    currentTicket = null;
   }
 
   try {
-    const resp = await fetch(`${API_BASE}/v1/chat`, {
+    const resp = await fetch(`${API_BASE}/v1/chat-stream`, {
       method: 'POST',
       body: formData,
     });
-    const data = await resp.json();
-    hideTyping();
 
-    if (data.success) {
-      const d = data.data;
+    if (!resp.ok) {
+      const err = await resp.text();
+      removeStreamBubble(streamBubble);
+      addMessage('assistant', `Error: ${err}`);
+      sendBtn.disabled = false;
+      input.focus();
+      return;
+    }
 
-      // Add text response
-      if (d.response) {
-        addMessage('assistant', d.response);
-        chatHistory.push({ role: 'assistant', content: d.response });
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let streamedText = '';
+    let finalData = null;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('event: ')) {
+          var eventType = line.slice(7).trim();
+        } else if (line.startsWith('data: ') && eventType) {
+          try {
+            const data = JSON.parse(line.slice(6));
+
+            if (eventType === 'text') {
+              streamedText += data.text;
+              updateStreamBubble(streamBubble, streamedText);
+            } else if (eventType === 'tool_start') {
+              updateStreamStatus(streamBubble, `Running ${data.tool}...`);
+            } else if (eventType === 'tool_end') {
+              updateStreamStatus(streamBubble, null);
+            } else if (eventType === 'chart') {
+              addChart(data);
+            } else if (eventType === 'download') {
+              addDownload(data.url);
+            } else if (eventType === 'done') {
+              finalData = data;
+            } else if (eventType === 'error') {
+              removeStreamBubble(streamBubble);
+              addMessage('assistant', `Error: ${data.message}`);
+            }
+          } catch (parseErr) {
+            // Ignore parse errors in SSE
+          }
+          eventType = null;
+        }
       }
+    }
 
-      // Render charts
-      if (d.charts && d.charts.length > 0) {
-        for (const chart of d.charts) {
+    // Finalize
+    if (finalData) {
+      removeStreamBubble(streamBubble);
+      addMessage('assistant', finalData.response);
+      chatHistory.push({ role: 'assistant', content: finalData.response });
+
+      // Render any remaining charts/downloads from final
+      for (const chart of (finalData.charts || [])) {
+        if (!document.querySelector(`[data-chart-title="${chart.title}"]`)) {
           addChart(chart);
         }
       }
-
-      // Show download links
-      if (d.downloads && d.downloads.length > 0) {
-        for (const url of d.downloads) {
-          addDownload(url);
-        }
+      for (const url of (finalData.downloads || [])) {
+        addDownload(url);
       }
-    } else {
-      addMessage('assistant', `Error: ${data.error?.message || 'Something went wrong'}`);
+    } else if (streamedText) {
+      // No done event but we have text — use streamed text
+      removeStreamBubble(streamBubble);
+      addMessage('assistant', streamedText);
+      chatHistory.push({ role: 'assistant', content: streamedText });
     }
+
   } catch (e) {
-    hideTyping();
-    addMessage('assistant', `Connection error: ${e.message}`);
+    removeStreamBubble(streamBubble);
+    // Fallback to non-streaming
+    console.warn('Stream failed, falling back to sync:', e.message);
+    try {
+      formData.delete('ticket');  // Already consumed
+      const resp = await fetch(`${API_BASE}/v1/chat`, { method: 'POST', body: formData });
+      const data = await resp.json();
+      if (data.success) {
+        addMessage('assistant', data.data.response);
+        chatHistory.push({ role: 'assistant', content: data.data.response });
+        for (const chart of (data.data.charts || [])) addChart(chart);
+        for (const url of (data.data.downloads || [])) addDownload(url);
+      } else {
+        addMessage('assistant', `Error: ${data.error?.message || e.message}`);
+      }
+    } catch (fallbackErr) {
+      addMessage('assistant', `Connection error: ${e.message}`);
+    }
   }
 
   sendBtn.disabled = false;
   input.focus();
+}
+
+// ── Streaming bubble helpers ───────────────────────────────────
+
+function createStreamBubble() {
+  const container = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'chat-msg flex justify-start stream-bubble';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'max-w-[80%] bg-white border border-gray-200 rounded-2xl rounded-bl-sm px-4 py-3 text-sm text-gray-800 shadow-sm markdown-content';
+  bubble.innerHTML = '<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>';
+
+  const status = document.createElement('div');
+  status.className = 'stream-status text-xs text-blue-500 mt-1 hidden';
+  bubble.appendChild(status);
+
+  div.appendChild(bubble);
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return div;
+}
+
+function updateStreamBubble(div, text) {
+  const bubble = div.querySelector('.markdown-content');
+  const status = bubble.querySelector('.stream-status');
+  bubble.innerHTML = simpleMarkdown(text);
+  bubble.appendChild(status);
+  document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+}
+
+function updateStreamStatus(div, statusText) {
+  const status = div.querySelector('.stream-status');
+  if (!status) return;
+  if (statusText) {
+    status.textContent = statusText;
+    status.classList.remove('hidden');
+  } else {
+    status.classList.add('hidden');
+  }
+}
+
+function removeStreamBubble(div) {
+  if (div && div.parentNode) div.parentNode.removeChild(div);
 }
 
 // ── Message Rendering ───────────────────────────────────────────
