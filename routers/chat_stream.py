@@ -69,6 +69,9 @@ async def chat_stream_endpoint(
     """
     settings = get_settings()
 
+    # Capture message in a mutable container for the inner generator
+    _msg = [message]
+
     async def event_stream() -> AsyncGenerator[str, None]:
         try:
             if not settings.anthropic_api_key:
@@ -97,7 +100,7 @@ async def chat_stream_endpoint(
                     meta = await run_in_executor(QuantiProEngine.extract_metadata, data)
                     var_list = [v["name"] for v in (meta.get("variables") or [])]
                     ticket_spec = await parser.parse(ticket_bytes, var_list)
-                    message += f"\n\n[SYSTEM: Reporting Ticket parsed. Spec: {json.dumps(ticket_spec)[:500]}. Generate the Excel tabulation using this spec.]"
+                    _msg[0] += f"\n\n[SYSTEM: Reporting Ticket parsed. Spec: {json.dumps(ticket_spec)[:500]}. Generate the Excel tabulation using this spec.]"
                 except Exception as e:
                     logger.warning("[STREAM] Ticket parsing failed: %s", e)
 
@@ -141,7 +144,7 @@ async def chat_stream_endpoint(
             if history_parsed:
                 for h in history_parsed[-10:]:
                     messages.append(h)
-            messages.append({"role": "user", "content": message})
+            messages.append({"role": "user", "content": _msg[0]})
 
             charts = []
             downloads = []
