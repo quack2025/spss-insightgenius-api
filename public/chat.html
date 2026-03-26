@@ -18,6 +18,9 @@
   .stream-status { animation: pulse 1.5s ease-in-out infinite; }
   @keyframes pulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
   pre { white-space: pre-wrap; word-break: break-word; }
+  .markdown-content table { border: 1px solid #e5e7eb; border-radius: 8px; }
+  .markdown-content th { font-size: 0.75rem; }
+  .markdown-content td { font-size: 0.75rem; }
   .markdown-content h3 { font-weight: 700; margin-top: 1rem; margin-bottom: 0.25rem; }
   .markdown-content p { margin-bottom: 0.5rem; }
   .markdown-content ul { list-style: disc; padding-left: 1.5rem; margin-bottom: 0.5rem; }
@@ -806,17 +809,104 @@ function renderChart(canvas, spec) {
 
 function simpleMarkdown(text) {
   if (!text) return '';
-  return text
+
+  // Split into lines to handle tables
+  const lines = text.split('\n');
+  const result = [];
+  let inTable = false;
+  let tableRows = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+
+    // Detect table rows (lines with | at start or containing | separators)
+    if (line.startsWith('|') && line.endsWith('|')) {
+      // Skip separator rows (|---|---|)
+      if (/^\|[\s\-:]+\|$/.test(line.replace(/\|/g, '|').replace(/[\s\-:]/g, ''))) {
+        if (!inTable) { inTable = true; }
+        continue;
+      }
+
+      if (!inTable) {
+        inTable = true;
+        tableRows = [];
+      }
+
+      const cells = line.split('|').filter((_, idx, arr) => idx > 0 && idx < arr.length - 1).map(c => c.trim());
+      tableRows.push(cells);
+      continue;
+    }
+
+    // End of table
+    if (inTable) {
+      result.push(renderTable(tableRows));
+      inTable = false;
+      tableRows = [];
+    }
+
+    // Regular line — apply inline formatting
+    result.push(line);
+  }
+
+  // Flush remaining table
+  if (inTable && tableRows.length) {
+    result.push(renderTable(tableRows));
+  }
+
+  // Join and apply inline markdown
+  return result.join('\n')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    // Restore HTML tags we generated (tables)
+    .replace(/&lt;table/g, '<table').replace(/&lt;\/table&gt;/g, '</table>')
+    .replace(/&lt;thead/g, '<thead').replace(/&lt;\/thead&gt;/g, '</thead>')
+    .replace(/&lt;tbody/g, '<tbody').replace(/&lt;\/tbody&gt;/g, '</tbody>')
+    .replace(/&lt;tr/g, '<tr').replace(/&lt;\/tr&gt;/g, '</tr>')
+    .replace(/&lt;th/g, '<th').replace(/&lt;\/th&gt;/g, '</th>')
+    .replace(/&lt;td/g, '<td').replace(/&lt;\/td&gt;/g, '</td>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`(.+?)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-xs">$1</code>')
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 class="text-base font-bold mt-3 mb-1">$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1 class="text-lg font-bold mt-3 mb-1">$1</h1>')
     .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+    .replace(/(<li>.*<\/li>)/s, '<ul class="list-disc ml-4">$1</ul>')
     .replace(/\n\n/g, '</p><p>')
     .replace(/\n/g, '<br>')
     .replace(/^/, '<p>').replace(/$/, '</p>');
+}
+
+function renderTable(rows) {
+  if (!rows.length) return '';
+  const header = rows[0];
+  const body = rows.slice(1);
+
+  let html = '<table class="w-full text-xs border-collapse my-3 rounded-lg overflow-hidden">';
+
+  // Header
+  html += '<thead><tr class="bg-gray-100">';
+  for (const cell of header) {
+    html += `<th class="px-3 py-2 text-left font-semibold text-gray-700 border-b border-gray-200">${cell}</th>`;
+  }
+  html += '</tr></thead>';
+
+  // Body
+  html += '<tbody>';
+  for (let r = 0; r < body.length; r++) {
+    const bgClass = r % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+    html += `<tr class="${bgClass}">`;
+    for (const cell of body[r]) {
+      // Bold cells (significance, key findings)
+      const isBold = /\*\*/.test(cell);
+      const cleanCell = cell.replace(/\*\*/g, '');
+      const style = isBold ? 'font-weight:700;color:#1e40af;' : '';
+      html += `<td class="px-3 py-1.5 border-b border-gray-100 text-gray-600" style="${style}">${cleanCell}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+
+  return html;
 }
 
 // ── Library ─────────────────────────────────────────────────────
