@@ -210,6 +210,13 @@
 <script>
 const API_KEY = window.__INSIGHTGENIUS_DEMO_KEY__ || 'demo';
 const API_BASE = window.location.origin;
+const AUTH_HEADERS = { 'Authorization': `Bearer ${API_KEY}` };
+
+// Wrapper for all API calls — auto-injects auth
+function authFetch(url, opts = {}) {
+  opts.headers = { ...AUTH_HEADERS, ...(opts.headers || {}) };
+  return fetch(url, opts);
+}
 
 let currentFileId = null;
 let currentFileName = null;
@@ -291,7 +298,7 @@ async function handleFile(file) {
 
   try {
     // Upload to library (persistent) + get file_id (Redis session)
-    const resp = await fetch(`${API_BASE}/v1/library/upload`, {
+    const resp = await authFetch(`${API_BASE}/v1/library/upload`, {
       method: 'POST',
       body: formData,
     });
@@ -308,9 +315,8 @@ async function handleFile(file) {
       const metaForm = new FormData();
       metaForm.append('file', file);
       try {
-        const metaResp = await fetch(`${API_BASE}/v1/metadata`, {
+        const metaResp = await authFetch(`${API_BASE}/v1/metadata`, {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${API_KEY}` },
           body: metaForm,
         });
         const metaData = await metaResp.json();
@@ -546,7 +552,7 @@ async function sendMessage(e) {
   }
 
   try {
-    const resp = await fetch(`${API_BASE}/v1/chat-stream`, {
+    const resp = await authFetch(`${API_BASE}/v1/chat-stream`, {
       method: 'POST',
       body: formData,
     });
@@ -636,7 +642,7 @@ async function sendMessage(e) {
     console.warn('Stream failed, falling back to sync:', e.message);
     try {
       formData.delete('ticket');  // Already consumed
-      const resp = await fetch(`${API_BASE}/v1/chat`, { method: 'POST', body: formData });
+      const resp = await authFetch(`${API_BASE}/v1/chat`, { method: 'POST', body: formData });
       const data = await resp.json();
       if (data.success) {
         addMessage('assistant', data.data.response);
@@ -1275,7 +1281,7 @@ let libraryFiles = [];
 
 async function loadLibrary() {
   try {
-    const resp = await fetch(`${API_BASE}/v1/library/files`);
+    const resp = await authFetch(`${API_BASE}/v1/library/files`);
     const data = await resp.json();
     libraryFiles = (data.data?.files) || [];
     renderLibrary(libraryFiles);
@@ -1330,7 +1336,7 @@ async function loadLibraryFile(libraryId, filename, nCases, nVars) {
 
   try {
     // Load into Redis
-    const resp = await fetch(`${API_BASE}/v1/library/${libraryId}/load`, {method: 'POST'});
+    const resp = await authFetch(`${API_BASE}/v1/library/${libraryId}/load`, {method: 'POST'});
     const data = await resp.json();
     if (data.success) {
       currentFileId = data.data.file_id;
@@ -1340,7 +1346,7 @@ async function loadLibraryFile(libraryId, filename, nCases, nVars) {
       status.textContent = 'Analyzing structure...';
       const metaForm = new FormData();
       // We need the file for metadata — re-download from library
-      const dlResp = await fetch(`${API_BASE}/v1/library/${libraryId}`);
+      const dlResp = await authFetch(`${API_BASE}/v1/library/${libraryId}`);
       const dlData = await dlResp.json();
       if (dlData.success) {
         // Use the metadata already stored in library
@@ -1352,7 +1358,7 @@ async function loadLibraryFile(libraryId, filename, nCases, nVars) {
           variables: [],  // We'd need to fetch these separately
         };
         // Fetch variables
-        const varResp = await fetch(`${API_BASE}/v1/library/${libraryId}/variables`);
+        const varResp = await authFetch(`${API_BASE}/v1/library/${libraryId}/variables`);
         const varData = await varResp.json();
         if (varData.success) {
           meta.variables = varData.data.variables.map(v => ({
@@ -1381,7 +1387,7 @@ async function loadLibraryFile(libraryId, filename, nCases, nVars) {
 async function deleteLibraryFile(libraryId) {
   if (!confirm('Delete this file permanently?')) return;
   try {
-    await fetch(`${API_BASE}/v1/library/${libraryId}`, {method: 'DELETE'});
+    await authFetch(`${API_BASE}/v1/library/${libraryId}`, {method: 'DELETE'});
     loadLibrary();
   } catch (e) {
     alert('Delete failed: ' + e.message);
@@ -1395,7 +1401,7 @@ async function renameFile(libraryId, el) {
   try {
     const form = new FormData();
     form.append('display_name', newName);
-    await fetch(`${API_BASE}/v1/library/${libraryId}`, {method: 'PATCH', body: form});
+    await authFetch(`${API_BASE}/v1/library/${libraryId}`, {method: 'PATCH', body: form});
     el.textContent = newName;
   } catch (e) {
     alert('Rename failed: ' + e.message);
@@ -1411,7 +1417,7 @@ async function searchLibrary(query) {
   }
   searchTimeout = setTimeout(async () => {
     try {
-      const resp = await fetch(`${API_BASE}/v1/library/search/files?q=${encodeURIComponent(query)}`);
+      const resp = await authFetch(`${API_BASE}/v1/library/search/files?q=${encodeURIComponent(query)}`);
       const data = await resp.json();
       const results = data.data?.results || [];
       renderLibrary(results);

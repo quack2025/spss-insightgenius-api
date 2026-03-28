@@ -2,22 +2,19 @@
 
 import asyncio
 import json
-import math
 import time
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
 from auth import require_scope, KeyConfig
 from middleware.processing import run_in_executor
+from middleware.rate_limiter import check_rate_limit
+from shared.file_resolver import resolve_file
+from shared.response import success_response
+from shared.validators import clean_numeric
 from services.quantipy_engine import QuantiProEngine, QUANTIPYMRX_AVAILABLE
 
 router = APIRouter(tags=["Analysis"])
-
-
-def _clean(val):
-    if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
-        return None
-    return round(val, 6) if isinstance(val, float) else val
 
 
 def _run_anova(file_bytes: bytes, filename: str, spec: dict):
@@ -48,20 +45,20 @@ def _run_anova(file_bytes: bytes, filename: str, spec: dict):
     response = {
         "dependent": dependent,
         "factor": factor,
-        "f_statistic": _clean(result.statistic),
-        "p_value": _clean(result.p_value),
+        "f_statistic": clean_numeric(result.statistic),
+        "p_value": clean_numeric(result.p_value),
         "significant": result.significant,
         "df_between": None,
         "df_within": None,
         "eta_squared": None,
-        "group_means": {str(k): _clean(v) for k, v in result.group_means.items()},
-        "group_stds": {str(k): _clean(v) for k, v in result.group_stds.items()},
+        "group_means": {str(k): clean_numeric(v) for k, v in result.group_means.items()},
+        "group_stds": {str(k): clean_numeric(v) for k, v in result.group_stds.items()},
         "group_ns": {str(k): v for k, v in result.group_ns.items()},
     }
 
     # Extract eta-squared from details if available
     if result.details:
-        response["eta_squared"] = _clean(result.details.get("eta_squared"))
+        response["eta_squared"] = clean_numeric(result.details.get("eta_squared"))
         response["df_between"] = result.details.get("df_between")
         response["df_within"] = result.details.get("df_within")
 
@@ -72,8 +69,8 @@ def _run_anova(file_bytes: bytes, filename: str, spec: dict):
             tukey_rows.append({
                 "group1": str(row.get("group1", row.get("Group 1", ""))),
                 "group2": str(row.get("group2", row.get("Group 2", ""))),
-                "mean_diff": _clean(row.get("meandiff", row.get("Mean Diff", 0))),
-                "p_value": _clean(row.get("p-adj", row.get("p_value", 0))),
+                "mean_diff": clean_numeric(row.get("meandiff", row.get("Mean Diff", 0))),
+                "p_value": clean_numeric(row.get("p-adj", row.get("p_value", 0))),
                 "significant": bool(row.get("reject", row.get("significant", False))),
             })
         response["post_hoc_tukey"] = tukey_rows
@@ -93,23 +90,23 @@ def _run_anova(file_bytes: bytes, filename: str, spec: dict):
              description="Test if means of a numeric variable differ across groups, with optional Tukey HSD post-hoc comparisons.")
 async def anova(
     request: Request,
-    file: UploadFile = File(..., description="SPSS .sav file"),
+    file: UploadFile = File(None, description="SPSS .sav file (or use file_id)"),
+    file_id: str | None = Form(None, description="File session ID from /v1/library/upload"),
     spec: str = Form(..., description='JSON: {"dependent": "Q1", "factor": "age_group", "post_hoc": true}'),
     key: KeyConfig = Depends(require_scope("crosstab")),
+    _rl: None = Depends(check_rate_limit),
 ):
     start = time.perf_counter()
+
+    file_bytes, filename = await resolve_file(file=file, file_id=file_id)
 
     try:
         spec_dict = json.loads(spec)
     except json.JSONDecodeError:
         raise HTTPException(400, detail={"code": "INVALID_SPEC", "message": "Invalid JSON in spec"})
 
-    file_bytes = await file.read()
-    if not file_bytes:
-        raise HTTPException(400, detail={"code": "INVALID_FILE_FORMAT", "message": "Empty file"})
-
     try:
-        result = await run_in_executor(_run_anova, file_bytes, file.filename or "upload.sav", spec_dict)
+        result = await run_in_executor(_run_anova, file_bytes, filename, spec_dict)
     except (asyncio.TimeoutError, RuntimeError) as e:
         if "QuantipyMRX required" in str(e):
             raise HTTPException(501, detail={"code": "ENGINE_UNAVAILABLE", "message": str(e)})
@@ -119,13 +116,8 @@ async def anova(
     except Exception as e:
         raise HTTPException(500, detail={"code": "PROCESSING_FAILED", "message": str(e)})
 
-    return {
-        "success": True,
-        "data": result,
-        "meta": {
-            "request_id": getattr(request.state, "request_id", ""),
-            "processing_time_ms": int((time.perf_counter() - start) * 1000),
-            "engine_version": "1.0.0",
-            "quantipymrx_available": QUANTIPYMRX_AVAILABLE,
-        },
-    }
+    elapsed_ms = int((time.perf_counter() - start) * 1000)
+    return success_response(result, processing_time_ms=elapsed_ms, meta={
+        "engine_version": "1.0.0",
+        "quantipymrx_available": QUANTIPYMRX_AVAILABLE,
+    })

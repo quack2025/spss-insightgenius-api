@@ -13,6 +13,8 @@ from fastapi.responses import StreamingResponse
 
 from auth import require_scope, KeyConfig
 from middleware.processing import run_in_executor
+from middleware.rate_limiter import check_rate_limit
+from shared.file_resolver import resolve_file
 from services.quantipy_engine import QuantiProEngine, QUANTIPYMRX_AVAILABLE
 from services.tabulation_builder import TabulateSpec, build_tabulation
 
@@ -168,23 +170,23 @@ def _run_auto_analyze(file_bytes: bytes, filename: str, options: dict):
                          "stubs, nets, MRS groups, and significance testing. No configuration needed.")
 async def auto_analyze(
     request: Request,
-    file: UploadFile = File(..., description="SPSS .sav file"),
+    file: UploadFile = File(None, description="SPSS .sav file (or use file_id)"),
+    file_id: str | None = Form(None, description="File session ID from /v1/library/upload"),
     options: str = Form("{}", description='Optional JSON: {"max_banners": 3, "output_mode": "multi_sheet", "significance_level": 0.95}'),
     key: KeyConfig = Depends(require_scope("process")),
+    _rl: None = Depends(check_rate_limit),
 ):
     start = time.perf_counter()
+
+    file_bytes, filename = await resolve_file(file=file, file_id=file_id)
 
     try:
         options_dict = json.loads(options)
     except json.JSONDecodeError:
         options_dict = {}
 
-    file_bytes = await file.read()
-    if not file_bytes:
-        raise HTTPException(400, detail={"code": "INVALID_FILE_FORMAT", "message": "Empty file"})
-
     try:
-        result = await run_in_executor(_run_auto_analyze, file_bytes, file.filename or "upload.sav", options_dict)
+        result = await run_in_executor(_run_auto_analyze, file_bytes, filename, options_dict)
     except (asyncio.TimeoutError, RuntimeError):
         raise
     except ValueError as e:

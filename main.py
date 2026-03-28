@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from auth import init_key_registry
 from config import get_settings
+from middleware.response_headers import ResponseHeadersMiddleware
 from middleware.usage_logger import UsageLoggerMiddleware
 
 logging.basicConfig(
@@ -82,12 +83,15 @@ def create_application() -> FastAPI:
     # Middleware stack (outermost first):
     # 1. Usage logger — logs every authenticated request for billing
     # 2. CORS — allow cross-origin requests
+    app.add_middleware(ResponseHeadersMiddleware)
     app.add_middleware(UsageLoggerMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.parsed_cors_origins,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["X-Request-Id", "API-Version", "X-RateLimit-Limit",
+                        "X-RateLimit-Remaining", "X-RateLimit-Reset"],
     )
 
     # Timeout handler — from run_in_executor

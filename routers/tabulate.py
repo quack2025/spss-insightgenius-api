@@ -15,6 +15,8 @@ from fastapi.responses import StreamingResponse
 
 from auth import KeyConfig, require_scope
 from middleware.processing import run_in_executor
+from middleware.rate_limiter import check_rate_limit
+from shared.file_resolver import resolve_file
 from services.quantipy_engine import QuantiProEngine
 from services.tabulation_builder import TabulateSpec, build_tabulation, _build_excel
 
@@ -28,8 +30,6 @@ _MAX_FILE_SIZE = {
     "pro": 50 * 1024 * 1024,
     "business": 200 * 1024 * 1024,
 }
-
-_ALLOWED_EXTENSIONS = {".sav", ".por", ".zsav"}
 
 
 @router.post(
@@ -58,21 +58,20 @@ _ALLOWED_EXTENSIONS = {".sav", ".por", ".zsav"}
 )
 async def tabulate(
     request: Request,
-    file: UploadFile = File(..., description=".sav file to tabulate"),
+    file: UploadFile = File(None, description=".sav file to tabulate (or use file_id)"),
+    file_id: str | None = Form(None, description="File session ID from /v1/library/upload"),
     spec: str = Form(..., description="JSON tabulation specification"),
     ticket: UploadFile | None = File(None, description="Optional .docx Reporting Ticket — Haiku parses it into a tab plan"),
     key: KeyConfig = Depends(require_scope("process")),
+    _rl: None = Depends(check_rate_limit),
 ):
     start = time.perf_counter()
     request_id = getattr(request.state, "request_id", "")
 
-    # ── Validate file ──
-    ext = "." + (file.filename or "").rsplit(".", 1)[-1].lower() if file.filename else ""
-    if ext not in _ALLOWED_EXTENSIONS:
-        raise HTTPException(400, detail={"code": "INVALID_FILE_FORMAT", "message": f"Expected .sav file, got {ext}"})
+    file_bytes, filename = await resolve_file(file=file, file_id=file_id)
 
+    # ── Check file size ──
     max_size = _MAX_FILE_SIZE.get(key.plan, _MAX_FILE_SIZE["free"])
-    file_bytes = await file.read()
     if len(file_bytes) > max_size:
         raise HTTPException(413, detail={
             "code": "FILE_TOO_LARGE",
@@ -94,7 +93,7 @@ async def tabulate(
 
             # Load SPSS first for variable list context
             data_for_vars = await run_in_executor(
-                QuantiProEngine.load_spss, file_bytes, file.filename or "upload.sav"
+                QuantiProEngine.load_spss, file_bytes, filename
             )
             var_info = [
                 {"name": c, "label": "", "type": str(data_for_vars.df[c].dtype)}
@@ -157,7 +156,7 @@ async def tabulate(
     # ── Load SPSS ──
     try:
         data = await run_in_executor(
-            QuantiProEngine.load_spss, file_bytes, file.filename or "upload.sav"
+            QuantiProEngine.load_spss, file_bytes, filename
         )
     except (asyncio.TimeoutError, RuntimeError):
         raise

@@ -8,28 +8,26 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 
 from auth import require_scope, KeyConfig
 from middleware.processing import run_in_executor
+from middleware.rate_limiter import check_rate_limit
+from shared.file_resolver import resolve_file
+from shared.response import success_response
 from services.quantipy_engine import QuantiProEngine, QUANTIPYMRX_AVAILABLE
 
 router = APIRouter(tags=["Analysis"])
 
 
-def _validate_upload(file: UploadFile) -> None:
-    if not file.filename:
-        raise HTTPException(400, detail={"code": "INVALID_FILE_FORMAT", "message": "No filename provided"})
-    ext = file.filename.lower().rsplit(".", 1)[-1] if "." in file.filename else ""
-    if ext not in ("sav", "por", "zsav"):
-        raise HTTPException(400, detail={"code": "INVALID_FILE_FORMAT", "message": f"Unsupported format '.{ext}'. Accepted: .sav, .por, .zsav"})
-
-
 @router.post("/v1/crosstab", summary="Crosstab with significance", description="Cross-tabulation with column proportion z-test significance letters (A/B/C notation).")
 async def crosstab(
     request: Request,
-    file: UploadFile = File(..., description="SPSS .sav file"),
+    file: UploadFile = File(None, description="SPSS .sav file (or use file_id)"),
+    file_id: str | None = Form(None, description="File session ID from /v1/library/upload"),
     spec: str = Form(..., description='JSON object: {"row": "Q1", "col": "S2", "weight": null, "significance_level": 0.95}'),
     key: KeyConfig = Depends(require_scope("crosstab")),
+    _rl: None = Depends(check_rate_limit),
 ):
     start = time.perf_counter()
-    _validate_upload(file)
+
+    file_bytes, filename = await resolve_file(file=file, file_id=file_id)
 
     # Parse spec JSON
     try:
@@ -45,12 +43,8 @@ async def crosstab(
     weight = spec_data.get("weight")
     sig_level = spec_data.get("significance_level", 0.95)
 
-    file_bytes = await file.read()
-    if not file_bytes:
-        raise HTTPException(400, detail={"code": "INVALID_FILE_FORMAT", "message": "Empty file"})
-
     try:
-        data = await run_in_executor(QuantiProEngine.load_spss, file_bytes, file.filename or "upload.sav")
+        data = await run_in_executor(QuantiProEngine.load_spss, file_bytes, filename)
     except (asyncio.TimeoutError, RuntimeError):
         raise
     except Exception as e:
@@ -67,13 +61,8 @@ async def crosstab(
     except Exception as e:
         raise HTTPException(500, detail={"code": "PROCESSING_FAILED", "message": str(e)})
 
-    return {
-        "success": True,
-        "data": result,
-        "meta": {
-            "request_id": getattr(request.state, "request_id", ""),
-            "processing_time_ms": int((time.perf_counter() - start) * 1000),
-            "engine_version": "1.0.0",
-            "quantipymrx_available": QUANTIPYMRX_AVAILABLE,
-        },
-    }
+    elapsed_ms = int((time.perf_counter() - start) * 1000)
+    return success_response(result, processing_time_ms=elapsed_ms, meta={
+        "engine_version": "1.0.0",
+        "quantipymrx_available": QUANTIPYMRX_AVAILABLE,
+    })

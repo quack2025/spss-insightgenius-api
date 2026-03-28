@@ -4,13 +4,15 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Form, File, UploadFile
+from fastapi import APIRouter, Depends, Form, File, UploadFile
 from fastapi.responses import JSONResponse
 
-from auth import KeyConfig
+from auth import require_auth, KeyConfig
 from config import get_settings
 from middleware.processing import run_in_executor
+from middleware.rate_limiter import check_rate_limit
 from services.quantipy_engine import QuantiProEngine
+from shared.file_resolver import resolve_file
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Chat"])
@@ -24,6 +26,8 @@ async def chat_endpoint(
     ticket: UploadFile = File(None),
     history: str = Form("[]"),
     prep_context: str = Form(""),
+    key: KeyConfig = Depends(require_auth),
+    _rl: None = Depends(check_rate_limit),
 ):
     """Send a natural language query about your survey data.
 
@@ -41,53 +45,7 @@ async def chat_endpoint(
         })
 
     # Resolve file data
-    file_bytes = None
-    filename = "upload.sav"
-
-    if file_id:
-        # Load from Redis session
-        import redis.asyncio as aioredis
-        if not settings.redis_url:
-            return JSONResponse(status_code=400, content={
-                "success": False,
-                "error": {"code": "NO_FILE", "message": "file_id requires Redis. Upload a file directly."},
-            })
-        r = aioredis.from_url(settings.redis_url, decode_responses=False)
-        try:
-            file_bytes = await r.get(f"spss:file:{file_id}")
-            meta_raw = await r.get(f"spss:meta:{file_id}")
-            if meta_raw:
-                meta_info = json.loads(meta_raw)
-                filename = meta_info.get("filename", filename)
-            # Refresh TTL
-            ttl = settings.spss_session_ttl_seconds
-            await r.expire(f"spss:file:{file_id}", ttl)
-            await r.expire(f"spss:meta:{file_id}", ttl)
-            await r.aclose()
-        except Exception as e:
-            try:
-                await r.aclose()
-            except Exception:
-                pass
-            return JSONResponse(status_code=400, content={
-                "success": False,
-                "error": {"code": "SESSION_ERROR", "message": str(e)},
-            })
-
-        if not file_bytes:
-            return JSONResponse(status_code=404, content={
-                "success": False,
-                "error": {"code": "FILE_NOT_FOUND", "message": f"file_id '{file_id}' not found or expired. Re-upload at /upload."},
-            })
-
-    elif file:
-        file_bytes = await file.read()
-        filename = file.filename or "upload.sav"
-    else:
-        return JSONResponse(status_code=400, content={
-            "success": False,
-            "error": {"code": "NO_FILE", "message": "Provide file_id or upload a file."},
-        })
+    file_bytes, filename = await resolve_file(file=file, file_id=file_id)
 
     # Load SPSS data
     try:

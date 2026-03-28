@@ -9,15 +9,13 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 
 from auth import require_scope, KeyConfig
 from middleware.processing import run_in_executor
+from middleware.rate_limiter import check_rate_limit
+from shared.file_resolver import resolve_file
+from shared.response import success_response
+from shared.validators import clean_numeric
 from services.quantipy_engine import QuantiProEngine, QUANTIPYMRX_AVAILABLE
 
 router = APIRouter(tags=["Analysis"])
-
-
-def _clean(val):
-    if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
-        return None
-    return round(val, 4) if isinstance(val, float) else val
 
 
 def _detect_scale(values):
@@ -85,7 +83,7 @@ def _run_satisfaction_summary(file_bytes: bytes, filename: str, spec: dict):
                 "label": labels.get(var),
                 "n_valid": int(series.count()),
                 "scale": var_scale,
-                **{k: _clean(v) if isinstance(v, float) else v for k, v in result.items()},
+                **{k: clean_numeric(v) if isinstance(v, float) else v for k, v in result.items()},
             })
         else:
             # Manual fallback
@@ -115,11 +113,11 @@ def _run_satisfaction_summary(file_bytes: bytes, filename: str, spec: dict):
                 "label": labels.get(var),
                 "n_valid": n,
                 "scale": var_scale,
-                "mean": _clean(mean_val),
-                "std": _clean(std_val),
-                "median": _clean(float(series.median())),
-                "t2b": _clean(t2b_count / n * 100) if n > 0 else 0,
-                "b2b": _clean(b2b_count / n * 100) if n > 0 else 0,
+                "mean": clean_numeric(mean_val),
+                "std": clean_numeric(std_val),
+                "median": clean_numeric(float(series.median())),
+                "t2b": clean_numeric(t2b_count / n * 100) if n > 0 else 0,
+                "b2b": clean_numeric(b2b_count / n * 100) if n > 0 else 0,
                 "distribution": dist,
             })
 
@@ -134,23 +132,23 @@ def _run_satisfaction_summary(file_bytes: bytes, filename: str, spec: dict):
              description="Compact summary of T2B%, B2B%, Mean, and distribution for multiple scale variables in one call.")
 async def satisfaction_summary_endpoint(
     request: Request,
-    file: UploadFile = File(..., description="SPSS .sav file"),
+    file: UploadFile = File(None, description="SPSS .sav file (or use file_id)"),
+    file_id: str | None = Form(None, description="File session ID from /v1/library/upload"),
     spec: str = Form(..., description='JSON: {"variables": ["sat_speed","sat_price"], "scale": "1-5"}'),
     key: KeyConfig = Depends(require_scope("crosstab")),
+    _rl: None = Depends(check_rate_limit),
 ):
     start = time.perf_counter()
+
+    file_bytes, filename = await resolve_file(file=file, file_id=file_id)
 
     try:
         spec_dict = json.loads(spec)
     except json.JSONDecodeError:
         raise HTTPException(400, detail={"code": "INVALID_SPEC", "message": "Invalid JSON in spec"})
 
-    file_bytes = await file.read()
-    if not file_bytes:
-        raise HTTPException(400, detail={"code": "INVALID_FILE_FORMAT", "message": "Empty file"})
-
     try:
-        result = await run_in_executor(_run_satisfaction_summary, file_bytes, file.filename or "upload.sav", spec_dict)
+        result = await run_in_executor(_run_satisfaction_summary, file_bytes, filename, spec_dict)
     except (asyncio.TimeoutError, RuntimeError):
         raise
     except ValueError as e:
@@ -158,13 +156,8 @@ async def satisfaction_summary_endpoint(
     except Exception as e:
         raise HTTPException(500, detail={"code": "PROCESSING_FAILED", "message": str(e)})
 
-    return {
-        "success": True,
-        "data": result,
-        "meta": {
-            "request_id": getattr(request.state, "request_id", ""),
-            "processing_time_ms": int((time.perf_counter() - start) * 1000),
-            "engine_version": "1.0.0",
-            "quantipymrx_available": QUANTIPYMRX_AVAILABLE,
-        },
-    }
+    elapsed_ms = int((time.perf_counter() - start) * 1000)
+    return success_response(result, processing_time_ms=elapsed_ms, meta={
+        "engine_version": "1.0.0",
+        "quantipymrx_available": QUANTIPYMRX_AVAILABLE,
+    })

@@ -4,49 +4,18 @@ import json
 import logging
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, Form, File, UploadFile
+from fastapi import APIRouter, Depends, Form, File, UploadFile
 from fastapi.responses import StreamingResponse
 
+from auth import require_auth, KeyConfig
 from config import get_settings
 from middleware.processing import run_in_executor
+from middleware.rate_limiter import check_rate_limit
 from services.quantipy_engine import QuantiProEngine
+from shared.file_resolver import resolve_file as shared_resolve_file
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Chat"])
-
-
-async def _resolve_file(file_id: str | None, file: UploadFile | None) -> tuple[bytes | None, str]:
-    """Resolve file bytes from file_id (Redis) or direct upload."""
-    settings = get_settings()
-    filename = "upload.sav"
-
-    if file_id:
-        import redis.asyncio as aioredis
-        if not settings.redis_url:
-            return None, filename
-        r = aioredis.from_url(settings.redis_url, decode_responses=False)
-        try:
-            file_bytes = await r.get(f"spss:file:{file_id}")
-            meta_raw = await r.get(f"spss:meta:{file_id}")
-            if meta_raw:
-                meta_info = json.loads(meta_raw)
-                filename = meta_info.get("filename", filename)
-            ttl = settings.spss_session_ttl_seconds
-            await r.expire(f"spss:file:{file_id}", ttl)
-            await r.expire(f"spss:meta:{file_id}", ttl)
-            await r.aclose()
-            return file_bytes, filename
-        except Exception:
-            try:
-                await r.aclose()
-            except Exception:
-                pass
-            return None, filename
-    elif file:
-        file_bytes = await file.read()
-        return file_bytes, file.filename or filename
-
-    return None, filename
 
 
 @router.post("/v1/chat-stream", summary="Streaming chat (SSE)")
@@ -57,6 +26,8 @@ async def chat_stream_endpoint(
     ticket: UploadFile = File(None),
     history: str = Form("[]"),
     prep_context: str = Form(""),
+    key: KeyConfig = Depends(require_auth),
+    _rl: None = Depends(check_rate_limit),
 ):
     """Stream chat response via SSE. Events:
     - `text`: partial text token
@@ -79,10 +50,7 @@ async def chat_stream_endpoint(
                 return
 
             # Resolve file
-            file_bytes, filename = await _resolve_file(file_id, file)
-            if not file_bytes:
-                yield f"event: error\ndata: {json.dumps({'message': 'File not found or expired. Re-upload.'})}\n\n"
-                return
+            file_bytes, filename = await shared_resolve_file(file=file, file_id=file_id)
 
             # Load data
             data = await run_in_executor(QuantiProEngine.load_spss, file_bytes, filename)

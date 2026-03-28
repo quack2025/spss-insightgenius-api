@@ -10,19 +10,14 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from auth import require_scope, KeyConfig
 from config import get_settings
 from middleware.processing import run_in_executor
+from middleware.rate_limiter import check_rate_limit
+from shared.file_resolver import resolve_file
+from shared.response import success_response
 from services.quantipy_engine import QuantiProEngine, QUANTIPYMRX_AVAILABLE
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Processing"])
-
-
-def _validate_upload(file: UploadFile) -> None:
-    if not file.filename:
-        raise HTTPException(400, detail={"code": "INVALID_FILE_FORMAT", "message": "No filename provided"})
-    ext = file.filename.lower().rsplit(".", 1)[-1] if "." in file.filename else ""
-    if ext not in ("sav", "por", "zsav"):
-        raise HTTPException(400, detail={"code": "INVALID_FILE_FORMAT", "message": f"Unsupported format '.{ext}'. Accepted: .sav, .por, .zsav"})
 
 
 async def _execute_operation(data, op: dict, op_id: str) -> dict:
@@ -64,22 +59,21 @@ async def _execute_operation(data, op: dict, op_id: str) -> dict:
 @router.post("/v1/process", summary="Full processing pipeline", description="Upload a .sav file with optional Reporting Ticket or manual operations spec. Returns metadata + all analysis results.")
 async def process(
     request: Request,
-    file: UploadFile = File(..., description="SPSS .sav file"),
+    file: UploadFile = File(None, description="SPSS .sav file (or use file_id)"),
+    file_id: str | None = Form(None, description="File session ID from /v1/library/upload"),
     operations: str | None = Form(None, description="JSON array of operation specs"),
     ticket: UploadFile | None = File(None, description="Reporting Ticket .docx (optional)"),
     weight: str | None = Form(None, description="Default weight variable"),
     key: KeyConfig = Depends(require_scope("process")),
+    _rl: None = Depends(check_rate_limit),
 ):
     start = time.perf_counter()
-    _validate_upload(file)
 
-    file_bytes = await file.read()
-    if not file_bytes:
-        raise HTTPException(400, detail={"code": "INVALID_FILE_FORMAT", "message": "Empty file"})
+    file_bytes, filename = await resolve_file(file=file, file_id=file_id)
 
     # Load SPSS
     try:
-        data = await run_in_executor(QuantiProEngine.load_spss, file_bytes, file.filename or "upload.sav")
+        data = await run_in_executor(QuantiProEngine.load_spss, file_bytes, filename)
     except (asyncio.TimeoutError, RuntimeError):
         raise
     except Exception as e:
@@ -140,17 +134,16 @@ async def process(
     ]
     results = await asyncio.gather(*tasks) if tasks else []
 
-    return {
-        "success": True,
-        "data": {
+    elapsed_ms = int((time.perf_counter() - start) * 1000)
+    return success_response(
+        {
             "metadata": metadata,
             "results": list(results),
             "ticket_plan": ticket_plan,
         },
-        "meta": {
-            "request_id": getattr(request.state, "request_id", ""),
-            "processing_time_ms": int((time.perf_counter() - start) * 1000),
+        processing_time_ms=elapsed_ms,
+        meta={
             "engine_version": "1.0.0",
             "quantipymrx_available": QUANTIPYMRX_AVAILABLE,
         },
-    }
+    )

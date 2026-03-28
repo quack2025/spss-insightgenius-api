@@ -9,15 +9,13 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 
 from auth import require_scope, KeyConfig
 from middleware.processing import run_in_executor
+from middleware.rate_limiter import check_rate_limit
+from shared.file_resolver import resolve_file
+from shared.response import success_response
+from shared.validators import clean_numeric
 from services.quantipy_engine import QuantiProEngine, QUANTIPYMRX_AVAILABLE
 
 router = APIRouter(tags=["Analysis"])
-
-
-def _clean(val):
-    if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
-        return None
-    return round(val, 4) if isinstance(val, float) else val
 
 
 def _run_gap_analysis(file_bytes: bytes, filename: str, spec: dict):
@@ -63,9 +61,9 @@ def _run_gap_analysis(file_bytes: bytes, filename: str, spec: dict):
                 "item": iv,
                 "importance_var": iv,
                 "performance_var": pv,
-                "importance": _clean(imp),
-                "performance": _clean(perf),
-                "gap": _clean(gap),
+                "importance": clean_numeric(imp),
+                "performance": clean_numeric(perf),
+                "gap": clean_numeric(gap),
                 "priority": "High" if gap > 0.5 else ("Medium" if gap > 0 else "Low"),
             })
     else:
@@ -77,9 +75,9 @@ def _run_gap_analysis(file_bytes: bytes, filename: str, spec: dict):
                 "item": r.item,
                 "importance_var": r.item,
                 "performance_var": performance_vars[importance_vars.index(r.item)] if r.item in importance_vars else r.item,
-                "importance": _clean(r.importance),
-                "performance": _clean(r.performance),
-                "gap": _clean(r.gap),
+                "importance": clean_numeric(r.importance),
+                "performance": clean_numeric(r.performance),
+                "gap": clean_numeric(r.gap),
                 "priority": r.priority,
             })
 
@@ -109,11 +107,11 @@ def _run_gap_analysis(file_bytes: bytes, filename: str, spec: dict):
     return {
         "items": items,
         "n_cases": len(df),
-        "avg_importance": _clean(avg_importance),
-        "avg_performance": _clean(avg_performance),
+        "avg_importance": clean_numeric(avg_importance),
+        "avg_performance": clean_numeric(avg_performance),
         "quadrant_thresholds": {
-            "importance_midpoint": _clean(avg_importance),
-            "performance_midpoint": _clean(avg_performance),
+            "importance_midpoint": clean_numeric(avg_importance),
+            "performance_midpoint": clean_numeric(avg_performance),
         },
     }
 
@@ -122,23 +120,23 @@ def _run_gap_analysis(file_bytes: bytes, filename: str, spec: dict):
              description="Analyze gaps between paired importance and performance variables. Returns gaps, priorities, and quadrant assignments.")
 async def gap_analysis_endpoint(
     request: Request,
-    file: UploadFile = File(..., description="SPSS .sav file"),
+    file: UploadFile = File(None, description="SPSS .sav file (or use file_id)"),
+    file_id: str | None = Form(None, description="File session ID from /v1/library/upload"),
     spec: str = Form(..., description='JSON: {"importance_vars": ["Q1_imp","Q2_imp"], "performance_vars": ["Q1_perf","Q2_perf"]}'),
     key: KeyConfig = Depends(require_scope("crosstab")),
+    _rl: None = Depends(check_rate_limit),
 ):
     start = time.perf_counter()
+
+    file_bytes, filename = await resolve_file(file=file, file_id=file_id)
 
     try:
         spec_dict = json.loads(spec)
     except json.JSONDecodeError:
         raise HTTPException(400, detail={"code": "INVALID_SPEC", "message": "Invalid JSON in spec"})
 
-    file_bytes = await file.read()
-    if not file_bytes:
-        raise HTTPException(400, detail={"code": "INVALID_FILE_FORMAT", "message": "Empty file"})
-
     try:
-        result = await run_in_executor(_run_gap_analysis, file_bytes, file.filename or "upload.sav", spec_dict)
+        result = await run_in_executor(_run_gap_analysis, file_bytes, filename, spec_dict)
     except (asyncio.TimeoutError, RuntimeError):
         raise
     except ValueError as e:
@@ -146,13 +144,8 @@ async def gap_analysis_endpoint(
     except Exception as e:
         raise HTTPException(500, detail={"code": "PROCESSING_FAILED", "message": str(e)})
 
-    return {
-        "success": True,
-        "data": result,
-        "meta": {
-            "request_id": getattr(request.state, "request_id", ""),
-            "processing_time_ms": int((time.perf_counter() - start) * 1000),
-            "engine_version": "1.0.0",
-            "quantipymrx_available": QUANTIPYMRX_AVAILABLE,
-        },
-    }
+    elapsed_ms = int((time.perf_counter() - start) * 1000)
+    return success_response(result, processing_time_ms=elapsed_ms, meta={
+        "engine_version": "1.0.0",
+        "quantipymrx_available": QUANTIPYMRX_AVAILABLE,
+    })

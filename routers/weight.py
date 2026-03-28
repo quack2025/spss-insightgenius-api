@@ -8,6 +8,9 @@ from fastapi.responses import JSONResponse
 
 from auth import KeyConfig, require_auth
 from middleware.processing import run_in_executor
+from middleware.rate_limiter import check_rate_limit
+from shared.file_resolver import resolve_file
+from shared.response import success_response
 from services.quantipy_engine import QuantiProEngine
 
 logger = logging.getLogger(__name__)
@@ -16,16 +19,17 @@ router = APIRouter(tags=["Weighting"])
 
 @router.post("/v1/weight/preview", summary="Preview variable distribution for weighting")
 async def weight_preview(
-    file: UploadFile = File(...),
+    file: UploadFile = File(None, description="SPSS .sav file (or use file_id)"),
+    file_id: str | None = Form(None, description="File session ID from /v1/library/upload"),
     variable: str = Form(...),
     key: KeyConfig = Depends(require_auth),
+    _rl: None = Depends(check_rate_limit),
 ):
     """Show current distribution of a variable — use this to decide target percentages.
 
     Returns counts and percentages per value, with labels from SPSS metadata.
     """
-    file_bytes = await file.read()
-    filename = file.filename or "upload.sav"
+    file_bytes, filename = await resolve_file(file=file, file_id=file_id)
 
     def _preview():
         data = QuantiProEngine.load_spss(file_bytes, filename)
@@ -76,16 +80,18 @@ async def weight_preview(
     if "error" in result:
         return JSONResponse(status_code=400, content={"success": False, "error": result})
 
-    return {"success": True, "data": result}
+    return success_response(result)
 
 
 @router.post("/v1/weight/compute", summary="Compute RIM weight from target distributions")
 async def weight_compute(
-    file: UploadFile = File(...),
+    file: UploadFile = File(None, description="SPSS .sav file (or use file_id)"),
+    file_id: str | None = Form(None, description="File session ID from /v1/library/upload"),
     targets: str = Form(...),
     max_iterations: int = Form(50),
     max_weight: float = Form(5.0),
     key: KeyConfig = Depends(require_auth),
+    _rl: None = Depends(check_rate_limit),
 ):
     """Compute a RIM weight (iterative proportional fitting).
 
@@ -100,8 +106,7 @@ async def weight_compute(
     Each variable's targets must sum to ~100%.
     Returns weight statistics, convergence info, and before/after distributions.
     """
-    file_bytes = await file.read()
-    filename = file.filename or "upload.sav"
+    file_bytes, filename = await resolve_file(file=file, file_id=file_id)
 
     try:
         targets_parsed = json.loads(targets)
@@ -170,4 +175,4 @@ async def weight_compute(
             content={"success": False, "error": {"code": "WEIGHTING_ERROR", "message": str(e)}},
         )
 
-    return {"success": True, "data": result}
+    return success_response(result)

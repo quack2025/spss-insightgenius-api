@@ -2,8 +2,11 @@
 
 import logging
 
-from fastapi import APIRouter, File, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import JSONResponse
+
+from auth import require_auth, KeyConfig
+from middleware.rate_limiter import check_rate_limit
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Library"])
@@ -15,6 +18,7 @@ async def library_upload(
     description: str = Form(""),
     tags: str = Form(""),
     user_id: str = Form("demo"),
+    _rl: None = Depends(check_rate_limit),
 ):
     """Upload a file to the persistent library. Returns library_id + file_id (Redis session)."""
     from services.library_service import LibraryService
@@ -46,14 +50,30 @@ async def library_upload(
 
 
 @router.get("/v1/library/files", summary="List all files in library")
-async def library_list(user_id: str = Query("demo")):
-    """List all files for a user with metadata summary."""
+async def library_list(
+    user_id: str = Query("demo"),
+    limit: int = Query(50, ge=1, le=200, description="Max files to return"),
+    offset: int = Query(0, ge=0, description="Number of files to skip"),
+):
+    """List all files for a user with metadata summary. Supports pagination."""
     from services.library_service import LibraryService
 
     try:
         svc = LibraryService()
-        files = await svc.list_files(user_id)
-        return {"success": True, "data": {"files": files, "total": len(files)}}
+        all_files = await svc.list_files(user_id)
+        total = len(all_files)
+        paginated = all_files[offset:offset + limit]
+        has_more = (offset + limit) < total
+        return {
+            "success": True,
+            "data": {
+                "files": paginated,
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+                "has_more": has_more,
+            },
+        }
     except Exception as e:
         return JSONResponse(status_code=500, content={
             "success": False,
