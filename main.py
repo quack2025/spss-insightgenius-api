@@ -180,6 +180,7 @@ def create_application() -> FastAPI:
     from routers.weight import router as weight_router
     from routers.chat import router as chat_router
     from routers.chat_stream import router as chat_stream_router
+    from routers.smart_spec import router as smart_spec_router
     from routers.library import router as library_router
 
     app.include_router(health_router)
@@ -200,6 +201,7 @@ def create_application() -> FastAPI:
     app.include_router(weight_router)
     app.include_router(chat_router)
     app.include_router(chat_stream_router)
+    app.include_router(smart_spec_router)
     app.include_router(library_router)
 
     # MCP server — SSE transport

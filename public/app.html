@@ -48,7 +48,7 @@
         <span class="section-badge bg-blue-600 text-white">1</span>
         <h2 class="text-lg font-semibold text-gray-900">Upload files</h2>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">SPSS file (.sav, .por, .zsav) <span class="text-red-500">*</span></label>
           <div id="sav-drop" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400">
@@ -59,12 +59,22 @@
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Reporting Ticket (.docx) <span class="text-gray-400">optional</span>
-            <span class="inline-block ml-1 w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold text-center leading-4 cursor-help" title="A Word document describing your reporting requirements (banners, stubs, sig level, nets). Our AI reads it and auto-configures your tables. If you don't have one, skip this and configure manually below.">?</span>
+            <span class="inline-block ml-1 w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold text-center leading-4 cursor-help" title="Client instructions: banners, stubs, sig level, nets. AI reads it and configures tables automatically.">?</span>
           </label>
-          <div id="docx-drop" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400">
-            <div id="docx-icon" class="text-3xl mb-2">&#128203;</div>
-            <p id="docx-label" class="text-sm text-gray-500">Drop .docx reporting ticket here or click to browse</p>
+          <div id="docx-drop" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400">
+            <div id="docx-icon" class="text-2xl mb-1">&#128203;</div>
+            <p id="docx-label" class="text-sm text-gray-500">Reporting Ticket (.docx)</p>
             <input type="file" id="docx-input" accept=".docx" class="hidden">
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Questionnaire (.docx/.pdf) <span class="text-gray-400">optional</span>
+            <span class="inline-block ml-1 w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold text-center leading-4 cursor-help" title="The survey instrument. AI uses it to detect skip logic, routing, and question types for accurate base calculations.">?</span>
+          </label>
+          <div id="quest-drop" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400">
+            <div id="quest-icon" class="text-2xl mb-1">&#128221;</div>
+            <p id="quest-label" class="text-sm text-gray-500">Questionnaire (.docx/.pdf)</p>
+            <input type="file" id="quest-input" accept=".docx,.pdf" class="hidden">
           </div>
         </div>
       </div>
@@ -426,7 +436,8 @@ console.log(`${resp.headers.get("X-Stubs-Success")} tables generated`);</code></
 <script src="/static/config.js"></script>
 <script>
 // ── State ──
-let savFile = null, docxFile = null, metadata = null, resultBlob = null, resultFilename = '';
+let savFile = null, docxFile = null, questFile = null, metadata = null, resultBlob = null, resultFilename = '';
+let smartSpec = null;  // AI-generated spec from smart-spec endpoint
 let selectedBanners = [];
 let mrsGroups = {};  // { "Brand Awareness": ["AWARE_A","AWARE_B"] }
 
@@ -454,11 +465,15 @@ setupDropZone('docx-drop', 'docx-input', 'docx-label', 'docx-icon', async (f, la
   docxFile = f; icon.textContent = '\u2705';
   label.textContent = `${f.name} (${(f.size/1024).toFixed(0)} KB)`;
   label.className = 'text-sm text-blue-700 font-medium';
-
-  // Auto-parse ticket if we have a .sav loaded
-  if (savFile) {
-    await parseAndShowTicket();
-  }
+  // Auto-parse when we have at least .sav + ticket
+  if (savFile) await runSmartSpec();
+});
+setupDropZone('quest-drop', 'quest-input', 'quest-label', 'quest-icon', async (f, label, icon) => {
+  questFile = f; icon.textContent = '\u2705';
+  label.textContent = `${f.name} (${(f.size/1024).toFixed(0)} KB)`;
+  label.className = 'text-sm text-blue-700 font-medium';
+  // Auto-parse when we have .sav + at least one document
+  if (savFile && (docxFile || questFile)) await runSmartSpec();
 });
 
 // ── Load metadata ──
@@ -1004,20 +1019,22 @@ function downloadResult() {
 // ── Ticket Parsing + Confirmation Card ──
 let parsedTicketSpec = null;
 
-async function parseAndShowTicket() {
-  if (!docxFile || !savFile) return;
+async function runSmartSpec() {
+  if (!savFile || (!docxFile && !questFile)) return;
 
   const card = document.getElementById('ticket-confirm');
   card.classList.remove('hidden');
-  document.getElementById('ticket-banners').textContent = 'Parsing...';
+  document.getElementById('ticket-banners').textContent = 'AI is reading your documents...';
   document.getElementById('ticket-stubs').textContent = '';
+  document.getElementById('ticket-confidence').textContent = 'Processing';
 
   const form = new FormData();
-  form.append('ticket', docxFile);
   form.append('file', savFile);
+  if (docxFile) form.append('ticket', docxFile);
+  if (questFile) form.append('questionnaire', questFile);
 
   try {
-    const resp = await fetch(`${API_BASE}/v1/parse-ticket`, {
+    const resp = await fetch(`${API_BASE}/v1/smart-spec`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${API_KEY}` },
       body: form,
@@ -1025,74 +1042,90 @@ async function parseAndShowTicket() {
     const data = await resp.json();
 
     if (data.success && data.data) {
-      parsedTicketSpec = data.data;
+      smartSpec = data.data;
       const d = data.data;
+      const conf = d.confidence || 0;
+      const confColor = conf >= 0.8 ? 'green' : conf >= 0.5 ? 'yellow' : 'red';
 
       // Populate card
       document.getElementById('ticket-banners').textContent =
-        d.banners?.length > 0 ? d.banners.join(' · ') : 'Total only';
+        d.banners?.length > 0 ? d.banners.join(' + ') : 'Total only';
       document.getElementById('ticket-sig').textContent =
-        d.significance_level ? `${(d.significance_level * 100).toFixed(0)}% C.I.` : '95% C.I.';
-      document.getElementById('ticket-stubs').textContent =
-        d.stubs?.length > 0
-          ? `${d.stubs.slice(0, 8).join(', ')}${d.stubs.length > 8 ? ` +${d.stubs.length - 8} more` : ''} (${d.stubs.length} questions)`
-          : 'All variables';
+        `${((d.significance_level || 0.95) * 100).toFixed(0)}% C.I.`;
+
+      // Stubs summary
+      const nStubs = d.stubs?.length || 0;
+      const nMrs = Object.keys(d.mrs_groups || {}).length;
+      const nGrids = Object.keys(d.grid_groups || {}).length;
+      const nNested = (d.nested_banners || []).length;
+      let stubText = [];
+      if (nStubs > 0) stubText.push(`${nStubs} questions`);
+      if (nMrs > 0) stubText.push(`${nMrs} MRS groups`);
+      if (nGrids > 0) stubText.push(`${nGrids} Grid groups`);
+      if (nNested > 0) stubText.push(`${nNested} nested banners`);
+      document.getElementById('ticket-stubs').textContent = stubText.join(' · ') || 'All variables';
+
       document.getElementById('ticket-nets-info').textContent =
         Object.keys(d.nets || {}).length > 0
-          ? `T2B/B2B for ${Object.keys(d.nets).length} variables`
+          ? `${Object.keys(d.nets).length} variables with custom nets`
           : 'Auto-detect';
       document.getElementById('ticket-weight').textContent = d.weight || 'None';
 
-      // Show notes if any
+      // Confidence badge
+      const confEl = document.getElementById('ticket-confidence');
+      confEl.textContent = `${(conf * 100).toFixed(0)}% confidence`;
+      confEl.className = `text-xs px-2 py-0.5 rounded-full bg-${confColor}-100 text-${confColor}-700`;
+
+      // Decisions
       const notesEl = document.getElementById('ticket-notes');
-      if (d.notes?.length > 0) {
+      const decisions = d.decisions || [];
+      const questions = d.questions_for_user || [];
+      if (decisions.length > 0 || questions.length > 0) {
         notesEl.classList.remove('hidden');
-        notesEl.innerHTML = '<strong>Notes:</strong> ' + d.notes.join(' · ');
+        let html = '';
+        if (decisions.length > 0) {
+          html += '<strong>AI decisions:</strong><br>' + decisions.map(dec => {
+            const icon = dec.confidence === 'high' ? '🟢' : dec.confidence === 'medium' ? '🟡' : '🔴';
+            return `${icon} ${dec.decision}`;
+          }).join('<br>');
+        }
+        if (questions.length > 0) {
+          html += '<br><br><strong>Questions for you:</strong><br>' + questions.map(q => `❓ ${q}`).join('<br>');
+        }
+        notesEl.innerHTML = html;
       } else {
         notesEl.classList.add('hidden');
       }
 
-      // Show matched variables count
+      // Matched variables count
       const matched = Object.keys(d.matched_variables || {}).length;
-      if (matched > 0) {
-        document.getElementById('ticket-confidence').textContent = `${matched} vars matched`;
+      if (matched > 0 && conf >= 0.8) {
+        confEl.textContent = `${matched} vars matched · ${(conf * 100).toFixed(0)}%`;
+      }
+
+      // Time
+      const timeMs = data.meta?.processing_time_ms;
+      if (timeMs) {
+        confEl.textContent += ` · ${(timeMs/1000).toFixed(1)}s`;
       }
     } else {
-      document.getElementById('ticket-banners').textContent = 'Failed to parse ticket';
+      document.getElementById('ticket-banners').textContent = 'Failed to generate spec';
       document.getElementById('ticket-stubs').textContent = data.error?.message || 'Unknown error';
-      parsedTicketSpec = null;
+      smartSpec = null;
     }
   } catch (e) {
     document.getElementById('ticket-banners').textContent = 'Error: ' + e.message;
-    parsedTicketSpec = null;
+    smartSpec = null;
   }
 }
 
 async function generateFromTicket() {
-  if (!parsedTicketSpec || !savFile) {
-    autoAnalyze();
-    return;
-  }
-
-  // Use auto-analyze with the ticket — the backend merges ticket spec with auto-detect
+  // Use auto-analyze which merges ticket spec
   autoAnalyze();
 }
 
 function editTicketManually() {
-  // Hide ticket card, scroll to the form section
   document.getElementById('ticket-confirm').classList.add('hidden');
-  // Pre-fill form with ticket spec if available
-  if (parsedTicketSpec) {
-    // Select banners
-    const bannerChips = document.querySelectorAll('[data-banner-var]');
-    bannerChips.forEach(chip => {
-      const varName = chip.dataset.bannerVar;
-      if (parsedTicketSpec.banners?.includes(varName)) {
-        chip.click();
-      }
-    });
-  }
-  // Scroll to banners section
   document.getElementById('section-banners')?.scrollIntoView({ behavior: 'smooth' });
 }
 
