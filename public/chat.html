@@ -201,11 +201,14 @@
           <h3 class="text-sm font-semibold text-gray-800">Study Brief / Objectives</h3>
           <span class="text-xs text-gray-400">(optional — improves AI analysis)</span>
         </div>
-        <textarea id="prep-study-context" rows="3" placeholder="Paste your study brief or describe the objectives. Example: 'Evaluate EGO hair cream performance vs competitors among Colombian men 18-45. Key questions: satisfaction drivers, purchase channel optimization, NPS by demographic.'"
+        <textarea id="prep-study-context" rows="3" oninput="updatePrepSummary()" placeholder="Paste your study brief or describe the objectives. Example: 'Evaluate EGO hair cream performance vs competitors among Colombian men 18-45. Key questions: satisfaction drivers, purchase channel optimization, NPS by demographic.'"
           class="w-full ml-8 mr-4 p-3 text-sm border border-gray-200 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-indigo-300 placeholder:text-gray-400" style="width: calc(100% - 2rem);"></textarea>
       </div>
 
-      <!-- Actions -->
+      <!-- Summary + Actions -->
+      <div id="prep-summary" class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800 hidden">
+        <span class="font-semibold">Ready:</span> <span id="prep-summary-text"></span>
+      </div>
       <div class="flex gap-3 pt-4 border-t">
         <button onclick="confirmPrep()" class="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl font-medium text-sm hover:bg-blue-700">
           Confirm & Start Chat
@@ -444,6 +447,9 @@ function showPrepPanel(fileInfo, meta) {
   document.getElementById('prep-nets-info').textContent = prepContext.nets_count > 0
     ? `T2B/B2B auto-detected for ${prepContext.nets_count} Likert/NPS variables`
     : 'No Likert or NPS scales detected';
+
+  // Update summary line
+  updatePrepSummary();
 }
 
 function _renderGroupItem(type, g, idx) {
@@ -578,6 +584,37 @@ function togglePrepItem(type, idx, checked) {
   if (type === 'mrs') prepContext.mrs_groups[idx].enabled = checked;
   else if (type === 'grid') prepContext.grid_groups[idx].enabled = checked;
   else if (type === 'demo') prepContext.demographics[idx].enabled = checked;
+  updatePrepSummary();
+}
+
+function updatePrepSummary() {
+  if (!prepContext) return;
+  const parts = [];
+  const mrs = prepContext.mrs_groups.filter(g => g.enabled).length;
+  const grids = prepContext.grid_groups.filter(g => g.enabled).length;
+  const demos = prepContext.demographics.filter(d => d.enabled);
+  const nDemos = demos.length;
+  const wt = prepContext.weight;
+  const nets = prepContext.nets_count || 0;
+  const ticket = currentTicket ? 1 : 0;
+  const brief = document.getElementById('prep-study-context')?.value?.trim();
+
+  if (mrs > 0) parts.push(`${mrs} MRS group${mrs > 1 ? 's' : ''}`);
+  if (grids > 0) parts.push(`${grids} Grid${grids > 1 ? 's' : ''}`);
+  if (nDemos > 0) parts.push(`${nDemos} banner${nDemos > 1 ? 's' : ''} (${demos.map(d => d.variable).join(', ')})`);
+  if (wt) parts.push(`weight: ${wt}`);
+  if (nets > 0) parts.push(`${nets} auto-nets`);
+  if (ticket) parts.push('Reporting Ticket');
+  if (brief) parts.push('Study Brief');
+
+  const el = document.getElementById('prep-summary');
+  const textEl = document.getElementById('prep-summary-text');
+  if (parts.length > 0) {
+    textEl.textContent = parts.join(' · ');
+    el.classList.remove('hidden');
+  } else {
+    el.classList.add('hidden');
+  }
 }
 
 function confirmPrep() {
