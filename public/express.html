@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talk2Data InsightGenius — Express</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="/static/config.js"></script>
+<style>
+  body { font-family: 'Inter', sans-serif; }
+  .fade-in { animation: fadeIn 0.3s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .drop-active { border-color: #2563eb !important; background: #eff6ff !important; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.15s; border: 1px solid #e5e7eb; background: white; }
+  .chip:hover { border-color: #93c5fd; }
+  .chip.active { background: #2563eb; color: white; border-color: #2563eb; }
+  .chip .remove { display: none; margin-left: 2px; }
+  .chip.active .remove { display: inline; }
+  .section-card { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+  .section-card.editable:hover { border-color: #93c5fd; }
+  .confidence-high { color: #059669; }
+  .confidence-medium { color: #d97706; }
+  .confidence-low { color: #dc2626; }
+  .spinner { width: 20px; height: 20px; border: 2px solid #e5e7eb; border-top: 2px solid #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<header class="bg-white border-b px-6 py-3 flex items-center justify-between">
+  <div>
+    <h1 class="text-lg font-bold text-gray-900">Talk2Data InsightGenius</h1>
+    <p class="text-xs text-gray-500">Express — Upload, confirm, export</p>
+  </div>
+  <div class="flex gap-3 text-xs">
+    <a href="/export" class="text-gray-500 hover:text-blue-600">Full Editor</a>
+    <a href="/wizard" class="text-gray-500 hover:text-blue-600">Wizard</a>
+    <a href="/export-mcp" class="text-gray-500 hover:text-blue-600">Chat</a>
+    <a href="/docs" class="text-gray-500 hover:text-blue-600">API Docs</a>
+  </div>
+</header>
+
+<main class="max-w-3xl mx-auto px-4 py-8">
+
+  <!-- Step 1: Upload -->
+  <div id="step-upload" class="fade-in">
+    <div class="text-center mb-6">
+      <h2 class="text-2xl font-bold text-gray-900">Upload your files</h2>
+      <p class="text-sm text-gray-500 mt-1">AI reads everything and generates your tables automatically</p>
+    </div>
+
+    <!-- Main file -->
+    <div id="drop-main" class="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center cursor-pointer hover:border-blue-400 transition-colors mb-4"
+         ondragover="event.preventDefault(); this.classList.add('drop-active')"
+         ondragleave="this.classList.remove('drop-active')"
+         ondrop="handleMainDrop(event)"
+         onclick="document.getElementById('input-main').click()">
+      <input id="input-main" type="file" accept=".sav,.por,.zsav,.csv,.xlsx" class="hidden" onchange="handleMainFile(this.files[0])">
+      <div id="main-icon" class="text-4xl mb-2">📊</div>
+      <p id="main-label" class="text-base font-medium text-gray-700">Drop your data file here</p>
+      <p class="text-xs text-gray-400 mt-1">.sav, .csv, .xlsx — required</p>
+    </div>
+
+    <!-- Optional files -->
+    <div class="grid grid-cols-2 gap-3 mb-6">
+      <div id="drop-ticket" class="border border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:border-purple-400 transition-colors"
+           onclick="document.getElementById('input-ticket').click()">
+        <input id="input-ticket" type="file" accept=".docx" class="hidden" onchange="handleTicketFile(this.files[0])">
+        <div id="ticket-icon" class="text-xl mb-1">📋</div>
+        <p id="ticket-label" class="text-xs text-gray-500">Reporting Ticket (.docx)</p>
+      </div>
+      <div id="drop-quest" class="border border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:border-green-400 transition-colors"
+           onclick="document.getElementById('input-quest').click()">
+        <input id="input-quest" type="file" accept=".docx,.pdf" class="hidden" onchange="handleQuestFile(this.files[0])">
+        <div id="quest-icon" class="text-xl mb-1">📝</div>
+        <p id="quest-label" class="text-xs text-gray-500">Questionnaire (.docx/.pdf)</p>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div id="upload-status" class="hidden text-center">
+      <div class="flex items-center justify-center gap-2 text-sm text-blue-600">
+        <div class="spinner"></div>
+        <span id="upload-status-text">Uploading...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: AI Spec Review (editable card) -->
+  <div id="step-review" class="hidden fade-in">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-lg font-bold text-gray-900">Review AI configuration</h2>
+        <p class="text-xs text-gray-500">Click any section to edit. Or just hit Generate.</p>
+      </div>
+      <div id="review-confidence" class="text-xs px-3 py-1 rounded-full bg-green-100 text-green-700"></div>
+    </div>
+
+    <!-- File info -->
+    <div id="review-file-info" class="text-xs text-gray-500 mb-4 bg-gray-50 rounded-lg px-3 py-2"></div>
+
+    <!-- Banners (editable) -->
+    <div class="section-card editable">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-semibold text-gray-800">Banners <span class="text-gray-400 font-normal">(columns)</span></h3>
+        <button onclick="toggleSection('banners-edit')" class="text-xs text-blue-600 hover:text-blue-800">Edit</button>
+      </div>
+      <div id="banners-display" class="flex flex-wrap gap-1"></div>
+      <div id="banners-edit" class="hidden mt-2 border-t pt-2">
+        <p class="text-xs text-gray-400 mb-2">Click to add/remove banners:</p>
+        <div id="banners-all" class="flex flex-wrap gap-1"></div>
+      </div>
+    </div>
+
+    <!-- Stubs -->
+    <div class="section-card">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-semibold text-gray-800">Questions <span class="text-gray-400 font-normal">(rows)</span></h3>
+        <span id="stubs-count" class="text-xs text-gray-400"></span>
+      </div>
+      <div id="stubs-summary" class="text-sm text-gray-600"></div>
+    </div>
+
+    <!-- Groups (MRS + Grid) -->
+    <div id="groups-section" class="section-card hidden">
+      <h3 class="text-sm font-semibold text-gray-800 mb-2">Detected Groups</h3>
+      <div id="groups-list" class="space-y-1"></div>
+    </div>
+
+    <!-- Nets -->
+    <div class="section-card">
+      <div class="flex items-center gap-3">
+        <div class="flex-1">
+          <h3 class="text-sm font-semibold text-gray-800">Nets & Options</h3>
+          <p id="nets-summary" class="text-xs text-gray-500 mt-1"></p>
+        </div>
+        <label class="flex items-center gap-2 text-xs">
+          <input type="checkbox" id="opt-means" checked class="rounded"> Means
+        </label>
+        <label class="flex items-center gap-2 text-xs">
+          <input type="checkbox" id="opt-total" checked class="rounded"> Total column
+        </label>
+      </div>
+    </div>
+
+    <!-- AI Decisions -->
+    <div id="decisions-section" class="section-card hidden">
+      <h3 class="text-sm font-semibold text-gray-800 mb-2">AI Decisions</h3>
+      <div id="decisions-list" class="space-y-1 text-xs"></div>
+    </div>
+
+    <!-- Questions for user -->
+    <div id="questions-section" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-4 mb-3">
+      <h3 class="text-sm font-semibold text-amber-800 mb-2">Questions for you</h3>
+      <div id="questions-list" class="space-y-2 text-sm text-amber-700"></div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex gap-3 mt-6">
+      <button onclick="generateExcel()" id="btn-generate" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl text-sm flex items-center justify-center gap-2 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Generate Excel
+      </button>
+      <button onclick="window.location='/export'" class="px-4 py-3 text-sm text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-50">
+        Full Editor ↗
+      </button>
+    </div>
+
+    <!-- Result -->
+    <div id="result-area" class="hidden mt-4 p-4 bg-green-50 border border-green-200 rounded-xl fade-in">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-semibold text-green-800">Excel generated!</p>
+          <p id="result-meta" class="text-xs text-green-600"></p>
+        </div>
+        <button onclick="downloadResult()" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg text-sm flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Download
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <p class="text-xs text-gray-400 mt-8 text-center">
+    Powered by Claude Sonnet · Numbers computed by an SPSS Engine (deterministic)
+  </p>
+</main>
+
+<script>
+const API_KEY = window.__INSIGHTGENIUS_DEMO_KEY__ || 'demo';
+const API_BASE = window.location.origin;
+
+let mainFile = null, ticketFile = null, questFile = null;
+let currentSpec = null;
+let resultBlob = null, resultFilename = '';
+
+// ── File handlers ──
+
+function handleMainDrop(e) {
+  e.preventDefault();
+  e.target.closest('#drop-main').classList.remove('drop-active');
+  handleMainFile(e.dataTransfer.files[0]);
+}
+
+async function handleMainFile(f) {
+  if (!f) return;
+  mainFile = f;
+  document.getElementById('main-icon').textContent = '✅';
+  document.getElementById('main-label').textContent = `${f.name} (${(f.size/1024).toFixed(0)} KB)`;
+  document.getElementById('main-label').className = 'text-base font-medium text-blue-700';
+
+  // If we have at least one doc, run smart spec
+  if (ticketFile || questFile) {
+    await runSmartSpec();
+  } else {
+    // Just run auto-detect metadata
+    showStatus('Analyzing file structure...');
+    await runSmartSpec();  // Works with just .sav too
+  }
+}
+
+function handleTicketFile(f) {
+  if (!f) return;
+  ticketFile = f;
+  document.getElementById('ticket-icon').textContent = '✅';
+  document.getElementById('ticket-label').textContent = f.name;
+  document.getElementById('ticket-label').className = 'text-xs text-purple-700 font-medium';
+  if (mainFile) runSmartSpec();
+}
+
+function handleQuestFile(f) {
+  if (!f) return;
+  questFile = f;
+  document.getElementById('quest-icon').textContent = '✅';
+  document.getElementById('quest-label').textContent = f.name;
+  document.getElementById('quest-label').className = 'text-xs text-green-700 font-medium';
+  if (mainFile) runSmartSpec();
+}
+
+// ── Smart Spec ──
+
+function showStatus(text) {
+  const el = document.getElementById('upload-status');
+  el.classList.remove('hidden');
+  document.getElementById('upload-status-text').textContent = text;
+}
+function hideStatus() {
+  document.getElementById('upload-status').classList.add('hidden');
+}
+
+async function runSmartSpec() {
+  showStatus('AI is reading your documents...');
+
+  const form = new FormData();
+  form.append('file', mainFile);
+  if (ticketFile) form.append('ticket', ticketFile);
+  if (questFile) form.append('questionnaire', questFile);
+
+  try {
+    const resp = await fetch(`${API_BASE}/v1/smart-spec`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${API_KEY}` },
+      body: form,
+    });
+    const data = await resp.json();
+    hideStatus();
+
+    if (data.success && data.data) {
+      currentSpec = data.data;
+      showReview(data.data, data.meta);
+    } else {
+      // Fallback: show basic auto-analyze option
+      showStatus('AI spec generation failed. Using auto-detect.');
+      currentSpec = { banners: [], stubs: ['_all_'], significance_level: 0.95, include_means: true, include_total_column: true };
+      showReview(currentSpec, {});
+    }
+  } catch (e) {
+    hideStatus();
+    alert('Error: ' + e.message);
+  }
+}
+
+// ── Review UI ──
+
+function showReview(spec, meta) {
+  document.getElementById('step-upload').classList.add('hidden');
+  document.getElementById('step-review').classList.remove('hidden');
+
+  // File info
+  document.getElementById('review-file-info').textContent =
+    `${mainFile.name}${ticketFile ? ' + ' + ticketFile.name : ''}${questFile ? ' + ' + questFile.name : ''} · ${meta?.processing_time_ms ? (meta.processing_time_ms/1000).toFixed(1) + 's' : ''}`;
+
+  // Confidence
+  const conf = spec.confidence || 0;
+  const confEl = document.getElementById('review-confidence');
+  confEl.textContent = `${(conf * 100).toFixed(0)}% confidence`;
+  confEl.className = `text-xs px-3 py-1 rounded-full ${conf >= 0.7 ? 'bg-green-100 text-green-700' : conf >= 0.5 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`;
+
+  // Banners
+  const bannersEl = document.getElementById('banners-display');
+  const banners = spec.banners || [];
+  bannersEl.innerHTML = banners.length > 0
+    ? banners.map(b => `<span class="chip active">${b} <span class="remove" onclick="removeBanner('${b}')">×</span></span>`).join('')
+    : '<span class="text-xs text-gray-400">Total only (no banners)</span>';
+
+  // Stubs
+  const nStubs = (spec.stubs || []).length;
+  const nMrs = Object.keys(spec.mrs_groups || {}).length;
+  const nGrids = Object.keys(spec.grid_groups || {}).length;
+  const nFilters = Object.keys(spec.stub_filters || {}).length;
+  document.getElementById('stubs-count').textContent =
+    `${nStubs} questions${nMrs ? ' · ' + nMrs + ' MRS' : ''}${nGrids ? ' · ' + nGrids + ' Grids' : ''}${nFilters ? ' · ' + nFilters + ' filtered' : ''}`;
+  document.getElementById('stubs-summary').textContent =
+    nStubs > 10 ? (spec.stubs || []).slice(0, 8).join(', ') + ` +${nStubs - 8} more` : (spec.stubs || []).join(', ') || 'All variables';
+
+  // Groups
+  const groups = [];
+  for (const [name, members] of Object.entries(spec.mrs_groups || {})) {
+    groups.push({ type: 'MRS', name, count: members.length });
+  }
+  for (const [name, cfg] of Object.entries(spec.grid_groups || {})) {
+    groups.push({ type: 'Grid', name, count: (cfg.variables || []).length });
+  }
+  if (groups.length > 0) {
+    document.getElementById('groups-section').classList.remove('hidden');
+    document.getElementById('groups-list').innerHTML = groups.map(g =>
+      `<div class="flex items-center gap-2 text-xs">
+        <span class="px-1.5 py-0.5 rounded ${g.type === 'MRS' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">${g.type}</span>
+        <span class="text-gray-700">${g.name}</span>
+        <span class="text-gray-400">(${g.count} vars)</span>
+      </div>`
+    ).join('');
+  }
+
+  // Nets
+  const nNets = Object.keys(spec.nets || {}).length;
+  document.getElementById('nets-summary').textContent =
+    nNets > 0 ? `${nNets} variables with custom nets (T2B/B2B/M3B)` : 'Auto-detect T2B/B2B for Likert scales';
+  document.getElementById('opt-means').checked = spec.include_means !== false;
+  document.getElementById('opt-total').checked = spec.include_total_column !== false;
+
+  // Decisions
+  const decisions = spec.decisions || [];
+  if (decisions.length > 0) {
+    document.getElementById('decisions-section').classList.remove('hidden');
+    document.getElementById('decisions-list').innerHTML = decisions.map(d => {
+      const icon = d.confidence === 'high' ? '🟢' : d.confidence === 'medium' ? '🟡' : '🔴';
+      return `<div>${icon} <span class="text-gray-700">${d.decision}</span> <span class="text-gray-400">— ${d.reason || ''}</span></div>`;
+    }).join('');
+  }
+
+  // Questions for user
+  const questions = spec.questions_for_user || [];
+  if (questions.length > 0) {
+    document.getElementById('questions-section').classList.remove('hidden');
+    document.getElementById('questions-list').innerHTML = questions.map(q =>
+      `<div class="flex gap-2"><span>❓</span><span>${q}</span></div>`
+    ).join('');
+  }
+}
+
+function toggleSection(id) {
+  document.getElementById(id).classList.toggle('hidden');
+}
+
+function removeBanner(varName) {
+  if (!currentSpec) return;
+  currentSpec.banners = (currentSpec.banners || []).filter(b => b !== varName);
+  showReview(currentSpec, {});
+}
+
+// ── Generate ──
+
+async function generateExcel() {
+  if (!mainFile) return;
+  const btn = document.getElementById('btn-generate');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Generating...';
+
+  const form = new FormData();
+  form.append('file', mainFile);
+  if (ticketFile) form.append('ticket', ticketFile);
+
+  // Build options from current spec
+  const options = {
+    output_mode: 'single_sheet',
+    significance_level: currentSpec?.significance_level || 0.95,
+    include_summary: true,
+  };
+  form.append('options', JSON.stringify(options));
+
+  try {
+    const resp = await fetch(`${API_BASE}/v1/auto-analyze`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${API_KEY}` },
+      body: form,
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail?.message || `HTTP ${resp.status}`);
+    }
+
+    resultBlob = await resp.blob();
+    resultFilename = `express_${mainFile.name.replace(/\.[^.]+$/, '')}.xlsx`;
+
+    const total = resp.headers.get('X-Stubs-Total') || '?';
+    const success = resp.headers.get('X-Stubs-Success') || '?';
+    const time = resp.headers.get('X-Processing-Time-Ms') || '?';
+
+    document.getElementById('result-area').classList.remove('hidden');
+    document.getElementById('result-meta').textContent =
+      `${success}/${total} tables · ${(time/1000).toFixed(1)}s`;
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Generate Excel';
+}
+
+function downloadResult() {
+  if (!resultBlob) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(resultBlob);
+  a.download = resultFilename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+</script>
+</body>
+</html>

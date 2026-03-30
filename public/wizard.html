@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talk2Data InsightGenius — Wizard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="/static/config.js"></script>
+<style>
+  body { font-family: 'Inter', sans-serif; }
+  .fade-in { animation: fadeIn 0.3s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .drop-active { border-color: #2563eb !important; background: #eff6ff !important; }
+  .step-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; }
+  .step-dot.active { background: #2563eb; color: white; }
+  .step-dot.done { background: #059669; color: white; }
+  .step-dot.pending { background: #e5e7eb; color: #9ca3af; }
+  .step-line { height: 2px; flex: 1; }
+  .step-line.done { background: #059669; }
+  .step-line.pending { background: #e5e7eb; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; border-radius: 20px; font-size: 13px; cursor: pointer; transition: all 0.15s; border: 1px solid #e5e7eb; background: white; }
+  .chip:hover { border-color: #93c5fd; }
+  .chip.selected { background: #2563eb; color: white; border-color: #2563eb; }
+  .spinner { width: 20px; height: 20px; border: 2px solid #e5e7eb; border-top: 2px solid #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<header class="bg-white border-b px-6 py-3 flex items-center justify-between">
+  <div>
+    <h1 class="text-lg font-bold text-gray-900">Talk2Data InsightGenius</h1>
+    <p class="text-xs text-gray-500">Wizard — Step by step</p>
+  </div>
+  <div class="flex gap-3 text-xs">
+    <a href="/express" class="text-gray-500 hover:text-blue-600">Express</a>
+    <a href="/export" class="text-gray-500 hover:text-blue-600">Full Editor</a>
+    <a href="/export-mcp" class="text-gray-500 hover:text-blue-600">Chat</a>
+  </div>
+</header>
+
+<main class="max-w-2xl mx-auto px-4 py-8">
+
+  <!-- Step indicator -->
+  <div class="flex items-center gap-2 mb-8">
+    <div id="dot-1" class="step-dot active">1</div>
+    <div id="line-1" class="step-line pending"></div>
+    <div id="dot-2" class="step-dot pending">2</div>
+    <div id="line-2" class="step-line pending"></div>
+    <div id="dot-3" class="step-dot pending">3</div>
+    <div id="line-3" class="step-line pending"></div>
+    <div id="dot-4" class="step-dot pending">4</div>
+  </div>
+
+  <!-- Step 1: Upload -->
+  <div id="step-1" class="fade-in">
+    <h2 class="text-xl font-bold text-gray-900 mb-1">Upload your files</h2>
+    <p class="text-sm text-gray-500 mb-6">Start with your data file. Optionally add a reporting ticket and questionnaire for AI-powered configuration.</p>
+
+    <div id="drop-main" class="border-2 border-dashed border-gray-300 rounded-2xl p-10 text-center cursor-pointer hover:border-blue-400 transition-colors mb-4"
+         ondragover="event.preventDefault(); this.classList.add('drop-active')"
+         ondragleave="this.classList.remove('drop-active')"
+         ondrop="event.preventDefault(); this.classList.remove('drop-active'); handleFile('main', event.dataTransfer.files[0])"
+         onclick="document.getElementById('input-main').click()">
+      <input id="input-main" type="file" accept=".sav,.por,.zsav,.csv,.xlsx" class="hidden" onchange="handleFile('main', this.files[0])">
+      <div id="icon-main" class="text-4xl mb-2">📊</div>
+      <p id="label-main" class="font-medium text-gray-700">Drop your data file (.sav, .csv, .xlsx)</p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div class="border border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:border-purple-400"
+           onclick="document.getElementById('input-ticket').click()">
+        <input id="input-ticket" type="file" accept=".docx" class="hidden" onchange="handleFile('ticket', this.files[0])">
+        <span id="icon-ticket" class="text-xl">📋</span>
+        <p id="label-ticket" class="text-xs text-gray-500 mt-1">Reporting Ticket</p>
+      </div>
+      <div class="border border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:border-green-400"
+           onclick="document.getElementById('input-quest').click()">
+        <input id="input-quest" type="file" accept=".docx,.pdf" class="hidden" onchange="handleFile('quest', this.files[0])">
+        <span id="icon-quest" class="text-xl">📝</span>
+        <p id="label-quest" class="text-xs text-gray-500 mt-1">Questionnaire</p>
+      </div>
+    </div>
+
+    <div id="status-1" class="hidden mt-4 flex items-center justify-center gap-2 text-sm text-blue-600">
+      <div class="spinner"></div> <span id="status-1-text">Processing...</span>
+    </div>
+
+    <button id="btn-next-1" class="hidden w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-sm" onclick="goStep(2)">
+      Continue to Banners →
+    </button>
+  </div>
+
+  <!-- Step 2: Banners -->
+  <div id="step-2" class="hidden fade-in">
+    <h2 class="text-xl font-bold text-gray-900 mb-1">Select banners</h2>
+    <p class="text-sm text-gray-500 mb-4">Banners are the column headers in your crosstabs. AI has pre-selected the best demographics.</p>
+
+    <div id="ai-banner-note" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-xs text-blue-700"></div>
+
+    <div id="banner-chips" class="flex flex-wrap gap-2 mb-6"></div>
+
+    <div class="flex gap-3">
+      <button class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-sm" onclick="goStep(3)">Continue to Questions →</button>
+      <button class="px-4 py-3 text-sm text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-50" onclick="goStep(1)">← Back</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Stubs + Groups -->
+  <div id="step-3" class="hidden fade-in">
+    <h2 class="text-xl font-bold text-gray-900 mb-1">Select questions</h2>
+    <p class="text-sm text-gray-500 mb-4">Choose which questions to include. AI detected groups (MRS, Grids) automatically.</p>
+
+    <div class="flex gap-4 mb-4">
+      <label class="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="radio" name="stub-mode" value="all" checked onchange="updateStubMode()" class="text-blue-600"> All questions
+      </label>
+      <label class="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="radio" name="stub-mode" value="select" onchange="updateStubMode()" class="text-blue-600"> Select specific
+      </label>
+    </div>
+
+    <div id="stub-select-area" class="hidden mb-4">
+      <input type="text" placeholder="Search questions..." oninput="filterStubs(this.value)"
+             class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-300">
+      <div id="stub-list" class="max-h-60 overflow-y-auto space-y-1"></div>
+    </div>
+
+    <div id="groups-area" class="mb-4">
+      <h3 class="text-sm font-semibold text-gray-700 mb-2">Detected Groups</h3>
+      <div id="group-list" class="space-y-2"></div>
+    </div>
+
+    <div class="flex gap-3">
+      <button class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-sm" onclick="goStep(4)">Continue to Generate →</button>
+      <button class="px-4 py-3 text-sm text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-50" onclick="goStep(2)">← Back</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Generate -->
+  <div id="step-4" class="hidden fade-in">
+    <h2 class="text-xl font-bold text-gray-900 mb-1">Generate Excel</h2>
+    <p class="text-sm text-gray-500 mb-4">Review your configuration and generate.</p>
+
+    <div class="bg-white border rounded-xl p-4 mb-4 text-sm space-y-2">
+      <div><span class="font-semibold text-gray-700">Banners:</span> <span id="summary-banners" class="text-gray-600"></span></div>
+      <div><span class="font-semibold text-gray-700">Questions:</span> <span id="summary-stubs" class="text-gray-600"></span></div>
+      <div><span class="font-semibold text-gray-700">Groups:</span> <span id="summary-groups" class="text-gray-600"></span></div>
+      <div class="flex gap-4">
+        <label class="flex items-center gap-2 text-xs"><input type="checkbox" id="opt-means-w" checked class="rounded"> Include means</label>
+        <label class="flex items-center gap-2 text-xs"><input type="checkbox" id="opt-total-w" checked class="rounded"> Total column</label>
+        <label class="flex items-center gap-2 text-xs"><input type="checkbox" id="opt-summary-w" checked class="rounded"> AI Executive Summary</label>
+      </div>
+    </div>
+
+    <div id="decisions-area" class="hidden bg-gray-50 border rounded-xl p-3 mb-4 text-xs space-y-1"></div>
+
+    <div class="flex gap-3">
+      <button onclick="generateWizard()" id="btn-generate-w" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl text-sm flex items-center justify-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Generate Excel
+      </button>
+      <button class="px-4 py-3 text-sm text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-50" onclick="goStep(3)">← Back</button>
+    </div>
+
+    <div id="result-w" class="hidden mt-4 p-4 bg-green-50 border border-green-200 rounded-xl fade-in">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-semibold text-green-800">Excel generated!</p>
+          <p id="result-meta-w" class="text-xs text-green-600"></p>
+        </div>
+        <button onclick="downloadWizard()" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg text-sm">Download</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="text-xs text-gray-400 mt-8 text-center">
+    Powered by Claude Sonnet · Numbers computed by an SPSS Engine (deterministic)
+  </p>
+</main>
+
+<script>
+const API_KEY = window.__INSIGHTGENIUS_DEMO_KEY__ || 'demo';
+const API_BASE = window.location.origin;
+
+let files = { main: null, ticket: null, quest: null };
+let spec = null;
+let metadata = null;
+let selectedBanners = [];
+let stubMode = 'all';
+let resultBlob = null;
+
+function handleFile(type, f) {
+  if (!f) return;
+  files[type] = f;
+  document.getElementById(`icon-${type}`).textContent = '✅';
+  const label = document.getElementById(`label-${type}`);
+  label.textContent = `${f.name} (${(f.size/1024).toFixed(0)} KB)`;
+  label.className = label.className.replace('text-gray-500', 'text-blue-700 font-medium').replace('text-gray-700', 'text-blue-700');
+
+  if (type === 'main') {
+    loadSmartSpec();
+  } else if (files.main) {
+    loadSmartSpec();
+  }
+}
+
+async function loadSmartSpec() {
+  const st = document.getElementById('status-1');
+  st.classList.remove('hidden');
+  document.getElementById('status-1-text').textContent = 'AI is analyzing your files...';
+
+  const form = new FormData();
+  form.append('file', files.main);
+  if (files.ticket) form.append('ticket', files.ticket);
+  if (files.quest) form.append('questionnaire', files.quest);
+
+  try {
+    const resp = await fetch(`${API_BASE}/v1/smart-spec`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${API_KEY}` },
+      body: form,
+    });
+    const data = await resp.json();
+
+    if (data.success && data.data) {
+      spec = data.data;
+      document.getElementById('status-1-text').textContent =
+        `Ready! ${(spec.confidence * 100).toFixed(0)}% confidence · ${(data.meta?.processing_time_ms/1000 || 0).toFixed(1)}s`;
+      selectedBanners = [...(spec.banners || [])];
+    } else {
+      spec = { banners: [], stubs: ['_all_'], significance_level: 0.95, include_means: true };
+      document.getElementById('status-1-text').textContent = 'Auto-detect ready (no AI docs)';
+      selectedBanners = [];
+    }
+  } catch (e) {
+    spec = { banners: [], stubs: ['_all_'], significance_level: 0.95, include_means: true };
+    document.getElementById('status-1-text').textContent = 'Using auto-detect (AI unavailable)';
+    selectedBanners = [];
+  }
+
+  document.getElementById('btn-next-1').classList.remove('hidden');
+
+  // Also load metadata for banner/stub selection
+  const metaForm = new FormData();
+  metaForm.append('file', files.main);
+  try {
+    const metaResp = await fetch(`${API_BASE}/v1/metadata`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${API_KEY}` },
+      body: metaForm,
+    });
+    const metaData = await metaResp.json();
+    if (metaData.success) metadata = metaData.data;
+  } catch (e) {}
+}
+
+function goStep(n) {
+  for (let i = 1; i <= 4; i++) {
+    document.getElementById(`step-${i}`).classList.add('hidden');
+    const dot = document.getElementById(`dot-${i}`);
+    dot.className = `step-dot ${i < n ? 'done' : i === n ? 'active' : 'pending'}`;
+    if (i < 4) {
+      document.getElementById(`line-${i}`).className = `step-line ${i < n ? 'done' : 'pending'}`;
+    }
+  }
+  document.getElementById(`step-${n}`).classList.remove('hidden');
+
+  if (n === 2) populateBanners();
+  if (n === 3) populateStubs();
+  if (n === 4) populateSummary();
+}
+
+function populateBanners() {
+  if (!metadata) return;
+  const container = document.getElementById('banner-chips');
+  const suggested = new Set((spec?.banners || []).concat((metadata.suggested_banners || []).map(b => b.variable)));
+
+  const vars = (metadata.variables || []).filter(v => {
+    const nCats = v.value_labels ? Object.keys(v.value_labels).length : 0;
+    return nCats >= 2 && nCats <= 15;
+  });
+
+  container.innerHTML = vars.map(v => {
+    const sel = selectedBanners.includes(v.name) ? 'selected' : '';
+    const nCats = Object.keys(v.value_labels || {}).length;
+    const label = v.label ? v.label.substring(0, 35) : v.name;
+    const ai = suggested.has(v.name) ? '<span class="text-[10px] bg-green-200 text-green-800 px-1 rounded ml-1">AI</span>' : '';
+    return `<button class="chip ${sel}" onclick="toggleBanner('${v.name}', this)">
+      <span class="font-mono text-[10px] opacity-60">${v.name}</span> ${label} (${nCats})${ai}
+    </button>`;
+  }).join('');
+
+  if (spec?.decisions?.some(d => d.decision.toLowerCase().includes('banner'))) {
+    const note = document.getElementById('ai-banner-note');
+    note.classList.remove('hidden');
+    note.textContent = spec.decisions.find(d => d.decision.toLowerCase().includes('banner'))?.decision || '';
+  }
+}
+
+function toggleBanner(name, el) {
+  const idx = selectedBanners.indexOf(name);
+  if (idx >= 0) {
+    selectedBanners.splice(idx, 1);
+    el.classList.remove('selected');
+  } else {
+    selectedBanners.push(name);
+    el.classList.add('selected');
+  }
+}
+
+function populateStubs() {
+  if (!metadata) return;
+  const groups = [];
+  for (const [name, members] of Object.entries(spec?.mrs_groups || {})) {
+    groups.push(`<div class="flex items-center gap-2 p-2 bg-purple-50 rounded-lg">
+      <span class="text-xs px-1.5 py-0.5 bg-purple-200 text-purple-800 rounded">MRS</span>
+      <span class="text-sm text-gray-700">${name}</span>
+      <span class="text-xs text-gray-400">(${members.length} vars)</span>
+    </div>`);
+  }
+  for (const [name, cfg] of Object.entries(spec?.grid_groups || {})) {
+    groups.push(`<div class="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
+      <span class="text-xs px-1.5 py-0.5 bg-blue-200 text-blue-800 rounded">Grid</span>
+      <span class="text-sm text-gray-700">${name}</span>
+      <span class="text-xs text-gray-400">(${(cfg.variables || []).length} vars)</span>
+    </div>`);
+  }
+  document.getElementById('group-list').innerHTML = groups.length > 0
+    ? groups.join('')
+    : '<p class="text-xs text-gray-400">No groups detected</p>';
+}
+
+function updateStubMode() {
+  stubMode = document.querySelector('input[name="stub-mode"]:checked').value;
+  document.getElementById('stub-select-area').classList.toggle('hidden', stubMode === 'all');
+}
+
+function populateSummary() {
+  document.getElementById('summary-banners').textContent =
+    selectedBanners.length > 0 ? selectedBanners.join(' + ') : 'Total only';
+  document.getElementById('summary-stubs').textContent =
+    stubMode === 'all' ? 'All questions' : `${(spec?.stubs || []).length} selected`;
+
+  const nMrs = Object.keys(spec?.mrs_groups || {}).length;
+  const nGrids = Object.keys(spec?.grid_groups || {}).length;
+  document.getElementById('summary-groups').textContent =
+    (nMrs + nGrids) > 0 ? `${nMrs} MRS + ${nGrids} Grids` : 'None';
+
+  const decisions = spec?.decisions || [];
+  if (decisions.length > 0) {
+    const area = document.getElementById('decisions-area');
+    area.classList.remove('hidden');
+    area.innerHTML = '<p class="font-semibold text-gray-700 mb-1">AI decisions:</p>' +
+      decisions.map(d => {
+        const icon = d.confidence === 'high' ? '🟢' : d.confidence === 'medium' ? '🟡' : '🔴';
+        return `<div>${icon} ${d.decision}</div>`;
+      }).join('');
+  }
+}
+
+async function generateWizard() {
+  const btn = document.getElementById('btn-generate-w');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Generating...';
+
+  const form = new FormData();
+  form.append('file', files.main);
+  if (files.ticket) form.append('ticket', files.ticket);
+  form.append('options', JSON.stringify({
+    output_mode: 'single_sheet',
+    significance_level: spec?.significance_level || 0.95,
+    include_summary: document.getElementById('opt-summary-w').checked,
+  }));
+
+  try {
+    const resp = await fetch(`${API_BASE}/v1/auto-analyze`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${API_KEY}` },
+      body: form,
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    resultBlob = await resp.blob();
+    const total = resp.headers.get('X-Stubs-Total') || '?';
+    const success = resp.headers.get('X-Stubs-Success') || '?';
+    document.getElementById('result-w').classList.remove('hidden');
+    document.getElementById('result-meta-w').textContent = `${success}/${total} tables generated`;
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Generate Excel';
+}
+
+function downloadWizard() {
+  if (!resultBlob) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(resultBlob);
+  a.download = `wizard_${files.main?.name || 'export'}.xlsx`;
+  a.click();
+}
+</script>
+</body>
+</html>

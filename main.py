@@ -253,6 +253,14 @@ def create_application() -> FastAPI:
         async def export_page():
             return FileResponse(public_dir / "app.html")
 
+        @app.get("/express", include_in_schema=False)
+        async def express_page():
+            return FileResponse(public_dir / "express.html")
+
+        @app.get("/wizard", include_in_schema=False)
+        async def wizard_page():
+            return FileResponse(public_dir / "wizard.html")
+
         @app.get("/export-mcp", include_in_schema=False)
         async def export_mcp_page():
             return FileResponse(public_dir / "chat.html")
