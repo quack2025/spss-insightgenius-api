@@ -112,6 +112,7 @@ class TabulateSpec:
     mrs_groups: dict[str, list[str]] | None = None
     grid_groups: dict[str, dict[str, Any]] | None = None  # Grid/Battery summaries
     # Format: {"Satisfaction": {"variables": ["sat_speed","sat_price",...], "show": ["t2b","b2b","mean"]}}
+    grid_mode: str = "individual"  # "individual" (each var as crosstab) or "summary" (compact T2B/Mean table)
     include_means: bool = False
     include_total_column: bool = True  # Total as first column (T2-5)
     output_mode: str = "multi_sheet"  # "multi_sheet" or "single_sheet"
@@ -349,21 +350,62 @@ def build_tabulation(engine_cls: Any, data: Any, spec: TabulateSpec) -> Tabulati
             result.failed += 1
         result.sheets.append(sheet)
 
-    # ── Grid/Battery summary groups ──
+    # ── Grid/Battery groups ──
+    grid_mode = getattr(spec, "grid_mode", "individual")  # "individual" (default) or "summary"
     for grid_name, grid_cfg in (spec.grid_groups or {}).items():
-        try:
-            gvars = grid_cfg.get("variables", [])
-            gshow = grid_cfg.get("show", ["t2b", "mean"])
-            grid_result = _compute_grid_summary(data, gvars, banners, banner_columns, spec.weight, spec.significance_level, gshow)
-            sheet = SheetResult(
-                variable=grid_name, label=grid_name, status="success",
-                is_grid=True, grid_data=grid_result,
-            )
-            result.successful += 1
-        except Exception as e:
-            sheet = SheetResult(variable=grid_name, label=grid_name, status="error", error=str(e), is_grid=True)
-            result.failed += 1
-        result.sheets.append(sheet)
+        gvars = grid_cfg.get("variables", [])
+        gshow = grid_cfg.get("show", ["t2b", "b2b", "mean"])
+
+        if grid_mode == "summary":
+            # Compact summary: one sheet with T2B/B2B/Mean rows per variable
+            try:
+                grid_result = _compute_grid_summary(data, gvars, banners, banner_columns, spec.weight, spec.significance_level, gshow)
+                sheet = SheetResult(
+                    variable=grid_name, label=grid_name, status="success",
+                    is_grid=True, grid_data=grid_result,
+                )
+                result.successful += 1
+            except Exception as e:
+                sheet = SheetResult(variable=grid_name, label=grid_name, status="error", error=str(e), is_grid=True)
+                result.failed += 1
+            result.sheets.append(sheet)
+        else:
+            # Individual mode: each variable gets its own crosstab with auto-nets
+            from services.quantipy_engine import _strip_common_label_prefix
+            grid_labels = [col_labels.get(v, v) for v in gvars if v in df.columns]
+            stripped = _strip_common_label_prefix(grid_labels)
+            label_map = dict(zip([v for v in gvars if v in df.columns], stripped))
+
+            for gvar in gvars:
+                if gvar not in df.columns:
+                    continue
+                try:
+                    all_banner_results = {}
+                    for banner_var in banners:
+                        ct = _crosstab_one(engine_cls, data, gvar, banner_var, spec.weight, spec.significance_level)
+                        all_banner_results[banner_var] = ct
+                    # Use stripped label for the variable
+                    var_label = label_map.get(gvar, col_labels.get(gvar, gvar))
+                    sheet = SheetResult(
+                        variable=gvar, label=var_label, status="success",
+                        crosstab_data=all_banner_results,
+                    )
+                    # Auto-add T2B/B2B nets for this variable
+                    vl = value_labels.get(gvar, {})
+                    if vl and len(vl) >= 4:
+                        keys = sorted([float(k) for k in vl.keys()])
+                        if gvar not in (spec.nets or {}):
+                            if not hasattr(spec, '_auto_grid_nets'):
+                                spec._auto_grid_nets = {}
+                            spec._auto_grid_nets[gvar] = {
+                                "Top 2 Box": [int(keys[-2]), int(keys[-1])],
+                                "Bottom 2 Box": [int(keys[0]), int(keys[1])],
+                            }
+                    result.successful += 1
+                except Exception as e:
+                    sheet = SheetResult(variable=gvar, label=label_map.get(gvar, gvar), status="error", error=str(e))
+                    result.failed += 1
+                result.sheets.append(sheet)
 
     result.excel_bytes = _build_excel(result, spec, data)
     return result
@@ -372,13 +414,25 @@ def build_tabulation(engine_cls: Any, data: Any, spec: TabulateSpec) -> Tabulati
 def _mrs_crosstab(
     data: Any, members: list[str], col: str, weight: str | None, sig_level: float,
 ) -> dict[str, Any]:
-    """Crosstab for a Multiple Response Set — each member is a row, base = total respondents."""
+    """Crosstab for a Multiple Response Set.
+
+    Base = respondents who answered AT LEAST ONE member (not NaN in all members).
+    This correctly handles conditional/show-if questions where only a subgroup was asked.
+    """
     df = data.df
     meta = data.meta
     col_labels = getattr(meta, "column_names_to_labels", {})
     col_vl = getattr(meta, "variable_value_labels", {}).get(col, {})
 
-    valid = df[[col] + [m for m in members if m in df.columns]].dropna(subset=[col])
+    valid_members = [m for m in members if m in df.columns]
+    # Start with rows that have a valid banner value
+    valid = df[[col] + valid_members + ([weight] if weight and weight in df.columns else [])].dropna(subset=[col])
+
+    # Key fix: filter to respondents who answered AT LEAST ONE MRS member
+    # (not NaN in all members). This handles conditional/show-if questions.
+    mrs_answered = valid[valid_members].notna().any(axis=1)
+    valid = valid.loc[mrs_answered]
+
     w = valid[weight] if weight and weight in df.columns else None
 
     col_values = sorted(valid[col].dropna().unique())
@@ -388,29 +442,37 @@ def _mrs_crosstab(
 
     # Strip common label prefix for MRS (e.g., "What treatments...? -Otezla" → "Otezla")
     from services.quantipy_engine import _strip_common_label_prefix
-    raw_labels = [col_labels.get(m, m) for m in members if m in df.columns]
+    raw_labels = [col_labels.get(m, m) for m in valid_members]
     stripped_labels = _strip_common_label_prefix(raw_labels)
-    _member_label_map = dict(zip([m for m in members if m in df.columns], stripped_labels))
+    _member_label_map = dict(zip(valid_members, stripped_labels))
+
+    # Pre-compute per-column bases (only respondents who answered the MRS)
+    col_bases = {}
+    col_subsets = {}
+    for i, cv in enumerate(col_values):
+        mask = valid[col] == cv
+        subset = valid.loc[mask]
+        col_subsets[cv] = subset
+        if w is not None:
+            col_bases[cv] = float(w.loc[subset.index].sum())
+        else:
+            col_bases[cv] = len(subset)
 
     table = []
-    for member in members:
-        if member not in df.columns:
-            continue
+    for member in valid_members:
         member_label = _member_label_map.get(member, col_labels.get(member, member))
         row_data = {"row_value": member, "row_label": member_label}
 
         for i, cv in enumerate(col_values):
-            mask = valid[col] == cv
-            subset = valid.loc[mask]
+            subset = col_subsets[cv]
+            base = col_bases[cv]
             # Count respondents who selected this option (value == 1 or value > 0)
             selected = (subset[member].fillna(0) > 0)
             if w is not None:
                 w_sub = w.loc[subset.index]
                 count = float((selected * w_sub).sum())
-                base = float(w_sub.sum())
             else:
                 count = int(selected.sum())
-                base = len(subset)
             pct = round(count / base * 100, 1) if base > 0 else 0
 
             # Sig testing vs other columns
@@ -418,16 +480,13 @@ def _mrs_crosstab(
             for j, ocv in enumerate(col_values):
                 if i == j:
                     continue
-                o_mask = valid[col] == ocv
-                o_subset = valid.loc[o_mask]
+                o_subset = col_subsets[ocv]
+                o_base = col_bases[ocv]
                 o_selected = (o_subset[member].fillna(0) > 0)
                 if w is not None:
-                    o_w = w.loc[o_subset.index]
-                    o_count = float((o_selected * o_w).sum())
-                    o_base = float(o_w.sum())
+                    o_count = float((o_selected * w.loc[o_subset.index]).sum())
                 else:
                     o_count = int(o_selected.sum())
-                    o_base = len(o_subset)
                 try:
                     p1 = count / base if base > 0 else 0
                     p2 = o_count / o_base if o_base > 0 else 0

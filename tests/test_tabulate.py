@@ -240,6 +240,7 @@ def test_tabulate_grid_summary(client, auth_headers, test_sav_bytes):
     spec = json.dumps({
         "banner": "gender",
         "stubs": [],
+        "grid_mode": "summary",
         "grid_groups": {
             "Satisfaction Battery": {
                 "variables": ["satisfaction", "recommend"],

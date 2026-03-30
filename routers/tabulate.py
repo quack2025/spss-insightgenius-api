@@ -140,6 +140,7 @@ async def tabulate(
         nets=spec_dict.get("nets"),
         mrs_groups=spec_dict.get("mrs_groups"),
         grid_groups=spec_dict.get("grid_groups"),
+        grid_mode=spec_dict.get("grid_mode", "individual"),
         include_means=spec_dict.get("include_means", False),
         include_total_column=spec_dict.get("include_total_column", True),
         output_mode=spec_dict.get("output_mode", "multi_sheet"),
