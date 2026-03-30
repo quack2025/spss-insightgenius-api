@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
         logger.warning("ANTHROPIC_API_KEY not set — ticket parsing and smart labeling will be disabled")
 
     # Start MCP Redis relay for cross-replica SSE session routing
-    from routers.mcp_server import start_redis_relay, stop_redis_relay
+    from mcp_server import start_redis_relay, stop_redis_relay
     await start_redis_relay()
 
     yield
@@ -208,7 +208,7 @@ def create_application() -> FastAPI:
     # when mounted. See Railway logs: "Task group is not initialized."
     # Streamable HTTP requires running FastMCP as standalone server, not embedded.
     # When FastMCP fixes this, re-enable at /mcp with http_app(path="/").
-    from routers.mcp_server import get_mcp_asgi_app
+    from mcp_server import get_mcp_asgi_app
     app.mount("/mcp", get_mcp_asgi_app())
     logger.info("MCP SSE mounted at /mcp/sse")
 
