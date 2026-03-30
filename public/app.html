@@ -71,6 +71,47 @@
       <div id="file-info" class="hidden mt-4 p-3 bg-blue-50 rounded-lg fade-in">
         <p class="text-sm font-medium text-blue-900" id="file-info-text"></p>
       </div>
+      <!-- Ticket Confirmation Card -->
+      <div id="ticket-confirm" class="hidden mt-4 p-4 bg-white rounded-lg border border-green-300 shadow-sm fade-in">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="w-6 h-6 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xs font-bold">✓</span>
+          <p class="text-sm font-semibold text-gray-800">Reporting Ticket parsed successfully</p>
+          <span id="ticket-confidence" class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">AI</span>
+        </div>
+        <div class="grid grid-cols-2 gap-3 text-sm mb-3">
+          <div>
+            <span class="text-xs font-medium text-gray-500 uppercase">Banners</span>
+            <p id="ticket-banners" class="text-gray-800 mt-0.5"></p>
+          </div>
+          <div>
+            <span class="text-xs font-medium text-gray-500 uppercase">Significance</span>
+            <p id="ticket-sig" class="text-gray-800 mt-0.5"></p>
+          </div>
+          <div class="col-span-2">
+            <span class="text-xs font-medium text-gray-500 uppercase">Stubs</span>
+            <p id="ticket-stubs" class="text-gray-800 mt-0.5"></p>
+          </div>
+          <div>
+            <span class="text-xs font-medium text-gray-500 uppercase">Nets</span>
+            <p id="ticket-nets-info" class="text-gray-800 mt-0.5"></p>
+          </div>
+          <div>
+            <span class="text-xs font-medium text-gray-500 uppercase">Weight</span>
+            <p id="ticket-weight" class="text-gray-800 mt-0.5"></p>
+          </div>
+        </div>
+        <div id="ticket-notes" class="hidden mb-3 text-xs text-amber-700 bg-amber-50 rounded-lg p-2"></div>
+        <div class="flex gap-2">
+          <button onclick="generateFromTicket()" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg text-sm transition-colors flex items-center justify-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Generate Excel
+          </button>
+          <button onclick="editTicketManually()" class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
+            Edit manually ↓
+          </button>
+        </div>
+      </div>
+
       <!-- Auto-Analyze quick action -->
       <div id="auto-analyze-bar" class="hidden mt-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-200 fade-in">
         <div class="flex items-center justify-between">
@@ -409,10 +450,15 @@ setupDropZone('sav-drop', 'sav-input', 'sav-label', 'sav-icon', async (f, label,
   label.className = 'text-sm text-blue-700 font-medium';
   await loadMetadata();
 });
-setupDropZone('docx-drop', 'docx-input', 'docx-label', 'docx-icon', (f, label, icon) => {
+setupDropZone('docx-drop', 'docx-input', 'docx-label', 'docx-icon', async (f, label, icon) => {
   docxFile = f; icon.textContent = '\u2705';
   label.textContent = `${f.name} (${(f.size/1024).toFixed(0)} KB)`;
   label.className = 'text-sm text-blue-700 font-medium';
+
+  // Auto-parse ticket if we have a .sav loaded
+  if (savFile) {
+    await parseAndShowTicket();
+  }
 });
 
 // ── Load metadata ──
@@ -953,6 +999,101 @@ async function generate() {
 function downloadResult() {
   if (!resultBlob) return;
   const a = document.createElement('a'); a.href = URL.createObjectURL(resultBlob); a.download = resultFilename; a.click(); URL.revokeObjectURL(a.href);
+}
+
+// ── Ticket Parsing + Confirmation Card ──
+let parsedTicketSpec = null;
+
+async function parseAndShowTicket() {
+  if (!docxFile || !savFile) return;
+
+  const card = document.getElementById('ticket-confirm');
+  card.classList.remove('hidden');
+  document.getElementById('ticket-banners').textContent = 'Parsing...';
+  document.getElementById('ticket-stubs').textContent = '';
+
+  const form = new FormData();
+  form.append('ticket', docxFile);
+  form.append('file', savFile);
+
+  try {
+    const resp = await fetch(`${API_BASE}/v1/parse-ticket`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${API_KEY}` },
+      body: form,
+    });
+    const data = await resp.json();
+
+    if (data.success && data.data) {
+      parsedTicketSpec = data.data;
+      const d = data.data;
+
+      // Populate card
+      document.getElementById('ticket-banners').textContent =
+        d.banners?.length > 0 ? d.banners.join(' · ') : 'Total only';
+      document.getElementById('ticket-sig').textContent =
+        d.significance_level ? `${(d.significance_level * 100).toFixed(0)}% C.I.` : '95% C.I.';
+      document.getElementById('ticket-stubs').textContent =
+        d.stubs?.length > 0
+          ? `${d.stubs.slice(0, 8).join(', ')}${d.stubs.length > 8 ? ` +${d.stubs.length - 8} more` : ''} (${d.stubs.length} questions)`
+          : 'All variables';
+      document.getElementById('ticket-nets-info').textContent =
+        Object.keys(d.nets || {}).length > 0
+          ? `T2B/B2B for ${Object.keys(d.nets).length} variables`
+          : 'Auto-detect';
+      document.getElementById('ticket-weight').textContent = d.weight || 'None';
+
+      // Show notes if any
+      const notesEl = document.getElementById('ticket-notes');
+      if (d.notes?.length > 0) {
+        notesEl.classList.remove('hidden');
+        notesEl.innerHTML = '<strong>Notes:</strong> ' + d.notes.join(' · ');
+      } else {
+        notesEl.classList.add('hidden');
+      }
+
+      // Show matched variables count
+      const matched = Object.keys(d.matched_variables || {}).length;
+      if (matched > 0) {
+        document.getElementById('ticket-confidence').textContent = `${matched} vars matched`;
+      }
+    } else {
+      document.getElementById('ticket-banners').textContent = 'Failed to parse ticket';
+      document.getElementById('ticket-stubs').textContent = data.error?.message || 'Unknown error';
+      parsedTicketSpec = null;
+    }
+  } catch (e) {
+    document.getElementById('ticket-banners').textContent = 'Error: ' + e.message;
+    parsedTicketSpec = null;
+  }
+}
+
+async function generateFromTicket() {
+  if (!parsedTicketSpec || !savFile) {
+    autoAnalyze();
+    return;
+  }
+
+  // Use auto-analyze with the ticket — the backend merges ticket spec with auto-detect
+  autoAnalyze();
+}
+
+function editTicketManually() {
+  // Hide ticket card, scroll to the form section
+  document.getElementById('ticket-confirm').classList.add('hidden');
+  // Pre-fill form with ticket spec if available
+  if (parsedTicketSpec) {
+    // Select banners
+    const bannerChips = document.querySelectorAll('[data-banner-var]');
+    bannerChips.forEach(chip => {
+      const varName = chip.dataset.bannerVar;
+      if (parsedTicketSpec.banners?.includes(varName)) {
+        chip.click();
+      }
+    });
+  }
+  // Scroll to banners section
+  document.getElementById('section-banners')?.scrollIntoView({ behavior: 'smooth' });
 }
 
 // ── Auto-Analyze ──
