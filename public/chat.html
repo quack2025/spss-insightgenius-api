@@ -99,22 +99,54 @@
 
       <!-- MRS Groups -->
       <div id="prep-mrs" class="mb-5">
-        <div class="flex items-center gap-2 mb-2">
-          <span class="w-6 h-6 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center text-xs font-bold">M</span>
-          <h3 class="text-sm font-semibold text-gray-800">Multiple Response Sets</h3>
-          <span id="prep-mrs-count" class="text-xs text-gray-400"></span>
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <span class="w-6 h-6 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center text-xs font-bold">M</span>
+            <h3 class="text-sm font-semibold text-gray-800">Multiple Response Sets</h3>
+            <span id="prep-mrs-count" class="text-xs text-gray-400"></span>
+          </div>
+          <button onclick="showGroupBuilder('mrs')" class="text-xs text-purple-600 hover:text-purple-800 font-medium">+ Add MRS group</button>
         </div>
+        <p class="text-xs text-gray-400 ml-8 mb-2">Binary yes/no variables grouped together (e.g., brand awareness). Click to expand and see members.</p>
         <div id="prep-mrs-list" class="space-y-1"></div>
       </div>
 
       <!-- Grid Batteries -->
       <div id="prep-grids" class="mb-5">
-        <div class="flex items-center gap-2 mb-2">
-          <span class="w-6 h-6 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-xs font-bold">G</span>
-          <h3 class="text-sm font-semibold text-gray-800">Grid / Scale Batteries</h3>
-          <span id="prep-grids-count" class="text-xs text-gray-400"></span>
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <span class="w-6 h-6 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-xs font-bold">G</span>
+            <h3 class="text-sm font-semibold text-gray-800">Grid / Scale Batteries</h3>
+            <span id="prep-grids-count" class="text-xs text-gray-400"></span>
+          </div>
+          <button onclick="showGroupBuilder('grid')" class="text-xs text-blue-600 hover:text-blue-800 font-medium">+ Add Grid group</button>
         </div>
+        <p class="text-xs text-gray-400 ml-8 mb-2">Scale variables with same response options (e.g., satisfaction 1-5). Shows T2B/Mean in one compact table.</p>
         <div id="prep-grids-list" class="space-y-1"></div>
+      </div>
+
+      <!-- Group Builder Modal -->
+      <div id="group-builder" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
+          <div class="p-4 border-b">
+            <h3 id="group-builder-title" class="font-semibold text-gray-800">Create Group</h3>
+            <input id="group-builder-name" type="text" placeholder="Group name (e.g., 'Brand Awareness')"
+                   class="mt-2 w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300">
+          </div>
+          <div class="p-4 flex-1 overflow-y-auto">
+            <input id="group-builder-search" type="text" placeholder="Search variables..."
+                   class="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 mb-3 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                   oninput="filterGroupVars(this.value)">
+            <div id="group-builder-vars" class="space-y-1 max-h-60 overflow-y-auto"></div>
+          </div>
+          <div class="p-4 border-t flex justify-between">
+            <span id="group-builder-selected" class="text-xs text-gray-500">0 selected</span>
+            <div class="flex gap-2">
+              <button onclick="cancelGroupBuilder()" class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+              <button onclick="saveGroup()" class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">Create Group</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Demographics / Banners -->
@@ -382,27 +414,15 @@ function showPrepPanel(fileInfo, meta) {
   const mrsList = document.getElementById('prep-mrs-list');
   document.getElementById('prep-mrs-count').textContent = `(${mrsGroups.length} detected)`;
   mrsList.innerHTML = mrsGroups.length === 0
-    ? '<p class="text-sm text-gray-400 ml-8">No multiple response sets detected</p>'
-    : mrsGroups.map((g, i) => `
-      <label class="flex items-center gap-2 ml-8 py-1 text-sm cursor-pointer">
-        <input type="checkbox" checked data-type="mrs" data-idx="${i}" onchange="togglePrepItem('mrs',${i},this.checked)"
-               class="rounded text-purple-600 w-4 h-4">
-        <span class="text-gray-700">${g.display_name ? g.display_name.substring(0,60) : g.name}</span>
-        <span class="text-gray-400">(${g.variables.length} vars)</span>
-      </label>`).join('');
+    ? '<p class="text-sm text-gray-400 ml-8">No MRS detected. Click "+ Add MRS group" to create one.</p>'
+    : mrsGroups.map((g, i) => _renderGroupItem('mrs', g, i)).join('');
 
   // Render Grids
   const gridsList = document.getElementById('prep-grids-list');
   document.getElementById('prep-grids-count').textContent = `(${gridGroups.length} detected)`;
   gridsList.innerHTML = gridGroups.length === 0
-    ? '<p class="text-sm text-gray-400 ml-8">No grid batteries detected</p>'
-    : gridGroups.map((g, i) => `
-      <label class="flex items-center gap-2 ml-8 py-1 text-sm cursor-pointer">
-        <input type="checkbox" checked data-type="grid" data-idx="${i}" onchange="togglePrepItem('grid',${i},this.checked)"
-               class="rounded text-blue-600 w-4 h-4">
-        <span class="text-gray-700">${g.display_name ? g.display_name.substring(0,60) : g.name}</span>
-        <span class="text-gray-400">(${g.variables.length} vars)</span>
-      </label>`).join('');
+    ? '<p class="text-sm text-gray-400 ml-8">No grids detected. Click "+ Add Grid group" to create one.</p>'
+    : gridGroups.map((g, i) => _renderGroupItem('grid', g, i)).join('');
 
   // Render Demographics
   const demosList = document.getElementById('prep-demos-list');
@@ -424,6 +444,134 @@ function showPrepPanel(fileInfo, meta) {
   document.getElementById('prep-nets-info').textContent = prepContext.nets_count > 0
     ? `T2B/B2B auto-detected for ${prepContext.nets_count} Likert/NPS variables`
     : 'No Likert or NPS scales detected';
+}
+
+function _renderGroupItem(type, g, idx) {
+  const color = type === 'mrs' ? 'purple' : 'blue';
+  const source = g.source === 'label_pattern' ? 'AI' : g.source === 'name_pattern' ? 'AI' : '';
+  const sourceBadge = source ? `<span class="text-[10px] bg-${color}-100 text-${color}-600 px-1.5 py-0.5 rounded-full">${source}</span>` : '';
+  const members = (g.variables || []).map(v => {
+    const varInfo = prepContext.all_variables.find(x => x.name === v);
+    const label = varInfo?.label?.split(':').pop()?.trim() || v;
+    return `<span class="text-xs text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">${label}</span>`;
+  }).join(' ');
+
+  return `
+    <div class="ml-8 py-1.5">
+      <label class="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="checkbox" checked data-type="${type}" data-idx="${idx}" onchange="togglePrepItem('${type}',${idx},this.checked)"
+               class="rounded text-${color}-600 w-4 h-4">
+        <span class="font-medium text-gray-700">${(g.display_name || g.name).substring(0,50)}</span>
+        <span class="text-gray-400">(${g.variables.length} vars)</span>
+        ${sourceBadge}
+        <button onclick="removeGroup('${type}',${idx})" class="ml-auto text-xs text-gray-400 hover:text-red-500">x</button>
+      </label>
+      <div class="flex flex-wrap gap-1 mt-1 ml-6">${members}</div>
+    </div>`;
+}
+
+let _groupBuilderType = null;
+let _groupBuilderSelected = new Set();
+
+function showGroupBuilder(type) {
+  _groupBuilderType = type;
+  _groupBuilderSelected = new Set();
+  document.getElementById('group-builder').classList.remove('hidden');
+  document.getElementById('group-builder-title').textContent = type === 'mrs' ? 'Create MRS Group' : 'Create Grid Group';
+  document.getElementById('group-builder-name').value = '';
+  document.getElementById('group-builder-search').value = '';
+  _renderGroupBuilderVars('');
+}
+
+function _renderGroupBuilderVars(filter) {
+  const vars = prepContext.all_variables || [];
+  // Get already-grouped variable names
+  const grouped = new Set();
+  prepContext.mrs_groups.filter(g => g.enabled).forEach(g => g.variables.forEach(v => grouped.add(v)));
+  prepContext.grid_groups.filter(g => g.enabled).forEach(g => g.variables.forEach(v => grouped.add(v)));
+  const banners = new Set(prepContext.demographics.filter(d => d.enabled).map(d => d.variable));
+
+  const html = vars.filter(v => {
+    if (grouped.has(v.name) || banners.has(v.name)) return false; // Already used
+    if (!v.value_labels || Object.keys(v.value_labels).length < 2) return false;
+    if (filter) {
+      const q = filter.toLowerCase();
+      return v.name.toLowerCase().includes(q) || (v.label || '').toLowerCase().includes(q);
+    }
+    return true;
+  }).map(v => {
+    const nCats = Object.keys(v.value_labels || {}).length;
+    const checked = _groupBuilderSelected.has(v.name) ? 'checked' : '';
+    return `<label class="flex items-center gap-2 py-1 text-sm cursor-pointer hover:bg-gray-50 rounded px-2">
+      <input type="checkbox" ${checked} onchange="toggleGroupVar('${v.name}',this.checked)" class="rounded w-4 h-4">
+      <span class="font-mono text-xs text-gray-600">${v.name}</span>
+      <span class="text-gray-500 text-xs truncate">${(v.label || '').substring(0,50)}</span>
+      <span class="text-gray-400 text-[10px] ml-auto">(${nCats})</span>
+    </label>`;
+  }).join('');
+
+  document.getElementById('group-builder-vars').innerHTML = html || '<p class="text-sm text-gray-400 text-center py-4">No available variables match your search</p>';
+}
+
+function filterGroupVars(query) {
+  _renderGroupBuilderVars(query);
+}
+
+function toggleGroupVar(varName, checked) {
+  if (checked) _groupBuilderSelected.add(varName);
+  else _groupBuilderSelected.delete(varName);
+  document.getElementById('group-builder-selected').textContent = `${_groupBuilderSelected.size} selected`;
+}
+
+function cancelGroupBuilder() {
+  document.getElementById('group-builder').classList.add('hidden');
+}
+
+function saveGroup() {
+  const name = document.getElementById('group-builder-name').value.trim();
+  if (!name) { alert('Please enter a group name'); return; }
+  if (_groupBuilderSelected.size < 2) { alert('Select at least 2 variables'); return; }
+
+  const group = {
+    name: name,
+    display_name: name,
+    question_type: _groupBuilderType === 'mrs' ? 'awareness' : 'scale',
+    variables: Array.from(_groupBuilderSelected),
+    enabled: true,
+    source: 'manual',
+  };
+
+  if (_groupBuilderType === 'mrs') {
+    prepContext.mrs_groups.push(group);
+    const mrsList = document.getElementById('prep-mrs-list');
+    const idx = prepContext.mrs_groups.length - 1;
+    // Remove "no MRS detected" message if present
+    if (mrsList.querySelector('p')) mrsList.innerHTML = '';
+    mrsList.innerHTML += _renderGroupItem('mrs', group, idx);
+    document.getElementById('prep-mrs-count').textContent = `(${prepContext.mrs_groups.filter(g => g.enabled).length} groups)`;
+  } else {
+    prepContext.grid_groups.push(group);
+    const gridsList = document.getElementById('prep-grids-list');
+    const idx = prepContext.grid_groups.length - 1;
+    if (gridsList.querySelector('p')) gridsList.innerHTML = '';
+    gridsList.innerHTML += _renderGroupItem('grid', group, idx);
+    document.getElementById('prep-grids-count').textContent = `(${prepContext.grid_groups.filter(g => g.enabled).length} groups)`;
+  }
+
+  cancelGroupBuilder();
+}
+
+function removeGroup(type, idx) {
+  if (type === 'mrs') prepContext.mrs_groups.splice(idx, 1);
+  else prepContext.grid_groups.splice(idx, 1);
+  // Re-render
+  const list = document.getElementById(type === 'mrs' ? 'prep-mrs-list' : 'prep-grids-list');
+  const groups = type === 'mrs' ? prepContext.mrs_groups : prepContext.grid_groups;
+  list.innerHTML = groups.length === 0
+    ? `<p class="text-sm text-gray-400 ml-8">No ${type === 'mrs' ? 'MRS' : 'grids'} configured. Click "+ Add" to create one.</p>`
+    : groups.map((g, i) => _renderGroupItem(type, g, i)).join('');
+  const countEl = document.getElementById(type === 'mrs' ? 'prep-mrs-count' : 'prep-grids-count');
+  countEl.textContent = `(${groups.filter(g => g.enabled).length} groups)`;
 }
 
 function togglePrepItem(type, idx, checked) {

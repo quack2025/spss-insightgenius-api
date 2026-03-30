@@ -425,6 +425,97 @@ class QuantiProEngine:
             except Exception as e:
                 logger.warning("detect_groups failed: %s", e)
 
+        # ── Label-pattern fallback for flat variable files ──────────────────
+        # MRX detect_groups works on SPSS _1/_2/_3 suffix convention.
+        # For files with flat names (sat_speed, sat_price, AWARE_UBER, AWARE_BOLT),
+        # we detect groups by shared label prefix (e.g., "Satisfaction:" or "Awareness:").
+        if not detected_groups:
+            detected_groups = []
+        _grouped_vars = {v for g in detected_groups for v in g.get("variables", [])}
+
+        label_groups: dict[str, list[dict]] = {}
+        for var_info in variables:
+            vname = var_info["name"]
+            if vname in _grouped_vars:
+                continue  # Already in an MRX-detected group
+            label = var_info.get("label") or ""
+            if ":" not in label:
+                continue
+            prefix = label.split(":")[0].strip()
+            if len(prefix) < 3:
+                continue
+            label_groups.setdefault(prefix, []).append(var_info)
+
+        for prefix, members in label_groups.items():
+            if len(members) < 2:
+                continue  # Need at least 2 variables to form a group
+            member_names = [m["name"] for m in members]
+            # Determine type: all binary (2 labels) → awareness/MRS; all same scale → grid
+            n_labels = [len(m.get("value_labels") or {}) for m in members]
+            all_binary = all(n == 2 for n in n_labels)
+            all_same_scale = len(set(n_labels)) == 1 and n_labels[0] >= 3
+
+            if all_binary:
+                q_type = "awareness"
+            elif all_same_scale:
+                q_type = "scale"
+            else:
+                q_type = "mixed"
+
+            detected_groups.append({
+                "name": prefix,
+                "display_name": prefix,
+                "question_type": q_type,
+                "variables": member_names,
+                "confidence": 0.7,
+                "source": "label_pattern",
+            })
+            _grouped_vars.update(member_names)
+
+        # Also detect by variable name prefix (sat_*, AWARE_*)
+        name_groups: dict[str, list[dict]] = {}
+        for var_info in variables:
+            vname = var_info["name"]
+            if vname in _grouped_vars:
+                continue
+            # Split on _ and use first part as prefix
+            parts = vname.split("_")
+            if len(parts) < 2:
+                continue
+            prefix = parts[0]
+            if len(prefix) < 2:
+                continue
+            name_groups.setdefault(prefix, []).append(var_info)
+
+        for prefix, members in name_groups.items():
+            if len(members) < 3:
+                continue  # Need at least 3 to be a meaningful group
+            member_names = [m["name"] for m in members]
+            n_labels = [len(m.get("value_labels") or {}) for m in members]
+            all_binary = all(n == 2 for n in n_labels)
+            all_same_scale = len(set(n_labels)) == 1 and n_labels[0] >= 3
+
+            if all_binary:
+                q_type = "awareness"
+            elif all_same_scale:
+                q_type = "scale"
+            else:
+                continue  # Mixed types by name prefix — not reliable
+
+            # Use label prefix if available, else name prefix
+            first_label = (members[0].get("label") or "").split(":")[0].strip()
+            display = first_label if first_label and len(first_label) > 2 else prefix.upper()
+
+            detected_groups.append({
+                "name": prefix,
+                "display_name": display,
+                "question_type": q_type,
+                "variables": member_names,
+                "confidence": 0.5,
+                "source": "name_pattern",
+            })
+            _grouped_vars.update(member_names)
+
         # Preset nets based on detected scale ranges
         preset_nets = {}
         for var_info in variables:

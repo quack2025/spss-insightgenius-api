@@ -279,12 +279,21 @@ def build_tabulation(engine_cls: Any, data: Any, spec: TabulateSpec) -> Tabulati
     if spec.stubs == ["_all_"] or not spec.stubs:
         value_labels = getattr(meta, "variable_value_labels", {})
         banner_set = set(banners)
+        # Collect variables that belong to MRS or Grid groups — they're exported as group sheets
+        grouped_vars = set()
+        for _name, members in (spec.mrs_groups or {}).items():
+            grouped_vars.update(members)
+        for _name, gspec in (spec.grid_groups or {}).items():
+            grouped_vars.update(gspec.get("variables", []) if isinstance(gspec, dict) else [])
         stubs = [
             col for col in df.columns
-            if col not in banner_set and col in value_labels and len(value_labels.get(col, {})) >= 2
+            if col not in banner_set and col not in grouped_vars
+            and col in value_labels and len(value_labels.get(col, {})) >= 2
         ]
         if not stubs:
-            stubs = [col for col in df.columns if col not in banner_set and df[col].dtype.kind in ("i", "f")]
+            stubs = [col for col in df.columns
+                     if col not in banner_set and col not in grouped_vars
+                     and df[col].dtype.kind in ("i", "f")]
     else:
         stubs = spec.stubs
 
