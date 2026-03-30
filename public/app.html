@@ -600,9 +600,9 @@ function _makeBannerChip(v, isSuggested) {
   const vl = v.value_labels ? Object.keys(v.value_labels).length : 0;
   const chip = document.createElement('button');
   chip.className = 'chip';
-  const shortLabel = v.label || v.name;
+  const shortLabel = v.label ? `${v.label.substring(0, 40)}${v.label.length > 40 ? '...' : ''}` : v.name;
   const badge = isSuggested ? '<span class="ml-1 px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-semibold">AI</span>' : '';
-  chip.innerHTML = `<span class="font-medium">${shortLabel}</span> <span class="text-gray-400 text-xs">(${vl})</span>${badge}`;
+  chip.innerHTML = `<span class="font-mono text-[10px] text-gray-500 mr-1">${v.name}</span> <span class="font-medium">${shortLabel}</span> <span class="text-gray-400 text-xs">(${vl})</span>${badge}`;
   chip.title = `${v.name}: ${v.label || ''} \u2014 ${vl} categories${isSuggested ? ' (recommended by AI)' : ''}`;
   chip.dataset.varname = v.name;
   chip.addEventListener('click', () => toggleBanner(v.name, chip));
@@ -875,7 +875,7 @@ function renderCustomGroups() {
 // ── Summary bar ──
 function updateSummary() {
   const el = document.getElementById('spec-summary');
-  if (!metadata || (selectedBanners.length === 0 && customGroups.length === 0)) { el.textContent = 'Select at least one banner or create a custom group to continue'; return; }
+  if (!metadata) { el.textContent = 'Upload a file to get started'; return; }
   const stubMode = document.querySelector('input[name="stub-mode"]:checked')?.value || 'all';
   const nStubs = stubMode === 'all' ? 'all' : document.getElementById('stubs-select').selectedOptions.length || 'all';
   const nMrs = Object.keys(mrsGroups).length;

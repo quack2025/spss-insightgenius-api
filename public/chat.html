@@ -433,8 +433,9 @@ function showPrepPanel(fileInfo, meta) {
     <label class="flex items-center gap-2 ml-8 py-1 text-sm cursor-pointer">
       <input type="checkbox" ${d.enabled ? 'checked' : ''} data-type="demo" data-idx="${i}" onchange="togglePrepItem('demo',${i},this.checked)"
              class="rounded text-green-600 w-4 h-4">
-      <span class="text-gray-700">${d.variable}</span>
-      <span class="text-gray-400">${d.label || ''} (${d.n_categories || '?'} cats)</span>
+      <span class="font-mono text-xs text-gray-500">${d.variable}</span>
+      <span class="text-gray-700">${(d.label || '').substring(0, 45)}${(d.label || '').length > 45 ? '...' : ''}</span>
+      <span class="text-gray-400">(${d.n_categories || '?'} cats)</span>
     </label>`).join('');
 
   // Weight

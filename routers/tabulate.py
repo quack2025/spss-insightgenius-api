@@ -128,8 +128,7 @@ async def tabulate(
     banner = spec_dict.get("banner", "")
     banners = spec_dict.get("banners")
     custom_groups = spec_dict.get("custom_groups")
-    if not banner and not banners and not custom_groups:
-        raise HTTPException(400, detail={"code": "INVALID_SPEC", "message": "spec.banner, spec.banners, or spec.custom_groups is required"})
+    # Allow Total-only export (no banners) — include_total_column will provide the Total column
 
     tab_spec = TabulateSpec(
         banner=banner,

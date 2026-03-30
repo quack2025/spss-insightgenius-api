@@ -386,11 +386,17 @@ def _mrs_crosstab(
     col_letter_map = {str(v): letters[i] for i, v in enumerate(col_values)}
     alpha = 1 - sig_level
 
+    # Strip common label prefix for MRS (e.g., "What treatments...? -Otezla" → "Otezla")
+    from services.quantipy_engine import _strip_common_label_prefix
+    raw_labels = [col_labels.get(m, m) for m in members if m in df.columns]
+    stripped_labels = _strip_common_label_prefix(raw_labels)
+    _member_label_map = dict(zip([m for m in members if m in df.columns], stripped_labels))
+
     table = []
     for member in members:
         if member not in df.columns:
             continue
-        member_label = col_labels.get(member, member)
+        member_label = _member_label_map.get(member, col_labels.get(member, member))
         row_data = {"row_value": member, "row_label": member_label}
 
         for i, cv in enumerate(col_values):

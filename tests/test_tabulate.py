@@ -332,7 +332,8 @@ def test_tabulate_custom_groups_only(client, auth_headers, test_sav_bytes):
     assert int(resp.headers["X-Stubs-Success"]) >= 1
 
 
-def test_tabulate_missing_banner(client, auth_headers, test_sav_bytes):
+def test_tabulate_total_only(client, auth_headers, test_sav_bytes):
+    """Total-only export (no banners) should succeed with just the Total column."""
     spec = json.dumps({"stubs": ["satisfaction"]})
     resp = client.post(
         "/v1/tabulate",
@@ -340,8 +341,8 @@ def test_tabulate_missing_banner(client, auth_headers, test_sav_bytes):
         files={"file": ("test.sav", test_sav_bytes, "application/octet-stream")},
         data={"spec": spec},
     )
-    assert resp.status_code == 400
-    assert resp.json()["detail"]["code"] == "INVALID_SPEC"
+    assert resp.status_code == 200
+    assert resp.headers.get("content-type") == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
 def test_tabulate_invalid_banner(client, auth_headers, test_sav_bytes):
