@@ -425,10 +425,24 @@ class QuantiProEngine:
             except Exception as e:
                 logger.warning("detect_groups failed: %s", e)
 
+        # ── Post-process MRX groups: fix misclassified GRID_SINGLE → awareness ──
+        # MRX sometimes classifies binary MRS variables (1/NaN, no value_labels) as GRID_SINGLE.
+        # If all members have only {0,1} or {1,NaN} data, reclassify as "awareness".
+        if detected_groups:
+            for g in detected_groups:
+                q_type = str(g.get("question_type", ""))
+                if "GRID" in q_type.upper() or q_type == "unknown":
+                    members = g.get("variables", [])
+                    if len(members) >= 2:
+                        all_binary = all(
+                            m in df.columns and set(df[m].dropna().unique().tolist()).issubset({0, 0.0, 1, 1.0})
+                            for m in members
+                        )
+                        if all_binary:
+                            g["question_type"] = "awareness"
+                            g["source"] = "mrx_corrected"
+
         # ── Label-pattern fallback for flat variable files ──────────────────
-        # MRX detect_groups works on SPSS _1/_2/_3 suffix convention.
-        # For files with flat names (sat_speed, sat_price, AWARE_UBER, AWARE_BOLT),
-        # we detect groups by shared label prefix (e.g., "Satisfaction:" or "Awareness:").
         if not detected_groups:
             detected_groups = []
         _grouped_vars = {v for g in detected_groups for v in g.get("variables", [])}
@@ -450,12 +464,21 @@ class QuantiProEngine:
             if len(members) < 2:
                 continue  # Need at least 2 variables to form a group
             member_names = [m["name"] for m in members]
-            # Determine type: all binary (2 labels) → awareness/MRS; all same scale → grid
+            # Determine type: all binary (2 labels OR 0/1 data) → awareness/MRS; all same scale → grid
             n_labels = [len(m.get("value_labels") or {}) for m in members]
-            all_binary = all(n == 2 for n in n_labels)
+            all_binary_labels = all(n == 2 for n in n_labels)
+
+            # Check if binary by data values (handles MRS without value_labels like Q_12_1..Q_12_20)
+            all_binary_data = False
+            if all(n <= 2 for n in n_labels):  # No labels or ≤2 labels
+                all_binary_data = all(
+                    m["name"] in df.columns and set(df[m["name"]].dropna().unique().tolist()).issubset({0, 0.0, 1, 1.0})
+                    for m in members
+                )
+
             all_same_scale = len(set(n_labels)) == 1 and n_labels[0] >= 3
 
-            if all_binary:
+            if all_binary_labels or all_binary_data:
                 q_type = "awareness"
             elif all_same_scale:
                 q_type = "scale"
@@ -492,10 +515,16 @@ class QuantiProEngine:
                 continue  # Need at least 3 to be a meaningful group
             member_names = [m["name"] for m in members]
             n_labels = [len(m.get("value_labels") or {}) for m in members]
-            all_binary = all(n == 2 for n in n_labels)
+            all_binary_labels = all(n == 2 for n in n_labels)
+            all_binary_data = False
+            if all(n <= 2 for n in n_labels):
+                all_binary_data = all(
+                    m["name"] in df.columns and set(df[m["name"]].dropna().unique().tolist()).issubset({0, 0.0, 1, 1.0})
+                    for m in members
+                )
             all_same_scale = len(set(n_labels)) == 1 and n_labels[0] >= 3
 
-            if all_binary:
+            if all_binary_labels or all_binary_data:
                 q_type = "awareness"
             elif all_same_scale:
                 q_type = "scale"
