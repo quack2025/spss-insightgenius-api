@@ -971,6 +971,7 @@ async function autoAnalyze() {
 
   const form = new FormData();
   form.append('file', savFile);
+  if (docxFile) form.append('ticket', docxFile);
   form.append('options', JSON.stringify({ output_mode: 'multi_sheet', significance_level: 0.95 }));
 
   try {

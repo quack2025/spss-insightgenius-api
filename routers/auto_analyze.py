@@ -38,19 +38,29 @@ def _run_auto_analyze(file_bytes: bytes, filename: str, options: dict):
     data = QuantiProEngine.load_spss(file_bytes, filename)
     meta = QuantiProEngine.extract_metadata(data)
 
-    # Step 2: Pick banners
-    suggested = meta.get("suggested_banners") or []
-    max_banners = options.get("max_banners", 3)
-    if suggested:
-        banners = [b["variable"] for b in suggested[:max_banners]]
+    # Step 2: Pick banners — ticket overrides auto-detect
+    ticket_banners = options.get("ticket_banners")
+    if ticket_banners:
+        # Validate ticket banners exist in the dataset
+        valid_cols = set(data.df.columns)
+        banners = [b for b in ticket_banners if b in valid_cols]
+        if not banners:
+            logger.warning("[AUTO] Ticket banners %s not found in dataset, falling back to auto-detect", ticket_banners)
     else:
         banners = []
-        for v in meta.get("variables", []):
-            vl = v.get("value_labels")
-            if vl and 2 <= len(vl) <= 8 and v["name"] not in banners:
-                banners.append(v["name"])
-                if len(banners) >= max_banners:
-                    break
+
+    if not banners:
+        suggested = meta.get("suggested_banners") or []
+        max_banners = options.get("max_banners", 3)
+        if suggested:
+            banners = [b["variable"] for b in suggested[:max_banners]]
+        else:
+            for v in meta.get("variables", []):
+                vl = v.get("value_labels")
+                if vl and 2 <= len(vl) <= 8 and v["name"] not in banners:
+                    banners.append(v["name"])
+                    if len(banners) >= max_banners:
+                        break
 
     if not banners:
         raise ValueError("No suitable banner variables found in the dataset")
@@ -80,26 +90,35 @@ def _run_auto_analyze(file_bytes: bytes, filename: str, options: dict):
             grid_groups[name] = {"variables": members, "show": ["t2b", "b2b", "mean"]}
             grouped_vars.update(members)
 
-    # Step 4: Build stubs — only UNGROUPED variables with value labels
-    # Variables in groups are exported via MRS/Grid, not as individual crosstabs
-    stubs = []
-    for v in meta.get("variables") or []:
-        vname = v["name"]
-        vl = v.get("value_labels")
-        if not vl or len(vl) < 2:
-            continue
-        if vname in grouped_vars:
-            continue  # Skip — this variable is in an MRS or Grid group
-        if vname in banner_set:
-            continue  # Skip — this is a banner variable
-        stubs.append(vname)
+    # Step 4: Build stubs — ticket overrides auto-detect
+    ticket_stubs = options.get("ticket_stubs")
+    if ticket_stubs:
+        valid_cols = set(data.df.columns)
+        stubs = [s for s in ticket_stubs if s in valid_cols and s not in banner_set]
+    else:
+        # Only UNGROUPED variables with value labels
+        stubs = []
+        for v in meta.get("variables") or []:
+            vname = v["name"]
+            vl = v.get("value_labels")
+            if not vl or len(vl) < 2:
+                continue
+            if vname in grouped_vars:
+                continue  # Skip — this variable is in an MRS or Grid group
+            if vname in banner_set:
+                continue  # Skip — this is a banner variable
+            stubs.append(vname)
 
     if not stubs and not mrs_groups and not grid_groups:
         stubs = ["_all_"]  # Fallback: export everything if nothing detected
 
-    # Step 5: Auto-nets from preset_nets (only for ungrouped stubs)
-    all_nets = meta.get("preset_nets") or {}
-    nets = {k: v for k, v in all_nets.items() if k in set(stubs)}
+    # Step 5: Nets — ticket overrides auto-detect
+    ticket_nets = options.get("ticket_nets")
+    if ticket_nets and isinstance(ticket_nets, dict):
+        nets = ticket_nets
+    else:
+        all_nets = meta.get("preset_nets") or {}
+        nets = {k: v for k, v in all_nets.items() if k in set(stubs)}
 
     # Step 6: Build spec
     spec = TabulateSpec(
@@ -172,6 +191,7 @@ async def auto_analyze(
     request: Request,
     file: UploadFile = File(None, description="SPSS .sav file (or use file_id)"),
     file_id: str | None = Form(None, description="File session ID from /v1/library/upload"),
+    ticket: UploadFile = File(None, description="Reporting Ticket .docx — AI parses it to override auto-detection"),
     options: str = Form("{}", description='Optional JSON: {"max_banners": 3, "output_mode": "multi_sheet", "significance_level": 0.95}'),
     key: KeyConfig = Depends(require_scope("process")),
     _rl: None = Depends(check_rate_limit),
@@ -184,6 +204,33 @@ async def auto_analyze(
         options_dict = json.loads(options)
     except json.JSONDecodeError:
         options_dict = {}
+
+    # Parse Reporting Ticket if provided — override auto-detection with ticket spec
+    if ticket and ticket.filename and ticket.filename.endswith('.docx'):
+        try:
+            ticket_bytes = await ticket.read()
+            from services.ticket_parser import TicketParser
+            parser = TicketParser()
+            # Get variable list for fuzzy matching
+            data_tmp = await run_in_executor(QuantiProEngine.load_spss, file_bytes, filename)
+            meta_tmp = await run_in_executor(QuantiProEngine.extract_metadata, data_tmp)
+            var_list = [v["name"] for v in (meta_tmp.get("variables") or [])]
+            ticket_spec = await parser.parse(ticket_bytes, var_list)
+            logger.info("[AUTO] Ticket parsed: banners=%s stubs=%s sig=%s",
+                        ticket_spec.get("banners"), ticket_spec.get("stubs"), ticket_spec.get("sig_level"))
+            # Merge ticket spec into options
+            if ticket_spec.get("banners"):
+                options_dict["ticket_banners"] = ticket_spec["banners"]
+            if ticket_spec.get("stubs"):
+                options_dict["ticket_stubs"] = ticket_spec["stubs"]
+            if ticket_spec.get("sig_level"):
+                options_dict["significance_level"] = ticket_spec["sig_level"]
+            if ticket_spec.get("nets"):
+                options_dict["ticket_nets"] = ticket_spec["nets"]
+            if ticket_spec.get("additional_cuts"):
+                options_dict["ticket_additional_cuts"] = ticket_spec["additional_cuts"]
+        except Exception as e:
+            logger.warning("[AUTO] Ticket parsing failed (continuing with auto-detect): %s", e)
 
     try:
         result = await run_in_executor(_run_auto_analyze, file_bytes, filename, options_dict)
