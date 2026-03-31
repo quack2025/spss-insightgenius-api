@@ -449,6 +449,18 @@ function showPrepPanel(fileInfo, meta) {
     ? `T2B/B2B auto-detected for ${prepContext.nets_count} Likert/NPS variables`
     : 'No Likert or NPS scales detected';
 
+  // Open-end warning
+  const openEnds = (meta.variables || []).filter(v => v.type === 'string' && (!v.value_labels || Object.keys(v.value_labels).length < 2));
+  if (openEnds.length > 0) {
+    const names = openEnds.slice(0, 5).map(v => v.name).join(', ');
+    const moreText = openEnds.length > 5 ? `... +${openEnds.length - 5} more` : '';
+    const warningHtml = `<div class="mt-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+      <span class="font-semibold">${openEnds.length} open-ended question${openEnds.length > 1 ? 's' : ''} detected</span>
+      (${names}${moreText}) — text responses, skipped in export.
+    </div>`;
+    document.getElementById('prep-nets-info').insertAdjacentHTML('afterend', warningHtml);
+  }
+
   // Update summary line
   updatePrepSummary();
 }
