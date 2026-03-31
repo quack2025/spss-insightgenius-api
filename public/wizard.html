@@ -87,7 +87,7 @@
       <div class="spinner"></div> <span id="status-1-text">Processing...</span>
     </div>
 
-    <button id="btn-next-1" class="hidden w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-sm" onclick="goStep(2)">
+    <button id="btn-next-1" class="hidden w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-sm" onclick="analyzeAndContinue()">
       Continue to Banners →
     </button>
   </div>
@@ -200,10 +200,27 @@ function handleFile(type, f) {
   label.className = label.className.replace('text-gray-500', 'text-blue-700 font-medium').replace('text-gray-700', 'text-blue-700');
 
   if (type === 'main') {
-    loadSmartSpec();
+    // Show Continue button — don't call AI yet (user may still upload docs)
+    document.getElementById('btn-next-1').classList.remove('hidden');
+    document.getElementById('btn-next-1').textContent = files.ticket || files.quest
+      ? 'Analyze with AI & Continue →'
+      : 'Continue to Banners →';
   } else if (files.main) {
-    loadSmartSpec();
+    // Updated a doc — update button text
+    document.getElementById('btn-next-1').textContent = 'Analyze with AI & Continue →';
   }
+}
+
+async function analyzeAndContinue() {
+  const btn = document.getElementById('btn-next-1');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> AI is analyzing...';
+
+  await loadSmartSpec();
+
+  btn.disabled = false;
+  btn.textContent = 'Continue to Banners →';
+  goStep(2);
 }
 
 async function loadSmartSpec() {

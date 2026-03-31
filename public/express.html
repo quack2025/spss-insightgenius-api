@@ -78,8 +78,13 @@
       </div>
     </div>
 
+    <!-- Analyze button (shown after .sav uploaded) -->
+    <button id="btn-analyze" class="hidden w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-sm" onclick="startAnalysis()">
+      Analyze with AI →
+    </button>
+
     <!-- Status -->
-    <div id="upload-status" class="hidden text-center">
+    <div id="upload-status" class="hidden text-center mt-3">
       <div class="flex items-center justify-center gap-2 text-sm text-blue-600">
         <div class="spinner"></div>
         <span id="upload-status-text">Uploading...</span>
@@ -210,14 +215,12 @@ async function handleMainFile(f) {
   document.getElementById('main-label').textContent = `${f.name} (${(f.size/1024).toFixed(0)} KB)`;
   document.getElementById('main-label').className = 'text-base font-medium text-blue-700';
 
-  // If we have at least one doc, run smart spec
-  if (ticketFile || questFile) {
-    await runSmartSpec();
-  } else {
-    // Just run auto-detect metadata
-    showStatus('Analyzing file structure...');
-    await runSmartSpec();  // Works with just .sav too
-  }
+  // Don't auto-call AI yet — wait for user to optionally add docs
+  // Show a "ready" state
+  hideStatus();
+  showStatus('File loaded. Add ticket/questionnaire below, or click Analyze.');
+  // Show analyze button
+  document.getElementById('btn-analyze').classList.remove('hidden');
 }
 
 function handleTicketFile(f) {
@@ -226,7 +229,6 @@ function handleTicketFile(f) {
   document.getElementById('ticket-icon').textContent = '✅';
   document.getElementById('ticket-label').textContent = f.name;
   document.getElementById('ticket-label').className = 'text-xs text-purple-700 font-medium';
-  if (mainFile) runSmartSpec();
 }
 
 function handleQuestFile(f) {
@@ -235,7 +237,14 @@ function handleQuestFile(f) {
   document.getElementById('quest-icon').textContent = '✅';
   document.getElementById('quest-label').textContent = f.name;
   document.getElementById('quest-label').className = 'text-xs text-green-700 font-medium';
-  if (mainFile) runSmartSpec();
+}
+
+async function startAnalysis() {
+  const btn = document.getElementById('btn-analyze');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="display:inline-block"></div> AI is analyzing...';
+  await runSmartSpec();
+  btn.classList.add('hidden');
 }
 
 // ── Smart Spec ──
