@@ -403,16 +403,19 @@ def build_tabulation(engine_cls: Any, data: Any, spec: TabulateSpec) -> Tabulati
                         crosstab_data=all_banner_results,
                     )
                     # Auto-add T2B/B2B nets for this variable
-                    vl = value_labels.get(gvar, {})
-                    if vl and len(vl) >= 4:
-                        keys = sorted([float(k) for k in vl.keys()])
-                        if gvar not in (spec.nets or {}):
-                            if not hasattr(spec, '_auto_grid_nets'):
-                                spec._auto_grid_nets = {}
-                            spec._auto_grid_nets[gvar] = {
-                                "Top 2 Box": [int(keys[-2]), int(keys[-1])],
-                                "Bottom 2 Box": [int(keys[0]), int(keys[1])],
-                            }
+                    gvar_vl = getattr(meta, "variable_value_labels", {}).get(gvar, {})
+                    if gvar_vl and len(gvar_vl) >= 4:
+                        try:
+                            keys = sorted([float(k) for k in gvar_vl.keys()])
+                            if gvar not in (spec.nets or {}):
+                                if not hasattr(spec, '_auto_grid_nets'):
+                                    spec._auto_grid_nets = {}
+                                spec._auto_grid_nets[gvar] = {
+                                    "Top 2 Box": [int(keys[-2]), int(keys[-1])],
+                                    "Bottom 2 Box": [int(keys[0]), int(keys[1])],
+                                }
+                        except (ValueError, TypeError):
+                            pass
                     result.successful += 1
                 except Exception as e:
                     sheet = SheetResult(variable=gvar, label=label_map.get(gvar, gvar), status="error", error=str(e))
