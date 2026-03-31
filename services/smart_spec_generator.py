@@ -69,6 +69,14 @@ Generate a JSON spec that our tabulation engine can execute directly. Be precise
 - The label suffix after "-" or ":" is the option name
 - Base = respondents who answered at least one option (NOT total sample)
 
+### Label Enrichment (when questionnaire is provided)
+- Compare SPSS variable labels with questionnaire text
+- If an SPSS label is truncated (e.g., "Conc" instead of "Concerns with how well the product works"),
+  provide the full text from the questionnaire in label_overrides
+- Only include overrides where the SPSS label is clearly truncated or incomplete
+- The user can choose whether to apply these overrides or keep original labels
+- Format: {"variable_name": "Full text from questionnaire"}
+
 ### Confidence
 - Rate each decision: "high" (clear from text), "medium" (inferred), "low" (guessing)
 - If confidence is low on a critical decision, add it to questions_for_user
@@ -115,6 +123,11 @@ Generate a JSON spec that our tabulation engine can execute directly. Be precise
   "matched_variables": {
     "S2": {"matched_to": "Q_10", "label": "Which of the following...", "confidence": "high"},
     "S4A": {"matched_to": "Q_12_1..Q_12_20", "label": "Treatments PsO", "confidence": "high"}
+  },
+  "label_overrides": {
+    "Q_37_1": "Concerns with how well the product works",
+    "Q_37_2": "Concerns with safety",
+    "Q_37_3": "Personal discomfort with dosing frequency"
   }
 }
 ```
@@ -188,6 +201,7 @@ class SmartSpecGenerator:
         spec.setdefault("decisions", [])
         spec.setdefault("questions_for_user", [])
         spec.setdefault("matched_variables", {})
+        spec.setdefault("label_overrides", {})
         spec.setdefault("title", "")
 
         n_stubs = len(spec["stubs"])

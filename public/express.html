@@ -133,6 +133,20 @@
       <div id="groups-list" class="space-y-1"></div>
     </div>
 
+    <!-- Label Enrichment -->
+    <div id="label-enrich-section" class="section-card hidden">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-semibold text-gray-800">Label Enrichment</h3>
+          <p id="label-enrich-summary" class="text-xs text-gray-500 mt-1"></p>
+        </div>
+        <label class="flex items-center gap-2 text-xs cursor-pointer">
+          <input type="checkbox" id="opt-enrich-labels" checked class="rounded text-green-600"> Apply
+        </label>
+      </div>
+      <div id="label-enrich-preview" class="mt-2 text-xs text-gray-500 max-h-24 overflow-y-auto"></div>
+    </div>
+
     <!-- Nets -->
     <div class="section-card">
       <div class="flex items-center gap-3">
@@ -357,6 +371,20 @@ function showReview(spec, meta) {
       const icon = d.confidence === 'high' ? '🟢' : d.confidence === 'medium' ? '🟡' : '🔴';
       return `<div>${icon} <span class="text-gray-700">${d.decision}</span> <span class="text-gray-400">— ${d.reason || ''}</span></div>`;
     }).join('');
+  }
+
+  // Label enrichment
+  const overrides = spec.label_overrides || {};
+  const nOverrides = Object.keys(overrides).length;
+  if (nOverrides > 0) {
+    document.getElementById('label-enrich-section').classList.remove('hidden');
+    document.getElementById('label-enrich-summary').textContent =
+      `${nOverrides} truncated labels found in SPSS — full text available from questionnaire`;
+    const preview = Object.entries(overrides).slice(0, 5).map(([k, v]) =>
+      `<div class="py-0.5"><span class="font-mono text-gray-400">${k}:</span> <span class="line-through text-red-400 mr-1">${k.split('_').pop()}</span>→ <span class="text-green-700">${v.substring(0, 60)}${v.length > 60 ? '...' : ''}</span></div>`
+    ).join('');
+    document.getElementById('label-enrich-preview').innerHTML = preview +
+      (nOverrides > 5 ? `<div class="text-gray-400 mt-1">+${nOverrides - 5} more</div>` : '');
   }
 
   // Questions for user
