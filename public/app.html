@@ -486,7 +486,14 @@ async function loadMetadata() {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     metadata = (await resp.json()).data;
     infoText.textContent = `${metadata.file_name} \u2014 ${metadata.n_cases.toLocaleString()} cases \u00d7 ${metadata.n_variables} variables`;
+    // Reset ALL state from previous file
     selectedBanners = []; mrsGroups = {}; gridGroups = {}; customGroups = [];
+    resultBlob = null; resultFilename = '';
+    smartSpec = null;
+    autoResultBlob = null; autoResultFilename = '';
+    document.getElementById('ticket-confirm').classList.add('hidden');
+    document.getElementById('auto-result')?.classList.add('hidden');
+    document.getElementById('result-section')?.classList.add('hidden');
     populateUI();
     document.getElementById('auto-analyze-bar').classList.remove('hidden');
     ['banners-section','stubs-section','options-section','custom-groups-section','generate-section'].forEach(id => document.getElementById(id).classList.remove('hidden'));
