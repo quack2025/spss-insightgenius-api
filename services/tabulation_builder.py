@@ -309,6 +309,11 @@ def build_tabulation(engine_cls: Any, data: Any, spec: TabulateSpec) -> Tabulati
 
     # ── Run crosstabs for each stub × each banner ──
     for stub in stubs:
+        # Skip string/text variables (open-ends) — not tabulable
+        if stub in df.columns and (df[stub].dtype == object or df[stub].dtype.kind in ('U', 'S', 'O')):
+            result.sheets.append(SheetResult(variable=stub, label=col_labels.get(stub, stub), status="error", error="Text/open-end variable — not tabulable"))
+            result.failed += 1
+            continue
         try:
             # Run crosstab against FIRST banner (primary), store all banner results
             all_banner_results = {}
@@ -379,10 +384,17 @@ def build_tabulation(engine_cls: Any, data: Any, spec: TabulateSpec) -> Tabulati
             for gvar in gvars:
                 if gvar not in df.columns:
                     continue
+                # Skip string/text variables (open-ends) — not tabulable
+                if df[gvar].dtype == object or df[gvar].dtype.kind in ('U', 'S', 'O'):
+                    continue
                 try:
                     all_banner_results = {}
                     for banner_var in banners:
-                        ct = _crosstab_one(engine_cls, data, gvar, banner_var, spec.weight, spec.significance_level)
+                        ct = engine_cls.crosstab_with_significance(
+                            data, row=gvar, col=banner_var,
+                            weight=spec.weight,
+                            significance_level=spec.significance_level,
+                        )
                         all_banner_results[banner_var] = ct
                     # Use stripped label for the variable
                     var_label = label_map.get(gvar, col_labels.get(gvar, gvar))
