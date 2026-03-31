@@ -19,6 +19,8 @@ import pyreadstat
 from scipy import stats
 from statsmodels.stats.proportion import proportions_ztest
 
+from shared.significance import z_test_proportions
+
 logger = logging.getLogger(__name__)
 
 # QuantipyMRX — graceful fallback
@@ -804,34 +806,30 @@ class QuantiProEngine:
                     pct = round((wc / ct * 100) if ct > 0 else 0, 1)
 
                     sig_letters = []
+                    n_cols = len(col_values)
                     for j, ocv in enumerate(col_values):
                         if i == j:
                             continue
                         owc = float(weighted_ct.loc[row_val, ocv]) if ocv in weighted_ct.columns else 0
                         oct = float(w_col_totals[ocv])
-                        try:
-                            n_eff_i = col_eff_n[cv]
-                            n_eff_j = col_eff_n[ocv]
-                            p_i = wc / ct if ct > 0 else 0
-                            p_j = owc / oct if oct > 0 else 0
-                            p_pool = (wc + owc) / (ct + oct) if (ct + oct) > 0 else 0
-                            se = np.sqrt(p_pool * (1 - p_pool) * (1 / n_eff_i + 1 / n_eff_j)) if n_eff_i > 0 and n_eff_j > 0 else 0
-                            if se > 0:
-                                z_stat = (p_i - p_j) / se
-                                p_val = float(2 * stats.norm.sf(abs(z_stat)))
-                            else:
-                                p_val = 1.0
-                            if p_val < alpha and p_i > p_j:
-                                sig_letters.append(letters[j])
-                                significant_pairs.append({
-                                    "row_value": _sanitize_value(row_val),
-                                    "col1": str(cv), "col1_letter": letters[i],
-                                    "col2": str(ocv), "col2_letter": letters[j],
-                                    "p_value": round(p_val, 4),
-                                    "higher_column": letters[i],
-                                })
-                        except Exception:
-                            pass
+                        n_eff_i = col_eff_n.get(cv, 0)
+                        n_eff_j = col_eff_n.get(ocv, 0)
+                        p_i = wc / ct if ct > 0 else 0
+                        p_j = owc / oct if oct > 0 else 0
+                        p_val, is_sig = z_test_proportions(
+                            p_i, n_eff_i, p_j, n_eff_j, alpha, n_cols,
+                            variable=f"{row}x{col}[{_sanitize_value(row_val)}]",
+                            col_a=letters[i], col_b=letters[j],
+                        )
+                        if is_sig:
+                            sig_letters.append(letters[j])
+                            significant_pairs.append({
+                                "row_value": _sanitize_value(row_val),
+                                "col1": str(cv), "col1_letter": letters[i],
+                                "col2": str(ocv), "col2_letter": letters[j],
+                                "p_value": round(p_val, 4),
+                                "higher_column": letters[i],
+                            })
 
                     row_data[str(cv)] = {
                         "count": round(float(wc), 1),
@@ -877,30 +875,28 @@ class QuantiProEngine:
                 pct = round((count / col_total * 100) if col_total > 0 else 0, 1)
 
                 sig_letters = []
+                n_cols = len(col_values)
                 for j, ocv in enumerate(col_values):
                     if i == j:
                         continue
                     other_count = int(crosstab.loc[row_val, ocv])
                     other_total = int(col_totals[ocv])
-                    try:
-                        z_stat, p_val = proportions_ztest(
-                            [count, other_count],
-                            [col_total, other_total],
-                            alternative="two-sided",
-                        )
-                        this_pct = count / col_total if col_total > 0 else 0
-                        other_pct = other_count / other_total if other_total > 0 else 0
-                        if p_val < alpha and this_pct > other_pct:
-                            sig_letters.append(letters[j])
-                            significant_pairs.append({
-                                "row_value": _sanitize_value(row_val),
-                                "col1": str(cv), "col1_letter": letters[i],
-                                "col2": str(ocv), "col2_letter": letters[j],
-                                "p_value": round(float(p_val), 4),
-                                "higher_column": letters[i],
-                            })
-                    except Exception:
-                        pass
+                    this_pct = count / col_total if col_total > 0 else 0
+                    other_pct = other_count / other_total if other_total > 0 else 0
+                    p_val, is_sig = z_test_proportions(
+                        this_pct, col_total, other_pct, other_total, alpha, n_cols,
+                        variable=f"{row}x{col}[{_sanitize_value(row_val)}]",
+                        col_a=letters[i], col_b=letters[j],
+                    )
+                    if is_sig:
+                        sig_letters.append(letters[j])
+                        significant_pairs.append({
+                            "row_value": _sanitize_value(row_val),
+                            "col1": str(cv), "col1_letter": letters[i],
+                            "col2": str(ocv), "col2_letter": letters[j],
+                            "p_value": round(float(p_val), 4),
+                            "higher_column": letters[i],
+                        })
 
                 row_data[str(cv)] = {
                     "count": count,

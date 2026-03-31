@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from auth import init_key_registry
 from config import get_settings
+from middleware.idempotency import IdempotencyMiddleware
 from middleware.response_headers import ResponseHeadersMiddleware
 from middleware.usage_logger import UsageLoggerMiddleware
 
@@ -83,6 +84,7 @@ def create_application() -> FastAPI:
     # Middleware stack (outermost first):
     # 1. Usage logger — logs every authenticated request for billing
     # 2. CORS — allow cross-origin requests
+    app.add_middleware(IdempotencyMiddleware)
     app.add_middleware(ResponseHeadersMiddleware)
     app.add_middleware(UsageLoggerMiddleware)
     app.add_middleware(
@@ -94,60 +96,33 @@ def create_application() -> FastAPI:
                         "X-RateLimit-Remaining", "X-RateLimit-Reset"],
     )
 
-    # Timeout handler — from run_in_executor
+    # Standardized error handlers using shared.response.error_response
+    from shared.response import error_response
+
     @app.exception_handler(asyncio.TimeoutError)
     async def timeout_handler(request: Request, exc: asyncio.TimeoutError):
-        request_id = getattr(request.state, "request_id", "")
-        logger.warning("Processing timeout [%s]", request_id)
-        return JSONResponse(
-            status_code=504,
-            content={
-                "success": False,
-                "error": {
-                    "code": "PROCESSING_TIMEOUT",
-                    "message": f"Processing exceeded {settings.processing_timeout_seconds}s limit. Try a smaller file or fewer stubs.",
-                },
-                "request_id": request_id,
-            },
-        )
+        logger.warning("Processing timeout [%s]", getattr(request.state, "request_id", ""))
+        return JSONResponse(status_code=504, content=error_response(
+            "PROCESSING_TIMEOUT",
+            f"Processing exceeded {settings.processing_timeout_seconds}s limit. Try a smaller file or fewer stubs.",
+        ))
 
-    # Concurrency overload handler — from run_in_executor
     @app.exception_handler(RuntimeError)
     async def runtime_error_handler(request: Request, exc: RuntimeError):
-        request_id = getattr(request.state, "request_id", "")
         if "too many files" in str(exc).lower():
-            logger.warning("Concurrency limit hit [%s]: %s", request_id, exc)
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "success": False,
-                    "error": {
-                        "code": "SERVER_BUSY",
-                        "message": str(exc),
-                    },
-                    "request_id": request_id,
-                },
-                headers={"Retry-After": "5"},
-            )
-        # Not a concurrency error — fall through to global handler
+            logger.warning("Concurrency limit [%s]: %s", getattr(request.state, "request_id", ""), exc)
+            return JSONResponse(status_code=503, content=error_response(
+                "SERVER_BUSY", str(exc),
+            ), headers={"Retry-After": "5"})
         return await global_exception_handler(request, exc)
 
-    # Global exception handler
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
-        request_id = getattr(request.state, "request_id", "")
-        logger.error("Unhandled exception [%s]: %s", request_id, exc, exc_info=True)
-        return JSONResponse(
-            status_code=500,
-            content={
-                "success": False,
-                "error": {
-                    "code": "PROCESSING_FAILED",
-                    "message": "Internal server error" if settings.is_production else str(exc),
-                },
-                "request_id": request_id,
-            },
-        )
+        logger.error("Unhandled exception [%s]: %s", getattr(request.state, "request_id", ""), exc, exc_info=True)
+        return JSONResponse(status_code=500, content=error_response(
+            "PROCESSING_FAILED",
+            "Internal server error" if settings.is_production else str(exc),
+        ))
 
     # OAuth 2.0 discovery endpoints (RFC 9728)
     @app.get("/.well-known/oauth-protected-resource", include_in_schema=False)

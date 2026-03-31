@@ -26,6 +26,8 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from scipy import stats
 
+from shared.significance import t_test_means, z_test_proportions
+
 logger = logging.getLogger(__name__)
 
 # Excel sheet names cannot contain: \ / * ? : [ ]
@@ -492,6 +494,7 @@ def _mrs_crosstab(
 
             # Sig testing vs other columns
             sig_letters = []
+            n_cols = len(col_values)
             for j, ocv in enumerate(col_values):
                 if i == j:
                     continue
@@ -502,18 +505,15 @@ def _mrs_crosstab(
                     o_count = float((o_selected * w.loc[o_subset.index]).sum())
                 else:
                     o_count = int(o_selected.sum())
-                try:
-                    p1 = count / base if base > 0 else 0
-                    p2 = o_count / o_base if o_base > 0 else 0
-                    p_pool = (count + o_count) / (base + o_base) if (base + o_base) > 0 else 0
-                    se = np.sqrt(p_pool * (1 - p_pool) * (1 / max(base, 1) + 1 / max(o_base, 1)))
-                    if se > 0:
-                        z = (p1 - p2) / se
-                        p_val = 2 * stats.norm.sf(abs(z))
-                        if p_val < alpha and p1 > p2:
-                            sig_letters.append(letters[j])
-                except Exception:
-                    pass
+                from shared.significance import z_test_proportions
+                p1 = count / base if base > 0 else 0
+                p2 = o_count / o_base if o_base > 0 else 0
+                _, is_sig = z_test_proportions(
+                    p1, base, p2, o_base, alpha, n_cols,
+                    variable=member, col_a=letters[i], col_b=letters[j],
+                )
+                if is_sig:
+                    sig_letters.append(letters[j])
 
             row_data[str(cv)] = {
                 "count": count, "percentage": pct,
@@ -652,26 +652,31 @@ def _add_mean_sig_to_grid_row(row, df, series, banner_columns, w, alpha):
     for bc in banner_columns:
         groups.setdefault(bc.banner_index, []).append(bc)
 
+    var_name = getattr(series, "name", "")
+
     for bcs in groups.values():
+        n_cols = len(bcs)
         for i, bc_i in enumerate(bcs):
             for j, bc_j in enumerate(bcs):
                 if i == j:
                     continue
-                try:
-                    bval_i = float(bc_i.value) if bc_i.value.replace('.','',1).replace('-','',1).isdigit() else bc_i.value
-                    bval_j = float(bc_j.value) if bc_j.value.replace('.','',1).replace('-','',1).isdigit() else bc_j.value
-                    mask_i = df[bc_i.banner_var] == bval_i
-                    mask_j = df[bc_j.banner_var] == bval_j
-                    vals_i = series[mask_i & series.notna()]
-                    vals_j = series[mask_j & series.notna()]
-                    if len(vals_i) < 2 or len(vals_j) < 2:
-                        continue
-                    t_stat, p_val = stats.ttest_ind(vals_i, vals_j, equal_var=False)
-                    if p_val < alpha and vals_i.mean() > vals_j.mean():
-                        if bc_i.letter in row["columns"]:
-                            row["columns"][bc_i.letter]["sig_letters"].append(bc_j.letter)
-                except Exception:
-                    pass
+                bval_i = float(bc_i.value) if bc_i.value.replace('.','',1).replace('-','',1).isdigit() else bc_i.value
+                bval_j = float(bc_j.value) if bc_j.value.replace('.','',1).replace('-','',1).isdigit() else bc_j.value
+                mask_i = df[bc_i.banner_var] == bval_i
+                mask_j = df[bc_j.banner_var] == bval_j
+                vals_i = series[mask_i & series.notna()]
+                vals_j = series[mask_j & series.notna()]
+                if len(vals_i) < 2 or len(vals_j) < 2:
+                    continue
+                _, is_sig = t_test_means(
+                    float(vals_i.mean()), float(vals_i.std()), len(vals_i),
+                    float(vals_j.mean()), float(vals_j.std()), len(vals_j),
+                    alpha, n_cols,
+                    variable=str(var_name), col_a=bc_i.letter, col_b=bc_j.letter,
+                )
+                if is_sig:
+                    if bc_i.letter in row["columns"]:
+                        row["columns"][bc_i.letter]["sig_letters"].append(bc_j.letter)
 
 
 def _add_prop_sig_to_grid_row(row, df, series, target_vals, banner_columns, w, alpha):
@@ -680,32 +685,34 @@ def _add_prop_sig_to_grid_row(row, df, series, target_vals, banner_columns, w, a
     for bc in banner_columns:
         groups.setdefault(bc.banner_index, []).append(bc)
 
+    var_name = getattr(series, "name", "")
+
     for bcs in groups.values():
+        n_cols = len(bcs)
         for i, bc_i in enumerate(bcs):
             for j, bc_j in enumerate(bcs):
                 if i == j:
                     continue
-                try:
-                    bval_i = float(bc_i.value) if bc_i.value.replace('.','',1).replace('-','',1).isdigit() else bc_i.value
-                    bval_j = float(bc_j.value) if bc_j.value.replace('.','',1).replace('-','',1).isdigit() else bc_j.value
-                    mask_i = df[bc_i.banner_var] == bval_i
-                    mask_j = df[bc_j.banner_var] == bval_j
-                    sub_i = series[mask_i & series.notna()]
-                    sub_j = series[mask_j & series.notna()]
-                    n_i, n_j = len(sub_i), len(sub_j)
-                    if n_i < 2 or n_j < 2:
-                        continue
-                    c_i = int(sub_i.isin(target_vals).sum())
-                    c_j = int(sub_j.isin(target_vals).sum())
-                    from statsmodels.stats.proportion import proportions_ztest
-                    z_stat, p_val = proportions_ztest([c_i, c_j], [n_i, n_j], alternative="two-sided")
-                    p_i = c_i / n_i
-                    p_j = c_j / n_j
-                    if p_val < alpha and p_i > p_j:
-                        if bc_i.letter in row["columns"]:
-                            row["columns"][bc_i.letter]["sig_letters"].append(bc_j.letter)
-                except Exception:
-                    pass
+                bval_i = float(bc_i.value) if bc_i.value.replace('.','',1).replace('-','',1).isdigit() else bc_i.value
+                bval_j = float(bc_j.value) if bc_j.value.replace('.','',1).replace('-','',1).isdigit() else bc_j.value
+                mask_i = df[bc_i.banner_var] == bval_i
+                mask_j = df[bc_j.banner_var] == bval_j
+                sub_i = series[mask_i & series.notna()]
+                sub_j = series[mask_j & series.notna()]
+                n_i, n_j = len(sub_i), len(sub_j)
+                if n_i < 2 or n_j < 2:
+                    continue
+                c_i = int(sub_i.isin(target_vals).sum())
+                c_j = int(sub_j.isin(target_vals).sum())
+                p_i = c_i / n_i
+                p_j = c_j / n_j
+                _, is_sig = z_test_proportions(
+                    p_i, n_i, p_j, n_j, alpha, n_cols,
+                    variable=str(var_name), col_a=bc_i.letter, col_b=bc_j.letter,
+                )
+                if is_sig:
+                    if bc_i.letter in row["columns"]:
+                        row["columns"][bc_i.letter]["sig_letters"].append(bc_j.letter)
 
 
 def _compute_means_by_column(
@@ -738,6 +745,7 @@ def _compute_means_by_column(
             col_stats[str(cv)] = {"mean": float(vals.mean()), "std": float(vals.std()), "n": len(vals), "letter": letters[i], "values": vals}
 
     # T-test between each pair
+    n_cols = len(col_values)
     for cv_str, st in col_stats.items():
         if st["mean"] is None:
             results[cv_str] = {"mean": None, "std": None, "n": st["n"], "sig_letters": []}
@@ -746,12 +754,14 @@ def _compute_means_by_column(
         for ocv_str, ost in col_stats.items():
             if cv_str == ocv_str or ost["mean"] is None:
                 continue
-            try:
-                t_stat, p_val = stats.ttest_ind(st["values"], ost["values"], equal_var=False)
-                if p_val < alpha and st["mean"] > ost["mean"]:
-                    sig_letters.append(ost["letter"])
-            except Exception:
-                pass
+            _, is_sig = t_test_means(
+                st["mean"], st["std"], st["n"],
+                ost["mean"], ost["std"], ost["n"],
+                alpha, n_cols,
+                variable=stub, col_a=st["letter"], col_b=ost["letter"],
+            )
+            if is_sig:
+                sig_letters.append(ost["letter"])
         results[cv_str] = {
             "mean": round(st["mean"], 2),
             "std": round(st["std"], 2),

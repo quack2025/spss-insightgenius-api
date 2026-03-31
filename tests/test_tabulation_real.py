@@ -14,14 +14,21 @@ import pytest
 from pathlib import Path
 from openpyxl import load_workbook
 
-# Skip if test data not available
-DATA_DIR = Path(r"C:\Users\jorge\OneDrive\Desktop\talk2data\Example 3 - LA Formulations Patient")
-SAV_FILE = DATA_DIR / "Raw datat.sav"
-GOLDEN_FILE = DATA_DIR / "Data Tables 3.xlsx"
+# Test fixtures — bundled in repo (no skip, always run)
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
+SAV_FILE = FIXTURES_DIR / "example3_raw.sav"
+GOLDEN_FILE = FIXTURES_DIR / "example3_golden.xlsx"
+
+# Fallback to OneDrive path for developer convenience
+if not SAV_FILE.exists():
+    _ALT_DIR = Path(r"C:\Users\jorge\OneDrive\Desktop\talk2data\Example 3 - LA Formulations Patient")
+    if (_ALT_DIR / "Raw datat.sav").exists():
+        SAV_FILE = _ALT_DIR / "Raw datat.sav"
+        GOLDEN_FILE = _ALT_DIR / "Data Tables 3.xlsx"
 
 pytestmark = pytest.mark.skipif(
-    not SAV_FILE.exists() or not GOLDEN_FILE.exists(),
-    reason="Test data files not available"
+    not SAV_FILE.exists(),
+    reason="Test fixtures not found (run from repo root or add tests/fixtures/)"
 )
 
 
