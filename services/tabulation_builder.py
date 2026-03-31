@@ -526,6 +526,8 @@ def _mrs_crosstab(
         "row_variable": "MRS",
         "col_variable": col,
         "total_responses": len(valid),
+        "is_mrs": True,
+        "col_bases": {str(cv): int(col_bases[cv]) for cv in col_values},
         "table": table,
         "col_labels": col_letter_map,
         "col_value_labels": {str(v): col_vl.get(v, str(v)) for v in col_values},
@@ -965,10 +967,15 @@ def _write_crosstab_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, dat
     for i, bc in enumerate(banner_columns):
         ct = all_ct.get(bc.banner_var, {})
         table = ct.get("table", [])
-        w_total = sum(
-            row_data.get(bc.value, {}).get("count", 0)
-            for row_data in table if isinstance(row_data.get(bc.value), dict)
-        )
+        # MRS: use pre-computed col_bases (respondents, not responses)
+        if ct.get("is_mrs") and ct.get("col_bases"):
+            w_total = ct["col_bases"].get(bc.value, 0)
+        else:
+            # Regular crosstab: sum counts across rows (each respondent in exactly one row)
+            w_total = sum(
+                row_data.get(bc.value, {}).get("count", 0)
+                for row_data in table if isinstance(row_data.get(bc.value), dict)
+            )
         col_bases[i] = w_total
 
         if has_dual_base:
