@@ -1422,10 +1422,14 @@ def _write_single_sheet(ws, result: TabulationResult, spec: TabulateSpec, data: 
         ws.cell(row=current_row, column=1, value=base_label).font = BASE_FONT
         for i, bc in enumerate(banner_columns):
             ct = all_ct.get(bc.banner_var, {})
-            base = sum(
-                rd.get(bc.value, {}).get("count", 0)
-                for rd in ct.get("table", []) if isinstance(rd.get(bc.value), dict)
-            )
+            # MRS: use pre-computed col_bases (respondents, not responses)
+            if ct.get("is_mrs") and ct.get("col_bases"):
+                base = ct["col_bases"].get(bc.value, 0)
+            else:
+                base = sum(
+                    rd.get(bc.value, {}).get("count", 0)
+                    for rd in ct.get("table", []) if isinstance(rd.get(bc.value), dict)
+                )
             cell = ws.cell(row=current_row, column=2 + i, value=int(round(base)))
             cell.font = BASE_FONT
             cell.alignment = CENTER
