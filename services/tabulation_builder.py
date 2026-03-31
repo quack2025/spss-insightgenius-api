@@ -124,6 +124,8 @@ class TabulateSpec:
     include_summary: bool = False  # AI executive summary as first sheet (Story #4)
     study_context: dict[str, Any] | None = None  # Optional context for summary
     filters: list[dict[str, Any]] | None = None  # Sub-population filters (Story #2)
+    stub_filters: dict[str, dict[str, Any]] | None = None  # Per-stub conditional filters
+    nested_banners: list[dict[str, Any]] | None = None  # Nested/cross-product banners
     title: str = ""
 
     @property
@@ -151,6 +153,9 @@ class BannerColumn:
     value_label: str  # The display label (e.g., "Male")
     letter: str  # The assigned letter (A, B, C, ...)
     banner_index: int  # Which banner group this belongs to
+    is_nested: bool = False  # True if this column is part of a nested (cross-product) banner
+    parent_value: str = ""  # Parent value for nested banners (e.g., "1.0")
+    parent_label: str = ""  # Parent display label (e.g., "PsO")
 
 
 @dataclass
@@ -187,6 +192,7 @@ class TabulationResult:
     excel_bytes: bytes = b""
     banner_columns: list[BannerColumn] = field(default_factory=list)
     executive_summary: str = ""  # AI-generated summary (Story #4)
+    nested_banner_info: list[dict[str, Any]] = field(default_factory=list)  # For Excel header rendering
 
 
 def build_tabulation(engine_cls: Any, data: Any, spec: TabulateSpec) -> TabulationResult:
@@ -278,6 +284,89 @@ def build_tabulation(engine_cls: Any, data: Any, spec: TabulateSpec) -> Tabulati
             cnl = getattr(meta, "column_names_to_labels", {})
             cnl[custom_col_name] = "Custom Groups"
 
+    # ── Nested (cross-product) banners ──
+    # Format: [{"parent_var": "Q_27", "child_var": "Q_10"}]
+    # Creates cartesian product columns added after flat banners.
+    nested_banner_info: list[dict[str, Any]] = []  # for Excel header rendering
+
+    if spec.nested_banners:
+        for nb in spec.nested_banners:
+            parent_var = nb.get("parent_var", "")
+            child_var = nb.get("child_var", "")
+            if parent_var not in df.columns or child_var not in df.columns:
+                logger.warning("Nested banner skipped: %s or %s not in dataset", parent_var, child_var)
+                continue
+
+            combined_col = f"_nb_{parent_var}\u00d7{child_var}"
+            df[combined_col] = (
+                df[parent_var].astype(str) + "|" + df[child_var].astype(str)
+            )
+
+            # Get value labels for parent and child
+            parent_vl = getattr(meta, "variable_value_labels", {}).get(parent_var, {})
+            child_vl = getattr(meta, "variable_value_labels", {}).get(child_var, {})
+
+            # Get sorted unique parent and child values (excluding NaN)
+            parent_vals = sorted(
+                df[parent_var].dropna().unique(), key=lambda x: str(x),
+            )
+            child_vals = sorted(
+                df[child_var].dropna().unique(), key=lambda x: str(x),
+            )
+
+            # Build combined value labels and parent_groups for Excel headers
+            combined_vl = {}
+            parent_groups = []
+            nb_b_idx = len(banners)  # banner index for this nested group
+
+            for pv in parent_vals:
+                p_label = parent_vl.get(pv, str(pv)) if parent_vl else str(pv)
+                children_info = []
+                for cv in child_vals:
+                    combined_key = f"{pv}|{cv}"
+                    c_label = child_vl.get(cv, str(cv)) if child_vl else str(cv)
+                    combined_vl[combined_key] = c_label
+
+                    banner_columns.append(BannerColumn(
+                        banner_var=combined_col,
+                        banner_label=f"{col_labels.get(parent_var, parent_var)} \u00d7 {col_labels.get(child_var, child_var)}",
+                        value=combined_key,
+                        value_label=c_label,
+                        letter=all_letters[letter_idx],
+                        banner_index=nb_b_idx,
+                        is_nested=True,
+                        parent_value=str(pv),
+                        parent_label=p_label,
+                    ))
+                    children_info.append({
+                        "value": combined_key,
+                        "label": c_label,
+                        "letter": all_letters[letter_idx],
+                    })
+                    letter_idx += 1
+
+                parent_groups.append({
+                    "value": str(pv),
+                    "label": p_label,
+                    "children": children_info,
+                })
+
+            # Patch meta so crosstab engine can find value labels
+            vvl = getattr(meta, "variable_value_labels", {})
+            vvl[combined_col] = combined_vl
+            cnl = getattr(meta, "column_names_to_labels", {})
+            cnl[combined_col] = f"{col_labels.get(parent_var, parent_var)} \u00d7 {col_labels.get(child_var, child_var)}"
+
+            banners = list(banners) + [combined_col]
+
+            nested_banner_info.append({
+                "combined_col": combined_col,
+                "parent_var": parent_var,
+                "child_var": child_var,
+                "parent_groups": parent_groups,
+                "banner_index": nb_b_idx,
+            })
+
     # ── Resolve stubs ──
     if spec.stubs == ["_all_"] or not spec.stubs:
         value_labels = getattr(meta, "variable_value_labels", {})
@@ -307,7 +396,39 @@ def build_tabulation(engine_cls: Any, data: Any, spec: TabulateSpec) -> Tabulati
         successful=0,
         failed=0,
         banner_columns=banner_columns,
+        nested_banner_info=nested_banner_info,
     )
+
+    # ── Helper: apply stub filter to create filtered data copy ──
+    stub_filters = getattr(spec, "stub_filters", None) or {}
+
+    def _apply_stub_filter(data_orig, stub_name):
+        """Apply per-stub filter if configured. Returns (filtered_data, filter_applied)."""
+        filt = stub_filters.get(stub_name)
+        if not filt:
+            return data_orig, False
+        filt_var = filt.get("variable", "")
+        filt_op = filt.get("operator", "eq")
+        filt_val = filt.get("value")
+        filt_vals = filt.get("values", [])
+        if not filt_var or filt_var not in data_orig.df.columns:
+            return data_orig, False
+        mask = None
+        if filt_op == "eq":
+            mask = data_orig.df[filt_var] == filt_val
+        elif filt_op == "ne":
+            mask = data_orig.df[filt_var] != filt_val
+        elif filt_op == "in":
+            mask = data_orig.df[filt_var].isin(filt_vals or [filt_val])
+        elif filt_op == "gt":
+            mask = data_orig.df[filt_var] > filt_val
+        elif filt_op == "lt":
+            mask = data_orig.df[filt_var] < filt_val
+        if mask is None:
+            return data_orig, False
+        filtered_df = data_orig.df.loc[mask].copy()
+        from services.quantipy_engine import SPSSData
+        return SPSSData(df=filtered_df, meta=data_orig.meta, mrx_dataset=None, file_name=data_orig.file_name), True
 
     # ── Run crosstabs for each stub × each banner ──
     for stub in stubs:
@@ -316,12 +437,14 @@ def build_tabulation(engine_cls: Any, data: Any, spec: TabulateSpec) -> Tabulati
             result.sheets.append(SheetResult(variable=stub, label=col_labels.get(stub, stub), status="error", error="Text/open-end variable — not tabulable"))
             result.failed += 1
             continue
+        # Apply per-stub filter if configured
+        stub_data, filtered = _apply_stub_filter(data, stub)
         try:
             # Run crosstab against FIRST banner (primary), store all banner results
             all_banner_results = {}
             for banner_var in banners:
                 ct = QuantiProEngine.crosstab_with_significance(
-                    data, row=stub, col=banner_var,
+                    stub_data, row=stub, col=banner_var,
                     weight=spec.weight,
                     significance_level=spec.significance_level,
                 )
@@ -811,9 +934,9 @@ def _build_excel(result: TabulationResult, spec: TabulateSpec, data: Any) -> byt
                 sheet_name = sheet_name[:28] + "_" + str(existing.count(sheet_name))
             ws = wb.create_sheet(title=sheet_name)
             if sheet_result.is_grid and sheet_result.grid_data:
-                _write_grid_sheet(ws, sheet_result, spec, result.banner_columns)
+                _write_grid_sheet(ws, sheet_result, spec, result.banner_columns, result.nested_banner_info)
             elif sheet_result.crosstab_data:
-                _write_crosstab_sheet(ws, sheet_result, spec, data, result.banner_columns)
+                _write_crosstab_sheet(ws, sheet_result, spec, data, result.banner_columns, result.nested_banner_info)
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -891,7 +1014,7 @@ def _write_summary_sheet(ws, result: TabulationResult, spec: TabulateSpec, data:
         ws.column_dimensions[col_letter].width = [18, 25, 12, 45, 12, 20]["ABCDEF".index(col_letter)]
 
 
-def _write_crosstab_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, data: Any, banner_columns: list[BannerColumn]):
+def _write_crosstab_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, data: Any, banner_columns: list[BannerColumn], nested_banner_info: list[dict[str, Any]] | None = None):
     """Write one crosstab table with multiple banners side-by-side."""
     all_ct = sheet_result.crosstab_data  # dict[banner_var -> crosstab_result]
     if not all_ct:
@@ -928,12 +1051,36 @@ def _write_crosstab_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, dat
 
     ws.cell(row=2, column=1, value=sig_note).font = Font(italic=True, size=9, color="6B7280")
 
+    # Build lookup for nested banner info by banner_index
+    nested_by_idx = {}
+    for nb in (nested_banner_info or []):
+        nested_by_idx[nb["banner_index"]] = nb
+
+    has_nested = bool(nested_by_idx)
+    show_group_row = len(banners) > 1 or has_nested
+
     # Row 3: Banner group headers (merged cells per banner)
-    if len(banners) > 1:
+    if show_group_row:
         col_idx = 2
         for b_idx, banner_var in enumerate(banners):
             group_cols = [bc for bc in banner_columns if bc.banner_index == b_idx]
-            if group_cols:
+            if not group_cols:
+                continue
+
+            nb = nested_by_idx.get(b_idx)
+            if nb:
+                # Nested banner: parent values as spanning headers
+                for pg in nb["parent_groups"]:
+                    n_children = len(pg["children"])
+                    cell = ws.cell(row=3, column=col_idx, value=pg["label"])
+                    cell.font = Font(bold=True, size=10, color="FFFFFF")
+                    cell.fill = BANNER_GROUP_FILL
+                    cell.alignment = CENTER
+                    if n_children > 1:
+                        ws.merge_cells(start_row=3, start_column=col_idx, end_row=3, end_column=col_idx + n_children - 1)
+                    col_idx += n_children
+            else:
+                # Flat banner: banner group name spanning
                 cell = ws.cell(row=3, column=col_idx, value=group_cols[0].banner_label)
                 cell.font = Font(bold=True, size=10, color="FFFFFF")
                 cell.fill = BANNER_GROUP_FILL
@@ -1182,13 +1329,13 @@ def _write_crosstab_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, dat
     ws.freeze_panes = f"B{data_start}"
 
 
-def _write_grid_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, banner_columns: list[BannerColumn]):
+def _write_grid_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, banner_columns: list[BannerColumn], nested_banner_info: list[dict[str, Any]] | None = None):
     """Write a grid/battery summary sheet — compact view of multiple variables.
 
     Layout:
     Row 1: Title
     Row 2: Sig note
-    Row 3: Banner group headers (if multi-banner)
+    Row 3: Banner group headers (if multi-banner or nested)
     Row 4: Column value labels
     Row 5: Column letters
     Row 6+: One row per variable per metric, grouped by metric
@@ -1227,13 +1374,31 @@ def _write_grid_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, banner_
     ws.cell(row=2, column=1, value=sig_note).font = Font(italic=True, size=9, color="6B7280")
 
     # Row 3: Banner group headers
+    nested_by_idx = {}
+    for nb in (nested_banner_info or []):
+        nested_by_idx[nb["banner_index"]] = nb
+    has_nested = bool(nested_by_idx)
     has_multi = len(banners) > 1
-    offset = 1 if has_multi else 0
-    if has_multi:
+    show_group_row = has_multi or has_nested
+    offset = 1 if show_group_row else 0
+    if show_group_row:
         col_idx = 2
         for b_idx, bvar in enumerate(banners):
             group_cols = [bc for bc in banner_columns if bc.banner_index == b_idx]
-            if group_cols:
+            if not group_cols:
+                continue
+            nb = nested_by_idx.get(b_idx)
+            if nb:
+                for pg in nb["parent_groups"]:
+                    n_children = len(pg["children"])
+                    cell = ws.cell(row=3, column=col_idx, value=pg["label"])
+                    cell.font = Font(bold=True, size=10, color="FFFFFF")
+                    cell.fill = BANNER_GROUP_FILL
+                    cell.alignment = CENTER
+                    if n_children > 1:
+                        ws.merge_cells(start_row=3, start_column=col_idx, end_row=3, end_column=col_idx + n_children - 1)
+                    col_idx += n_children
+            else:
                 cell = ws.cell(row=3, column=col_idx, value=group_cols[0].banner_label)
                 cell.font = Font(bold=True, size=10, color="FFFFFF")
                 cell.fill = BANNER_GROUP_FILL
@@ -1361,13 +1526,31 @@ def _write_single_sheet(ws, result: TabulationResult, spec: TabulateSpec, data: 
     ws.cell(row=2, column=1, value=sig_note).font = Font(italic=True, size=9, color="6B7280")
 
     # Row 3: Banner group headers
+    nested_by_idx = {}
+    for nb in (result.nested_banner_info or []):
+        nested_by_idx[nb["banner_index"]] = nb
+    has_nested = bool(nested_by_idx)
     has_multi = len(banners) > 1
-    offset = 1 if has_multi else 0
-    if has_multi:
+    show_group_row = has_multi or has_nested
+    offset = 1 if show_group_row else 0
+    if show_group_row:
         col_idx = 2
         for b_idx, bvar in enumerate(banners):
             group_cols = [bc for bc in banner_columns if bc.banner_index == b_idx]
-            if group_cols:
+            if not group_cols:
+                continue
+            nb = nested_by_idx.get(b_idx)
+            if nb:
+                for pg in nb["parent_groups"]:
+                    n_children = len(pg["children"])
+                    cell = ws.cell(row=3, column=col_idx, value=pg["label"])
+                    cell.font = Font(bold=True, size=10, color="FFFFFF")
+                    cell.fill = BANNER_GROUP_FILL
+                    cell.alignment = CENTER
+                    if n_children > 1:
+                        ws.merge_cells(start_row=3, start_column=col_idx, end_row=3, end_column=col_idx + n_children - 1)
+                    col_idx += n_children
+            else:
                 cell = ws.cell(row=3, column=col_idx, value=group_cols[0].banner_label)
                 cell.font = Font(bold=True, size=10, color="FFFFFF")
                 cell.fill = BANNER_GROUP_FILL
