@@ -391,3 +391,138 @@ class TestGoldenStandard:
                     total_val = ws.cell(row=r, column=5).value
                     assert total_val in (30, 85), f"S4A total sample should be 30 or 85, got {total_val}"
                     break
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Test 9: Nested Banners (cross-product banner columns)
+# ══════════════════════════════════════════════════════════════════════
+
+class TestNestedBanners:
+    """Nested banners create a cartesian product of two variables as banner columns.
+
+    Example: Q_11 (Severity) x Q_10 (Condition)
+    Parent header row: Moderate | Severe  (merged, spanning child columns)
+    Child header row:  PsO PsA UC CD | PsO PsA UC CD
+    """
+
+    def test_nested_banner_produces_combined_columns(self, data):
+        """Nested banner Q_11 x Q_10 should produce parent*child columns."""
+        result, wb = _tabulate(data,
+            banners=[],
+            stubs=["Q_11"],  # Use a different stub since Q_11 is the parent
+            nested_banners=[{"parent_var": "Q_11", "child_var": "Q_10"}],
+            include_total_column=True,
+        )
+        # The combined column should be in the banner list
+        combined_col = "_nb_Q_11\u00d7Q_10"
+        assert combined_col in result.banners, f"Expected {combined_col} in banners: {result.banners}"
+
+    def test_nested_banner_column_count(self, data):
+        """Nested banner should have parent_vals * child_vals columns."""
+        result, wb = _tabulate(data,
+            banners=[],
+            stubs=["Q_20_1"],
+            nested_banners=[{"parent_var": "Q_11", "child_var": "Q_10"}],
+            include_total_column=True,
+        )
+        # Q_11 has 2 values (Moderate, Severe), Q_10 has 4 values (PsO, PsA, UC, CD)
+        # Expected: Total(1) + 2*4=8 nested columns = 9 banner columns
+        nested_cols = [bc for bc in result.banner_columns if bc.is_nested]
+        assert len(nested_cols) == 8, f"Expected 8 nested columns (2x4), got {len(nested_cols)}"
+
+    def test_nested_banner_parent_labels(self, data):
+        """Each nested column should have parent_value and parent_label set."""
+        result, wb = _tabulate(data,
+            banners=[],
+            stubs=["Q_20_1"],
+            nested_banners=[{"parent_var": "Q_11", "child_var": "Q_10"}],
+            include_total_column=True,
+        )
+        nested_cols = [bc for bc in result.banner_columns if bc.is_nested]
+        # All nested columns should have non-empty parent_value and parent_label
+        for bc in nested_cols:
+            assert bc.parent_value, f"Nested column {bc.value} missing parent_value"
+            assert bc.parent_label, f"Nested column {bc.value} missing parent_label"
+
+    def test_nested_banner_letters_assigned(self, data):
+        """Each nested column should have a unique letter."""
+        result, wb = _tabulate(data,
+            banners=[],
+            stubs=["Q_20_1"],
+            nested_banners=[{"parent_var": "Q_11", "child_var": "Q_10"}],
+            include_total_column=True,
+        )
+        nested_cols = [bc for bc in result.banner_columns if bc.is_nested]
+        letters = [bc.letter for bc in nested_cols]
+        assert all(letters), "All nested columns should have letters"
+        assert len(set(letters)) == len(letters), f"Letters not unique: {letters}"
+
+    def test_nested_banner_excel_has_parent_headers(self, data):
+        """Excel output should have parent value labels in the group header row."""
+        result, wb = _tabulate(data,
+            banners=[],
+            stubs=["Q_20_1"],
+            nested_banners=[{"parent_var": "Q_11", "child_var": "Q_10"}],
+            include_total_column=True,
+        )
+        ws = wb["Q_20_1"]
+        # Row 3 should have the parent group headers (Moderate, Severe)
+        parent_vals_found = []
+        for c in range(2, ws.max_column + 1):
+            val = ws.cell(row=3, column=c).value
+            if val and val not in parent_vals_found:
+                parent_vals_found.append(val)
+        # Should contain "Total" and the severity labels (Moderate, Severe)
+        assert len(parent_vals_found) >= 2, f"Expected parent headers, found: {parent_vals_found}"
+
+    def test_nested_banner_info_stored(self, data):
+        """TabulationResult should store nested_banner_info for rendering."""
+        result, wb = _tabulate(data,
+            banners=[],
+            stubs=["Q_20_1"],
+            nested_banners=[{"parent_var": "Q_11", "child_var": "Q_10"}],
+            include_total_column=True,
+        )
+        assert len(result.nested_banner_info) == 1
+        nb = result.nested_banner_info[0]
+        assert nb["parent_var"] == "Q_11"
+        assert nb["child_var"] == "Q_10"
+        assert "parent_groups" in nb
+        assert len(nb["parent_groups"]) >= 2  # At least Moderate and Severe
+
+    def test_nested_with_flat_banner(self, data):
+        """Nested banner alongside a flat banner should both render correctly."""
+        result, wb = _tabulate(data,
+            banners=["Q_10"],
+            stubs=["Q_20_1"],
+            nested_banners=[{"parent_var": "Q_11", "child_var": "Q_10"}],
+            include_total_column=True,
+        )
+        # Should have Total + Q_10 flat columns + nested columns
+        flat_cols = [bc for bc in result.banner_columns if not bc.is_nested]
+        nested_cols = [bc for bc in result.banner_columns if bc.is_nested]
+        assert len(flat_cols) >= 5, f"Expected at least 5 flat columns (Total+4), got {len(flat_cols)}"
+        assert len(nested_cols) >= 8, f"Expected at least 8 nested columns, got {len(nested_cols)}"
+
+    def test_nested_banner_crosstab_succeeds(self, data):
+        """The crosstab engine should successfully compute against the combined column."""
+        result, wb = _tabulate(data,
+            banners=[],
+            stubs=["Q_20_1"],
+            nested_banners=[{"parent_var": "Q_11", "child_var": "Q_10"}],
+            include_total_column=True,
+        )
+        assert result.successful >= 1, f"Expected at least 1 success, got {result.successful}"
+        assert result.failed == 0, f"Expected 0 failures, got {result.failed}"
+
+    def test_nested_banner_skips_missing_vars(self, data):
+        """Nested banner with non-existent variable should be skipped, not crash."""
+        result, wb = _tabulate(data,
+            banners=["Q_10"],
+            stubs=["Q_11"],
+            nested_banners=[{"parent_var": "NONEXISTENT", "child_var": "Q_10"}],
+            include_total_column=True,
+        )
+        # Should still work with the flat banner
+        assert result.successful >= 1
+        assert len(result.nested_banner_info) == 0  # Skipped
