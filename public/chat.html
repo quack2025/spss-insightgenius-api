@@ -266,6 +266,7 @@ function saveSession() {
     sessionStorage.setItem('ig_session', JSON.stringify({
       fileId: currentFileId,
       fileName: currentFileName,
+      fileInfo: { n_cases: _fileInfo?.n_cases, n_variables: _fileInfo?.n_variables },
       chatHistory: chatHistory.slice(-20),
       prepContext: prepContext,
     }));
@@ -883,9 +884,17 @@ function createStreamBubble() {
 
 function updateStreamBubble(div, text) {
   const bubble = div.querySelector('.markdown-content');
+  // Preserve status element across innerHTML replacement
   const status = bubble.querySelector('.stream-status');
-  bubble.innerHTML = simpleMarkdown(text);
-  bubble.appendChild(status);
+  const statusHtml = status ? status.outerHTML : '';
+  const statusVisible = status && !status.classList.contains('hidden');
+  bubble.innerHTML = simpleMarkdown(text) + statusHtml;
+  // Restore visibility
+  const newStatus = bubble.querySelector('.stream-status');
+  if (newStatus && statusVisible) {
+    newStatus.classList.remove('hidden');
+    newStatus.style.display = 'inline-block';
+  }
   document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
 }
 
@@ -1430,9 +1439,9 @@ function simpleMarkdown(text) {
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`(.+?)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-xs">$1</code>')
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" class="text-blue-600 underline hover:text-blue-800">$1</a>')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2 class="text-base font-bold mt-3 mb-1">$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1 class="text-lg font-bold mt-3 mb-1">$1</h1>')
+    .replace(/(?:^|\n)### (.+)/gm, '\n<h3 class="text-sm font-bold mt-2 mb-1">$1</h3>')
+    .replace(/(?:^|\n)## (.+)/gm, '\n<h2 class="text-base font-bold mt-3 mb-1">$1</h2>')
+    .replace(/(?:^|\n)# (.+)/gm, '\n<h1 class="text-lg font-bold mt-3 mb-1">$1</h1>')
     .replace(/^- (.+)$/gm, '<li>$1</li>')
     .replace(/(<li>.*<\/li>)/s, '<ul class="list-disc ml-4">$1</ul>')
     .replace(/\n\n/g, '</p><p>')
@@ -1634,7 +1643,12 @@ if (restoreSession()) {
   const badge = document.getElementById('file-badge');
   badge.classList.remove('hidden');
   badge.classList.add('flex');
-  document.getElementById('file-badge-text').textContent = currentFileName || 'Restored session';
+  const savedSession = JSON.parse(sessionStorage.getItem('ig_session') || '{}');
+  const fi = savedSession.fileInfo || {};
+  const badgeText = fi.n_cases
+    ? `${currentFileName} • ${fi.n_cases} cases × ${fi.n_variables} vars`
+    : currentFileName || 'Restored session';
+  document.getElementById('file-badge-text').textContent = badgeText;
   // Replay chat history into UI
   for (const msg of chatHistory) {
     addMessage(msg.role === 'user' ? 'user' : 'assistant', msg.content);

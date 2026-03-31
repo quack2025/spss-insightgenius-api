@@ -1,0 +1,33 @@
+name: Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+
+      - name: Run tests
+        env:
+          APP_ENV: test
+          API_KEYS_JSON: '[{"key_hash":"a81998e8da6026fd1d1b241418ac5aaff17bcd33bbde18cc4e4c4231181c93c9","name":"test","plan":"pro","scopes":["process","metadata","convert","crosstab","frequency","parse_ticket","tabulate","auto_analyze","correlation","anova","gap_analysis","satisfaction_summary"]}]'
+        run: |
+          python -m pytest tests/ -v --tb=short -x
