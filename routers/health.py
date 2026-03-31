@@ -20,6 +20,8 @@ except ImportError:
 @router.get("/v1/health")
 async def health():
     settings = get_settings()
+    from middleware.processing import get_memory_mb, MAX_RSS_MB
+    rss = get_memory_mb()
     return {
         "status": "ok",
         "version": settings.app_version,
@@ -27,6 +29,9 @@ async def health():
         "quantipymrx_available": _QUANTIPYMRX_AVAILABLE,
         "environment": settings.app_env,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "memory_mb": round(rss, 1),
+        "memory_limit_mb": MAX_RSS_MB,
+        "memory_pct": round(rss / MAX_RSS_MB * 100, 1) if MAX_RSS_MB > 0 else 0,
     }
 
 

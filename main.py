@@ -16,6 +16,7 @@ from config import get_settings
 from middleware.idempotency import IdempotencyMiddleware
 from middleware.response_headers import ResponseHeadersMiddleware
 from middleware.usage_logger import UsageLoggerMiddleware
+from middleware.usage_metering import UsageMeteringMiddleware
 
 logging.basicConfig(
     level=logging.INFO,
@@ -84,6 +85,7 @@ def create_application() -> FastAPI:
     # Middleware stack (outermost first):
     # 1. Usage logger — logs every authenticated request for billing
     # 2. CORS — allow cross-origin requests
+    app.add_middleware(UsageMeteringMiddleware)
     app.add_middleware(IdempotencyMiddleware)
     app.add_middleware(ResponseHeadersMiddleware)
     app.add_middleware(UsageLoggerMiddleware)
@@ -155,6 +157,7 @@ def create_application() -> FastAPI:
     from routers.weight import router as weight_router
     from routers.chat import router as chat_router
     from routers.chat_stream import router as chat_stream_router
+    from routers.keys import router as keys_router
     from routers.smart_spec import router as smart_spec_router
     from routers.library import router as library_router
 
@@ -176,6 +179,7 @@ def create_application() -> FastAPI:
     app.include_router(weight_router)
     app.include_router(chat_router)
     app.include_router(chat_stream_router)
+    app.include_router(keys_router)
     app.include_router(smart_spec_router)
     app.include_router(library_router)
 
