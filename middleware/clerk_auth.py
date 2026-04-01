@@ -200,9 +200,7 @@ async def validate_clerk_token(token: str) -> ClerkUser:
             options={"verify_aud": False},  # Clerk tokens may not have aud
         )
     except ImportError:
-        # PyJWT not installed — fall back to unverified decode (dev only)
-        logger.warning("PyJWT not installed — skipping signature verification (DEV ONLY)")
-        decoded = payload
+        raise ValueError("PyJWT is required for token verification — install it with: pip install PyJWT[crypto]")
     except Exception as e:
         raise ValueError(f"Token verification failed: {e}")
 

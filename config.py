@@ -60,8 +60,8 @@ class Settings(BaseSettings):
     # Base URL for download links
     base_url: str = "https://spss.insightgenius.io"
 
-    # CORS
-    cors_origins: str = '["*"]'
+    # CORS — production origins only; override with CORS_ORIGINS env var
+    cors_origins: str = '["https://spss.insightgenius.io", "https://talk2data.insightgenius.io", "https://claude.ai"]'
 
     @property
     def is_production(self) -> bool:
@@ -79,9 +79,9 @@ class Settings(BaseSettings):
     def parsed_cors_origins(self) -> list[str]:
         try:
             origins = json.loads(self.cors_origins)
-            return origins if isinstance(origins, list) else ["*"]
+            return origins if isinstance(origins, list) else ["https://spss.insightgenius.io"]
         except json.JSONDecodeError:
-            return ["*"]
+            return ["https://spss.insightgenius.io"]
 
     @property
     def clerk_frontend_api(self) -> str:
