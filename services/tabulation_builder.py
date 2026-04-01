@@ -1057,14 +1057,33 @@ def _write_crosstab_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, dat
         nested_by_idx[nb["banner_index"]] = nb
 
     has_nested = bool(nested_by_idx)
-    show_group_row = len(banners) > 1 or has_nested
+
+    # Collect unique banner indices from banner_columns (in order)
+    all_b_indices = list(dict.fromkeys(bc.banner_index for bc in banner_columns))
+    # Determine if we need a group header row
+    # Total-only banners don't count; need 2+ non-total groups or any nested
+    non_total_groups = [idx for idx in all_b_indices
+                        if not (spec.include_total_column and idx == 0
+                                and any(bc.banner_var == "_total_" for bc in banner_columns if bc.banner_index == idx))]
+    show_group_row = len(non_total_groups) > 1 or has_nested
 
     # Row 3: Banner group headers (merged cells per banner)
     if show_group_row:
         col_idx = 2
-        for b_idx, banner_var in enumerate(banners):
+        for b_idx in all_b_indices:
             group_cols = [bc for bc in banner_columns if bc.banner_index == b_idx]
             if not group_cols:
+                continue
+
+            # Skip Total column in group header — it gets its own treatment
+            is_total_group = group_cols[0].banner_var == "_total_"
+            if is_total_group:
+                # Write "Total" as group header for consistency
+                cell = ws.cell(row=3, column=col_idx, value="Total")
+                cell.font = Font(bold=True, size=10, color="FFFFFF")
+                cell.fill = BANNER_GROUP_FILL
+                cell.alignment = CENTER
+                col_idx += len(group_cols)
                 continue
 
             nb = nested_by_idx.get(b_idx)
@@ -1378,14 +1397,26 @@ def _write_grid_sheet(ws, sheet_result: SheetResult, spec: TabulateSpec, banner_
     for nb in (nested_banner_info or []):
         nested_by_idx[nb["banner_index"]] = nb
     has_nested = bool(nested_by_idx)
-    has_multi = len(banners) > 1
-    show_group_row = has_multi or has_nested
+
+    all_b_indices = list(dict.fromkeys(bc.banner_index for bc in banner_columns))
+    non_total_groups = [idx for idx in all_b_indices
+                        if not (spec.include_total_column and idx == 0
+                                and any(bc.banner_var == "_total_" for bc in banner_columns if bc.banner_index == idx))]
+    show_group_row = len(non_total_groups) > 1 or has_nested
     offset = 1 if show_group_row else 0
     if show_group_row:
         col_idx = 2
-        for b_idx, bvar in enumerate(banners):
+        for b_idx in all_b_indices:
             group_cols = [bc for bc in banner_columns if bc.banner_index == b_idx]
             if not group_cols:
+                continue
+            is_total_group = group_cols[0].banner_var == "_total_"
+            if is_total_group:
+                cell = ws.cell(row=3, column=col_idx, value="Total")
+                cell.font = Font(bold=True, size=10, color="FFFFFF")
+                cell.fill = BANNER_GROUP_FILL
+                cell.alignment = CENTER
+                col_idx += len(group_cols)
                 continue
             nb = nested_by_idx.get(b_idx)
             if nb:
@@ -1530,14 +1561,26 @@ def _write_single_sheet(ws, result: TabulationResult, spec: TabulateSpec, data: 
     for nb in (result.nested_banner_info or []):
         nested_by_idx[nb["banner_index"]] = nb
     has_nested = bool(nested_by_idx)
-    has_multi = len(banners) > 1
-    show_group_row = has_multi or has_nested
+
+    all_b_indices = list(dict.fromkeys(bc.banner_index for bc in banner_columns))
+    non_total_groups = [idx for idx in all_b_indices
+                        if not (spec.include_total_column and idx == 0
+                                and any(bc.banner_var == "_total_" for bc in banner_columns if bc.banner_index == idx))]
+    show_group_row = len(non_total_groups) > 1 or has_nested
     offset = 1 if show_group_row else 0
     if show_group_row:
         col_idx = 2
-        for b_idx, bvar in enumerate(banners):
+        for b_idx in all_b_indices:
             group_cols = [bc for bc in banner_columns if bc.banner_index == b_idx]
             if not group_cols:
+                continue
+            is_total_group = group_cols[0].banner_var == "_total_"
+            if is_total_group:
+                cell = ws.cell(row=3, column=col_idx, value="Total")
+                cell.font = Font(bold=True, size=10, color="FFFFFF")
+                cell.fill = BANNER_GROUP_FILL
+                cell.alignment = CENTER
+                col_idx += len(group_cols)
                 continue
             nb = nested_by_idx.get(b_idx)
             if nb:
