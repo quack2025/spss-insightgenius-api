@@ -119,6 +119,15 @@ async def library_variables(library_id: str, key: KeyConfig = Depends(require_au
 
     try:
         svc = LibraryService()
+        meta = await svc.get_file_metadata(library_id)
+        if not meta:
+            return JSONResponse(status_code=404, content={
+                "success": False, "error": {"code": "NOT_FOUND", "message": f"File {library_id} not found"},
+            })
+        if meta.get("user_id") and meta["user_id"] != _user_id(key):
+            return JSONResponse(status_code=403, content={
+                "success": False, "error": {"code": "FORBIDDEN", "message": "You do not own this file"},
+            })
         variables = await svc.get_file_variables(library_id)
         return {"success": True, "data": {"variables": variables, "total": len(variables)}}
     except Exception as e:
@@ -134,6 +143,15 @@ async def library_load(library_id: str, key: KeyConfig = Depends(require_auth)):
 
     try:
         svc = LibraryService()
+        meta = await svc.get_file_metadata(library_id)
+        if not meta:
+            return JSONResponse(status_code=404, content={
+                "success": False, "error": {"code": "NOT_FOUND", "message": f"File {library_id} not found"},
+            })
+        if meta.get("user_id") and meta["user_id"] != _user_id(key):
+            return JSONResponse(status_code=403, content={
+                "success": False, "error": {"code": "FORBIDDEN", "message": "You do not own this file"},
+            })
         file_id = await svc.load_to_redis(library_id)
         if not file_id:
             return JSONResponse(status_code=404, content={
@@ -192,6 +210,15 @@ async def library_delete(library_id: str, key: KeyConfig = Depends(require_auth)
 
     try:
         svc = LibraryService()
+        meta = await svc.get_file_metadata(library_id)
+        if not meta:
+            return JSONResponse(status_code=404, content={
+                "success": False, "error": {"code": "NOT_FOUND", "message": f"File {library_id} not found"},
+            })
+        if meta.get("user_id") and meta["user_id"] != _user_id(key):
+            return JSONResponse(status_code=403, content={
+                "success": False, "error": {"code": "FORBIDDEN", "message": "You do not own this file"},
+            })
         deleted = await svc.delete_file(library_id)
         if not deleted:
             return JSONResponse(status_code=404, content={

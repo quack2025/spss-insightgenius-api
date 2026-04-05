@@ -33,12 +33,18 @@ async def wave_compare(
 ):
     start = time.perf_counter()
 
-    # Load both files
-    bytes1, name1 = await resolve_file(file=file1, file_id=file1_id)
-    bytes2, name2 = await resolve_file(file=file2, file_id=file2_id)
+    try:
+        # Load both files
+        bytes1, name1 = await resolve_file(file=file1, file_id=file1_id)
+        bytes2, name2 = await resolve_file(file=file2, file_id=file2_id)
 
-    data1 = await run_in_executor(QuantiProEngine.load_spss, bytes1, name1)
-    data2 = await run_in_executor(QuantiProEngine.load_spss, bytes2, name2)
+        data1 = await run_in_executor(QuantiProEngine.load_spss, bytes1, name1)
+        data2 = await run_in_executor(QuantiProEngine.load_spss, bytes2, name2)
+    except ValueError as e:
+        raise HTTPException(400, detail={"code": "LOAD_ERROR", "message": str(e)})
+    except Exception as e:
+        logger.error("Wave compare file load failed: %s", e, exc_info=True)
+        raise HTTPException(422, detail={"code": "FILE_ERROR", "message": f"Failed to load file: {e}"})
 
     # Parse variables
     var_list = None
@@ -49,10 +55,16 @@ async def wave_compare(
             var_list = [v.strip() for v in variables.split(",") if v.strip()]
 
     # Run comparison
-    from services.wave_comparison import compare_waves
-    result = await run_in_executor(
-        compare_waves, data1, data2, var_list, weight, significance_level,
-    )
+    try:
+        from services.wave_comparison import compare_waves
+        result = await run_in_executor(
+            compare_waves, data1, data2, var_list, weight, significance_level,
+        )
+    except ValueError as e:
+        raise HTTPException(400, detail={"code": "COMPARISON_ERROR", "message": str(e)})
+    except Exception as e:
+        logger.error("Wave compare failed: %s", e, exc_info=True)
+        raise HTTPException(500, detail={"code": "COMPARISON_ERROR", "message": f"Wave comparison failed: {e}"})
 
     elapsed = int((time.perf_counter() - start) * 1000)
     return success_response(result, processing_time_ms=elapsed)

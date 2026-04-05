@@ -34,9 +34,15 @@ async def smart_spec(
         raise HTTPException(503, detail={"code": "AI_UNAVAILABLE", "message": "ANTHROPIC_API_KEY required"})
 
     # Load SPSS metadata
-    file_bytes, filename = await resolve_file(file=file, file_id=file_id)
-    data = await run_in_executor(QuantiProEngine.load_spss, file_bytes, filename)
-    metadata = await run_in_executor(QuantiProEngine.extract_metadata, data)
+    try:
+        file_bytes, filename = await resolve_file(file=file, file_id=file_id)
+        data = await run_in_executor(QuantiProEngine.load_spss, file_bytes, filename)
+        metadata = await run_in_executor(QuantiProEngine.extract_metadata, data)
+    except ValueError as e:
+        raise HTTPException(400, detail={"code": "LOAD_ERROR", "message": str(e)})
+    except Exception as e:
+        logger.error("Smart spec file load failed: %s", e, exc_info=True)
+        raise HTTPException(422, detail={"code": "FILE_ERROR", "message": f"Failed to load file: {e}"})
 
     # Extract questionnaire text
     from services.smart_spec_generator import SmartSpecGenerator
@@ -62,13 +68,20 @@ async def smart_spec(
                        "Both are recommended for best results.",
         })
 
-    # Generate spec
-    generator = SmartSpecGenerator()
-    spec = await generator.generate(
-        metadata=metadata,
-        questionnaire_text=questionnaire_text,
-        ticket_text=ticket_text,
-    )
+    # Generate spec via AI
+    try:
+        generator = SmartSpecGenerator()
+        spec = await generator.generate(
+            metadata=metadata,
+            questionnaire_text=questionnaire_text,
+            ticket_text=ticket_text,
+        )
+    except Exception as e:
+        logger.error("Smart spec generation failed: %s", e, exc_info=True)
+        raise HTTPException(502, detail={
+            "code": "AI_ERROR",
+            "message": f"AI spec generation failed: {e}. Try again or provide more detailed documents.",
+        })
 
     elapsed = int((time.perf_counter() - start) * 1000)
     return success_response(spec, processing_time_ms=elapsed)

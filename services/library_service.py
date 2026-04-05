@@ -365,16 +365,25 @@ class LibraryService:
 
     # ── Search ───────────────────────────────────────────────────
 
+    @staticmethod
+    def _sanitize_postgrest_query(value: str) -> str:
+        """Escape characters that have special meaning in PostgREST filter values."""
+        import urllib.parse
+        # Remove PostgREST operators and dangerous characters, then URL-encode
+        sanitized = value.replace("(", "").replace(")", "").replace("&", "").replace(",", "").replace("%", "")
+        return urllib.parse.quote(sanitized, safe="")
+
     async def search_files(self, user_id: str, query: str) -> list[dict]:
         """Text search across files, descriptions, tags, and variables."""
-        query_lower = query.lower().strip()
+        query_lower = query.lower().strip()[:100]  # Cap length
+        safe_q = self._sanitize_postgrest_query(query_lower)
 
         # Search in file names + descriptions + display_name + tags
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{self.rest_url}/library_files?user_id=eq.{user_id}"
-                f"&or=(filename.ilike.%25{query_lower}%25,description.ilike.%25{query_lower}%25,"
-                f"display_name.ilike.%25{query_lower}%25,tags.cs.{{{query_lower}}})",
+                f"&or=(filename.ilike.%25{safe_q}%25,description.ilike.%25{safe_q}%25,"
+                f"display_name.ilike.%25{safe_q}%25,tags.cs.{{{safe_q}}})",
                 headers=self.headers,
             )
             file_results = resp.json() if resp.status_code == 200 else []
@@ -383,7 +392,7 @@ class LibraryService:
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{self.rest_url}/library_variables?"
-                f"or=(name.ilike.%25{query_lower}%25,label.ilike.%25{query_lower}%25)"
+                f"or=(name.ilike.%25{safe_q}%25,label.ilike.%25{safe_q}%25)"
                 f"&select=file_id,name,label",
                 headers=self.headers,
             )

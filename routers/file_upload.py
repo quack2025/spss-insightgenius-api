@@ -16,11 +16,12 @@ import json
 import logging
 import uuid
 
-from fastapi import APIRouter, File, Header, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile
 
-from auth import get_key_config
+from auth import get_key_config, require_auth, KeyConfig
 from config import get_settings
 from middleware.processing import run_in_executor
+from middleware.rate_limiter import check_rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -56,19 +57,11 @@ def _get_extension(filename: str) -> str:
 )
 async def upload_file(
     file: UploadFile = File(..., description="Data file (.sav, .csv, .tsv, .xlsx, .xls)"),
-    x_api_key: str | None = Header(None, alias="X-API-Key"),
-    api_key: str | None = Query(None, description="API key (alternative to X-API-Key header)"),
+    key: KeyConfig = Depends(require_auth),
+    _rl: None = Depends(check_rate_limit),
 ):
     """Upload a data file and get a file_id for use with MCP tools."""
-
-    # Auth — optional for demo mode
-    key_str = x_api_key or api_key
-    key_config = None
-    if key_str:
-        try:
-            key_config = get_key_config(key_str)
-        except ValueError:
-            pass  # Invalid key, proceed as demo user
+    key_config = key
 
     # Validate extension
     ext = _get_extension(file.filename or "")

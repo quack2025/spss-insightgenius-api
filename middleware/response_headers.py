@@ -28,6 +28,10 @@ class ResponseHeadersMiddleware(BaseHTTPMiddleware):
         # Always add these
         response.headers["X-Request-Id"] = request_id
         response.headers["API-Version"] = API_VERSION
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
         # Add rate limit headers if they were set by check_rate_limit
         rl_headers = getattr(request.state, "rate_limit_headers", None)
