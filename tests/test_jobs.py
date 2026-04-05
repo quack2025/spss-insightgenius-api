@@ -67,7 +67,7 @@ def test_get_job_status_not_found():
 
 def test_get_job_status_returns_job():
     store = JobStore()
-    job_id = store.create(user_id="test_key", endpoint="/v1/tabulate")
+    job_id = store.create(user_id="Test Key", endpoint="/v1/tabulate")
     store.complete(job_id, download_url="https://example.com/dl/abc")
 
     resp = client.get(f"/v1/jobs/{job_id}", headers=HEADERS)

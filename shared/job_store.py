@@ -17,12 +17,24 @@ class JobStatus(str, Enum):
     FAILED = "failed"
 
 
-# In-memory store (per-worker). Redis upgrade in a follow-up task.
+# In-memory store (per-worker). Not shared across Uvicorn workers.
+# Redis upgrade planned for cross-worker visibility.
 _jobs: dict[str, dict] = {}
+
+# Jobs older than this are evicted on next create/get
+_JOB_TTL_SECONDS = 3600  # 1 hour
+
+
+def _evict_expired() -> None:
+    """Remove jobs older than TTL to prevent unbounded memory growth."""
+    cutoff = time.time() - _JOB_TTL_SECONDS
+    expired = [jid for jid, j in _jobs.items() if j["updated_at"] < cutoff]
+    for jid in expired:
+        del _jobs[jid]
 
 
 class JobStore:
-    """Manages async job lifecycle. In-memory with Redis fallback."""
+    """Manages async job lifecycle. In-memory with TTL eviction."""
 
     def create(
         self,
@@ -30,6 +42,7 @@ class JobStore:
         endpoint: str,
         webhook_url: Optional[str] = None,
     ) -> str:
+        _evict_expired()
         job_id = str(uuid.uuid4())
         _jobs[job_id] = {
             "id": job_id,
@@ -44,6 +57,7 @@ class JobStore:
         return job_id
 
     def get(self, job_id: str) -> Optional[dict]:
+        _evict_expired()
         return _jobs.get(job_id)
 
     def update(self, job_id: str, status: JobStatus) -> None:

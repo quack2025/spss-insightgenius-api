@@ -98,7 +98,7 @@ async def tabulate(
             data = await run_in_executor(QuantiProEngine.load_spss, _file_bytes, _filename)
             spec_dict = json.loads(_spec)
             spec_obj = TabulateSpec(**spec_dict)
-            result = await run_in_executor(build_tabulation, data, spec_obj)
+            result = await run_in_executor(build_tabulation, QuantiProEngine, data, spec_obj)
             excel_bytes = await run_in_executor(_build_excel, result, spec_obj, data)
             token, download_url = await store_download(excel_bytes, f"{spec_obj.title or 'tabulation'}.xlsx")
             return excel_bytes, download_url

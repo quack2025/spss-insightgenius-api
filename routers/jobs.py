@@ -22,4 +22,10 @@ async def get_job(job_id: str, key: KeyConfig = Depends(require_auth)):
             "success": False,
             "error": {"code": "NOT_FOUND", "message": f"Job {job_id} not found"},
         })
+    # Ownership check — users can only see their own jobs
+    if job.get("user_id") and job["user_id"] != key.name:
+        return JSONResponse(status_code=404, content={
+            "success": False,
+            "error": {"code": "NOT_FOUND", "message": f"Job {job_id} not found"},
+        })
     return {"success": True, "data": job}
