@@ -23,7 +23,13 @@ class ResponseHeadersMiddleware(BaseHTTPMiddleware):
         request_id = str(uuid.uuid4())[:8]
         request.state.request_id = request_id
 
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            # BaseHTTPMiddleware can crash on certain empty responses;
+            # fall through without headers rather than killing the request.
+            from starlette.responses import Response as StarletteResponse
+            response = StarletteResponse(status_code=500)
 
         # Always add these
         response.headers["X-Request-Id"] = request_id
