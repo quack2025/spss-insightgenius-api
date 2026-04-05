@@ -185,6 +185,9 @@ def create_application() -> FastAPI:
     app.include_router(smart_spec_router)
     app.include_router(library_router)
 
+    from routers.jobs import router as jobs_router
+    app.include_router(jobs_router)
+
     # MCP server — SSE transport
     # NOTE: Streamable HTTP (http_app) CANNOT be mounted as FastAPI sub-app —
     # it requires run() to initialize an anyio task group, which doesn't happen

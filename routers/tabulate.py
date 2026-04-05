@@ -62,6 +62,7 @@ async def tabulate(
     file_id: str | None = Form(None, description="File session ID from /v1/library/upload"),
     spec: str = Form(..., description="JSON tabulation specification"),
     ticket: UploadFile | None = File(None, description="Optional .docx Reporting Ticket — Haiku parses it into a tab plan"),
+    webhook_url: str | None = Form(None, description="URL to POST job result when processing completes. If provided, returns 202 with job_id instead of blocking."),
     key: KeyConfig = Depends(require_scope("process")),
     _rl: None = Depends(check_rate_limit),
 ):
@@ -76,6 +77,42 @@ async def tabulate(
         raise HTTPException(413, detail={
             "code": "FILE_TOO_LARGE",
             "message": f"File exceeds {max_size // (1024*1024)}MB limit for {key.plan} plan",
+        })
+
+    # ── Async mode: return 202 + job_id ──
+    if webhook_url:
+        from fastapi.responses import JSONResponse
+        from shared.job_store import JobStore
+        from services.job_runner import run_tabulation_job
+        from routers.downloads import store_download
+
+        store = JobStore()
+        job_id = store.create(user_id=key.name, endpoint="/v1/tabulate", webhook_url=webhook_url)
+
+        # Capture current args for background execution
+        _file_bytes, _filename, _spec, _ticket_bytes = file_bytes, filename, spec, None
+        if ticket and ticket.filename:
+            _ticket_bytes = await ticket.read()
+
+        async def _do_tabulate():
+            data = await run_in_executor(QuantiProEngine.load_spss, _file_bytes, _filename)
+            spec_dict = json.loads(_spec)
+            spec_obj = TabulateSpec(**spec_dict)
+            result = await run_in_executor(build_tabulation, data, spec_obj)
+            excel_bytes = await run_in_executor(_build_excel, result, spec_obj, data)
+            token, download_url = await store_download(excel_bytes, f"{spec_obj.title or 'tabulation'}.xlsx")
+            return excel_bytes, download_url
+
+        asyncio.create_task(run_tabulation_job(job_id, _do_tabulate))
+        return JSONResponse(status_code=202, content={
+            "success": True,
+            "data": {
+                "job_id": job_id,
+                "status": "pending",
+                "poll_url": f"/v1/jobs/{job_id}",
+                "webhook_url": webhook_url,
+                "message": "Processing started. Poll the job URL or wait for webhook callback.",
+            },
         })
 
     # ── Parse spec ──

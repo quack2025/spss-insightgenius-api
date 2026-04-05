@@ -49,3 +49,30 @@ def test_fail_with_error():
 def test_get_nonexistent_returns_none():
     store = JobStore()
     assert store.get("nonexistent-uuid") is None
+
+
+# ── HTTP integration tests ──────────────────────────────────────────────
+
+from fastapi.testclient import TestClient
+from main import app
+
+client = TestClient(app)
+HEADERS = {"Authorization": "Bearer sk_test_quantipro_test_key_abc123"}
+
+
+def test_get_job_status_not_found():
+    resp = client.get("/v1/jobs/nonexistent-uuid", headers=HEADERS)
+    assert resp.status_code == 404
+
+
+def test_get_job_status_returns_job():
+    store = JobStore()
+    job_id = store.create(user_id="test_key", endpoint="/v1/tabulate")
+    store.complete(job_id, download_url="https://example.com/dl/abc")
+
+    resp = client.get(f"/v1/jobs/{job_id}", headers=HEADERS)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert data["data"]["status"] == "done"
+    assert data["data"]["result"]["download_url"] == "https://example.com/dl/abc"
