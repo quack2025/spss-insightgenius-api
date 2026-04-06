@@ -85,19 +85,20 @@ async def _check_mcp_rate_limit(key_config: KeyConfig) -> None:
 async def _auth_async(api_key: str = "") -> KeyConfig:
     """Validate API key OR Clerk JWT token. Supports dual auth.
 
-    - If api_key is empty: reject with auth_required error.
+    - If api_key is empty: grant rate-limited OAuth free tier (Claude.ai connector users).
     - If api_key looks like a JWT: validate as Clerk OAuth token.
     - If api_key starts with sk_: validate as API key.
     """
-    # Reject empty / placeholder keys — authentication is required
+    # OAuth users via Claude.ai connector don't send api_key — grant rate-limited free tier
     if not api_key or api_key in OAUTH_PLACEHOLDER_KEYS:
-        raise ToolError(json.dumps(_make_error(
-            "auth_required",
-            "Authentication is required. Provide a valid API key (sk_test_... or sk_live_...) "
-            "or connect via OAuth on Claude.ai.",
-            "Ask the user for their API key. They can get one at https://spss.insightgenius.io/account",
-            docs_url="https://spss.insightgenius.io/docs/mcp#authentication",
-        )))
+        key = KeyConfig(
+            key_hash="oauth_free",
+            name="oauth_user",
+            plan="free",
+            scopes=list(OAUTH_FREE_SCOPES),
+        )
+        await _check_mcp_rate_limit(key)
+        return key
 
     # Check if this is a Clerk JWT token
     if _is_jwt_token(api_key):
@@ -143,15 +144,14 @@ def _auth(api_key: str = "") -> KeyConfig:
     """Sync wrapper for backwards compatibility. For new code, use _auth_async."""
     import asyncio
 
-    # Reject empty / placeholder keys — authentication is required
+    # OAuth users via Claude.ai connector — grant rate-limited free tier
     if not api_key or api_key in OAUTH_PLACEHOLDER_KEYS:
-        raise ToolError(json.dumps(_make_error(
-            "auth_required",
-            "Authentication is required. Provide a valid API key (sk_test_... or sk_live_...) "
-            "or connect via OAuth on Claude.ai.",
-            "Ask the user for their API key. They can get one at https://spss.insightgenius.io/account",
-            docs_url="https://spss.insightgenius.io/docs/mcp#authentication",
-        )))
+        return KeyConfig(
+            key_hash="oauth_free",
+            name="oauth_user",
+            plan="free",
+            scopes=list(OAUTH_FREE_SCOPES),
+        )
 
     # For JWT tokens, we need async. For API keys, sync is fine.
     if _is_jwt_token(api_key):
