@@ -206,6 +206,9 @@ def create_application() -> FastAPI:
     from routers.explore import router as explore_router
     from routers.segments import router as segments_router
     from routers.metadata_overrides import router as metadata_overrides_router
+    from routers.tables_api import router as tables_router
+    from routers.exports_api import router as exports_router
+    from routers.reports import router as reports_router
     app.include_router(projects_router)
     app.include_router(conversations_router)
     app.include_router(data_prep_router)
@@ -214,6 +217,9 @@ def create_application() -> FastAPI:
     app.include_router(explore_router)
     app.include_router(segments_router)
     app.include_router(metadata_overrides_router)
+    app.include_router(tables_router)
+    app.include_router(exports_router)
+    app.include_router(reports_router)
 
     # MCP server — SSE transport
     # NOTE: Streamable HTTP (http_app) CANNOT be mounted as FastAPI sub-app —
