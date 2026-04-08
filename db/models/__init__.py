@@ -12,3 +12,5 @@ from db.models.wave import ProjectWave  # noqa: F401
 from db.models.explore_bookmark import ExploreBookmark  # noqa: F401
 from db.models.segment import Segment  # noqa: F401
 from db.models.export import Export, TableTemplate, Report  # noqa: F401
+from db.models.team import Team, TeamMember  # noqa: F401
+from db.models.dashboard import Dashboard, ShareLink, AuditLog  # noqa: F401

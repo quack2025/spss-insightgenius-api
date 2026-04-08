@@ -221,6 +221,23 @@ def create_application() -> FastAPI:
     app.include_router(exports_router)
     app.include_router(reports_router)
 
+    from routers.teams import router as teams_router
+    from routers.dashboards import router as dashboards_router
+    from routers.share import share_router, public_router
+    from routers.users_api import router as users_router
+    from routers.help_chat import router as help_router
+    app.include_router(teams_router)
+    app.include_router(dashboards_router)
+    app.include_router(share_router)
+    app.include_router(public_router)
+    app.include_router(users_router)
+    app.include_router(help_router)
+
+    from routers.merge import router as merge_router
+    from routers.clustering import router as clustering_router
+    app.include_router(merge_router)
+    app.include_router(clustering_router)
+
     # MCP server — SSE transport
     # NOTE: Streamable HTTP (http_app) CANNOT be mounted as FastAPI sub-app —
     # it requires run() to initialize an anyio task group, which doesn't happen
