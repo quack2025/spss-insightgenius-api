@@ -24,6 +24,7 @@ os.environ["API_KEYS_JSON"] = json.dumps([
     }
 ])
 os.environ["APP_ENV"] = "development"
+os.environ.setdefault("SUPABASE_JWT_SECRET", "test-jwt-secret-for-testing-only-32chars!")
 
 # Clear settings cache so test env vars take effect
 from config import get_settings

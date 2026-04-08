@@ -36,8 +36,20 @@ redis>=5.0.0
 # MCP (Model Context Protocol) server — SSE transport
 fastmcp>=2.0.0
 
-# Auth (Clerk JWT validation)
+# Auth (Clerk JWT validation + Supabase JWT)
 PyJWT[crypto]>=2.8.0
 
 # HTTP
 httpx>=0.26.0
+
+# Database (PostgreSQL — optional, enables project/conversation features)
+sqlalchemy>=2.0.25
+alembic>=1.13.1
+asyncpg>=0.29.0
+psycopg2-binary>=2.9.9
+
+# Encryption (optional — SPSS files at rest)
+cryptography>=41.0.0
+
+# Retry logic
+tenacity>=8.2.3

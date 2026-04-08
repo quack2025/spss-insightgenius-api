@@ -38,6 +38,14 @@ async def lifespan(app: FastAPI):
     if not settings.anthropic_api_key:
         logger.warning("ANTHROPIC_API_KEY not set — ticket parsing and smart labeling will be disabled")
 
+    # Initialize PostgreSQL connection (optional — stateless API mode if not set)
+    from db.database import init_db, close_db
+    db_connected = await init_db()
+    if db_connected:
+        logger.info("PostgreSQL connected — project/conversation features enabled")
+    else:
+        logger.info("No DATABASE_URL — running in stateless API-only mode")
+
     # Start MCP Redis relay for cross-replica SSE session routing
     from mcp_server import start_redis_relay, stop_redis_relay
     await start_redis_relay()
@@ -45,6 +53,7 @@ async def lifespan(app: FastAPI):
     yield
 
     await stop_redis_relay()
+    await close_db()
     logger.info("Shutting down %s", settings.app_name)
 
 
@@ -187,6 +196,10 @@ def create_application() -> FastAPI:
 
     from routers.jobs import router as jobs_router
     app.include_router(jobs_router)
+
+    # Platform features (require PostgreSQL + Supabase JWT)
+    from routers.projects import router as projects_router
+    app.include_router(projects_router)
 
     # MCP server — SSE transport
     # NOTE: Streamable HTTP (http_app) CANNOT be mounted as FastAPI sub-app —

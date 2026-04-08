@@ -57,6 +57,16 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_service_role_key: str = ""
 
+    # Supabase JWT auth (for Talk2Data frontend users)
+    supabase_jwt_secret: str = ""
+
+    # PostgreSQL (optional — enables project/conversation/dashboard features)
+    # Format: postgresql+asyncpg://user:pass@host:5432/dbname
+    database_url: str = ""
+
+    # Encryption key for SPSS files at rest (optional, Fernet)
+    encryption_key: str = ""
+
     # Base URL for download links
     base_url: str = "https://spss.insightgenius.io"
 
@@ -66,6 +76,18 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
+
+    @property
+    def database_url_sync(self) -> str:
+        """Sync version of database_url for Alembic (replaces asyncpg with psycopg2)."""
+        if not self.database_url:
+            return ""
+        return self.database_url.replace("+asyncpg", "").replace("asyncpg://", "postgresql://")
+
+    @property
+    def has_database(self) -> bool:
+        """Whether a PostgreSQL database is configured."""
+        return bool(self.database_url)
 
     @property
     def parsed_api_keys(self) -> list[dict]:
