@@ -324,6 +324,10 @@ def create_application() -> FastAPI:
         async def mcp_docs():
             return FileResponse(public_dir / "mcp-docs.html")
 
+        @app.get("/developers", include_in_schema=False)
+        async def developers_page():
+            return FileResponse(public_dir / "developers.html")
+
         app.mount("/static", StaticFiles(directory=str(public_dir)), name="static")
     else:
         @app.get("/", include_in_schema=False)

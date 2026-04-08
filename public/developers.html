@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Developers | InsightGenius API</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  body { font-family: 'Inter', sans-serif; }
+  code, pre { font-family: 'JetBrains Mono', monospace; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 1.5rem; border-radius: 0.75rem; overflow-x: auto; font-size: 0.875rem; line-height: 1.7; }
+  .keyword { color: #c084fc; }
+  .string { color: #86efac; }
+  .comment { color: #64748b; }
+  .func { color: #93c5fd; }
+</style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+<!-- Nav -->
+<nav class="border-b bg-white sticky top-0 z-10">
+  <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+    <a href="/" class="font-bold text-lg">InsightGenius</a>
+    <div class="flex gap-6 text-sm">
+      <a href="/docs" class="text-gray-600 hover:text-gray-900">API Docs</a>
+      <a href="/docs/mcp" class="text-gray-600 hover:text-gray-900">MCP Docs</a>
+      <a href="/developers" class="text-blue-600 font-medium">Developers</a>
+      <a href="/export" class="bg-blue-600 text-white px-4 py-1.5 rounded-full text-sm hover:bg-blue-700">Try Free</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="py-20 px-6">
+  <div class="max-w-3xl mx-auto text-center">
+    <h1 class="text-5xl font-bold tracking-tight mb-6">Build your own Displayr.</h1>
+    <p class="text-xl text-gray-500 mb-8">
+      Professional survey analysis via API. Significance testing, auto-detected MRS groups,
+      publication-ready Excel — all with one npm install.
+    </p>
+    <div class="flex gap-4 justify-center">
+      <a href="#quickstart" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700">Quickstart</a>
+      <a href="https://www.npmjs.com/package/insightgenius-sdk" target="_blank" class="border border-gray-300 px-6 py-3 rounded-lg font-medium hover:bg-gray-100">npm install insightgenius-sdk</a>
+    </div>
+  </div>
+</section>
+
+<!-- Quickstart -->
+<section id="quickstart" class="py-16 px-6 bg-white border-t">
+  <div class="max-w-3xl mx-auto">
+    <h2 class="text-3xl font-bold mb-8">5-Minute Quickstart</h2>
+
+    <div class="space-y-6">
+      <div>
+        <h3 class="font-semibold text-lg mb-2">1. Install</h3>
+        <pre>npm install insightgenius-sdk</pre>
+      </div>
+
+      <div>
+        <h3 class="font-semibold text-lg mb-2">2. Initialize</h3>
+        <pre><span class="keyword">import</span> { <span class="func">InsightGenius</span> } <span class="keyword">from</span> <span class="string">"insightgenius-sdk"</span>;
+
+<span class="keyword">const</span> ig = <span class="keyword">new</span> <span class="func">InsightGenius</span>(<span class="string">"sk_test_your_key"</span>);</pre>
+      </div>
+
+      <div>
+        <h3 class="font-semibold text-lg mb-2">3. Upload</h3>
+        <pre><span class="keyword">const</span> file = <span class="keyword">new</span> <span class="func">Blob</span>([<span class="func">readFileSync</span>(<span class="string">"survey.sav"</span>)]);
+<span class="keyword">const</span> { file_id } = <span class="keyword">await</span> ig.<span class="func">upload</span>(file, <span class="string">"survey.sav"</span>);
+<span class="comment">// file_id valid for 30 minutes</span></pre>
+      </div>
+
+      <div>
+        <h3 class="font-semibold text-lg mb-2">4. Analyze</h3>
+        <pre><span class="keyword">const</span> ct = <span class="keyword">await</span> ig.<span class="func">crosstab</span>(file_id, {
+  row: <span class="string">"Q1_Satisfaction"</span>,
+  col: <span class="string">"Gender"</span>,
+  significance_level: 0.95,
+});
+<span class="comment">// ct.significant_pairs → [{ row: "5", col1: "1.0", col2: "2.0", letter: "B" }]</span>
+<span class="comment">// Column A is significantly higher than Column B</span></pre>
+      </div>
+
+      <div>
+        <h3 class="font-semibold text-lg mb-2">5. Export</h3>
+        <pre><span class="keyword">const</span> excel = <span class="keyword">await</span> ig.<span class="func">tabulate</span>(file_id, {
+  banners: [<span class="string">"Gender"</span>, <span class="string">"AgeGroup"</span>],
+  stubs: [<span class="string">"_all_"</span>],
+  significance_level: 0.95,
+  include_means: <span class="keyword">true</span>,
+});
+<span class="func">writeFileSync</span>(<span class="string">"report.xlsx"</span>, <span class="func">Buffer</span>.from(excel));</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SDK Methods -->
+<section class="py-16 px-6 border-t">
+  <div class="max-w-3xl mx-auto">
+    <h2 class="text-3xl font-bold mb-8">SDK Methods</h2>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b text-left">
+            <th class="py-3 pr-4 font-semibold">Method</th>
+            <th class="py-3 pr-4 font-semibold">Description</th>
+            <th class="py-3 font-semibold">Returns</th>
+          </tr>
+        </thead>
+        <tbody class="font-mono text-sm">
+          <tr class="border-b"><td class="py-2 pr-4">upload(file, name)</td><td class="pr-4 font-sans">Upload .sav/.csv/.xlsx</td><td class="font-sans">UploadResult</td></tr>
+          <tr class="border-b"><td class="py-2 pr-4">getMetadata(fileId)</td><td class="pr-4 font-sans">Variables, groups, banners</td><td class="font-sans">Metadata</td></tr>
+          <tr class="border-b"><td class="py-2 pr-4">frequency(fileId, var)</td><td class="pr-4 font-sans">Frequency table</td><td class="font-sans">FrequencyResult</td></tr>
+          <tr class="border-b"><td class="py-2 pr-4">crosstab(fileId, spec)</td><td class="pr-4 font-sans">Crosstab + sig letters</td><td class="font-sans">CrosstabResult</td></tr>
+          <tr class="border-b"><td class="py-2 pr-4">anova(fileId, spec)</td><td class="pr-4 font-sans">ANOVA + Tukey HSD</td><td class="font-sans">AnovaResult</td></tr>
+          <tr class="border-b"><td class="py-2 pr-4">correlation(fileId, spec)</td><td class="pr-4 font-sans">Correlation matrix</td><td class="font-sans">CorrelationResult</td></tr>
+          <tr class="border-b"><td class="py-2 pr-4">tabulate(fileId, spec)</td><td class="pr-4 font-sans">Full Excel report</td><td class="font-sans">ArrayBuffer</td></tr>
+          <tr class="border-b"><td class="py-2 pr-4">autoAnalyze(fileId)</td><td class="pr-4 font-sans">Zero-config Excel</td><td class="font-sans">ArrayBuffer</td></tr>
+          <tr class="border-b"><td class="py-2 pr-4">convert(fileId, fmt)</td><td class="pr-4 font-sans">Convert to csv/xlsx/dta</td><td class="font-sans">ArrayBuffer</td></tr>
+          <tr class="border-b"><td class="py-2 pr-4">waveCompare(id1, id2)</td><td class="pr-4 font-sans">Compare two waves</td><td class="font-sans">WaveComparisonItem[]</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- Authentication -->
+<section class="py-16 px-6 bg-white border-t">
+  <div class="max-w-3xl mx-auto">
+    <h2 class="text-3xl font-bold mb-8">Authentication</h2>
+    <div class="grid md:grid-cols-2 gap-8">
+      <div>
+        <h3 class="font-semibold mb-2">API Keys</h3>
+        <p class="text-gray-600 mb-4">Self-service at <a href="/app/keys" class="text-blue-600 underline">/app/keys</a>. No human approval needed.</p>
+        <pre>Authorization: Bearer sk_test_...</pre>
+      </div>
+      <div>
+        <h3 class="font-semibold mb-2">Rate Limits</h3>
+        <table class="w-full text-sm">
+          <tr class="border-b"><td class="py-1 font-medium">Free</td><td>10 req/min, 5MB</td></tr>
+          <tr class="border-b"><td class="py-1 font-medium">Growth ($29)</td><td>60 req/min, 50MB</td></tr>
+          <tr class="border-b"><td class="py-1 font-medium">Business ($99)</td><td>200 req/min, 200MB</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Integrations -->
+<section class="py-16 px-6 border-t">
+  <div class="max-w-3xl mx-auto">
+    <h2 class="text-3xl font-bold mb-8">Integrations</h2>
+    <div class="grid md:grid-cols-3 gap-6">
+      <div class="border rounded-lg p-6">
+        <h3 class="font-semibold mb-2">npm SDK</h3>
+        <p class="text-sm text-gray-600 mb-3">TypeScript/JavaScript with full types.</p>
+        <code class="text-sm bg-gray-100 px-2 py-1 rounded">npm i insightgenius-sdk</code>
+      </div>
+      <div class="border rounded-lg p-6">
+        <h3 class="font-semibold mb-2">Claude.ai MCP</h3>
+        <p class="text-sm text-gray-600 mb-3">Chat with your survey data.</p>
+        <a href="/docs/mcp" class="text-sm text-blue-600 underline">Connect to Claude</a>
+      </div>
+      <div class="border rounded-lg p-6">
+        <h3 class="font-semibold mb-2">Zapier</h3>
+        <p class="text-sm text-gray-600 mb-3">Automate survey pipelines.</p>
+        <span class="text-sm text-gray-400">Available on Zapier Platform</span>
+      </div>
+      <div class="border rounded-lg p-6">
+        <h3 class="font-semibold mb-2">Next.js Template</h3>
+        <p class="text-sm text-gray-600 mb-3">Full app in 5 minutes.</p>
+        <a href="https://github.com/quack2025/insightgenius-nextjs-template" class="text-sm text-blue-600 underline">GitHub</a>
+      </div>
+      <div class="border rounded-lg p-6">
+        <h3 class="font-semibold mb-2">REST API</h3>
+        <p class="text-sm text-gray-600 mb-3">29 endpoints, OpenAPI spec.</p>
+        <a href="/docs" class="text-sm text-blue-600 underline">Swagger UI</a>
+      </div>
+      <div class="border rounded-lg p-6">
+        <h3 class="font-semibold mb-2">Webhooks</h3>
+        <p class="text-sm text-gray-600 mb-3">Async processing with callbacks.</p>
+        <code class="text-xs bg-gray-100 px-2 py-1 rounded">webhook_url param</code>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="py-20 px-6 bg-blue-600 text-white text-center">
+  <h2 class="text-3xl font-bold mb-4">Start building for free.</h2>
+  <p class="text-blue-100 mb-8">No credit card. No signup. Just an API key and your first crosstab.</p>
+  <a href="/app/keys" class="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50">Get API Key</a>
+</section>
+
+<footer class="border-t py-8 px-6 text-center text-sm text-gray-400">
+  InsightGenius &copy; 2026 Genius Labs. Statistical Precision Guaranteed.
+</footer>
+
+</body></html>
