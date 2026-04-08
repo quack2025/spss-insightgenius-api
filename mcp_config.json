@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "insightgenius": {
+      "type": "sse",
+      "url": "https://spss.insightgenius.io/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer YOUR_INSIGHTGENIUS_API_KEY"
+      }
+    }
+  }
+}
