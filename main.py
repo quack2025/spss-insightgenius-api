@@ -199,7 +199,9 @@ def create_application() -> FastAPI:
 
     # Platform features (require PostgreSQL + Supabase JWT)
     from routers.projects import router as projects_router
+    from routers.conversations import router as conversations_router
     app.include_router(projects_router)
+    app.include_router(conversations_router)
 
     # MCP server — SSE transport
     # NOTE: Streamable HTTP (http_app) CANNOT be mounted as FastAPI sub-app —
