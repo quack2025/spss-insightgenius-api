@@ -54,7 +54,7 @@ def _get_engine() -> AsyncEngine | None:
         return None
 
     _engine = create_async_engine(
-        settings.database_url,
+        settings.database_url_async,
         echo=False,
         future=True,
         pool_size=15,

@@ -61,8 +61,21 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str = ""
 
     # PostgreSQL (optional — enables project/conversation/dashboard features)
-    # Format: postgresql+asyncpg://user:pass@host:5432/dbname
+    # Accepts any format: postgresql://, postgres://, postgresql+asyncpg://
+    # Auto-converts to asyncpg for SQLAlchemy async engine.
     database_url: str = ""
+
+    @property
+    def database_url_async(self) -> str:
+        """Database URL with asyncpg driver for SQLAlchemy async engine."""
+        url = self.database_url
+        if not url:
+            return ""
+        # Railway/Heroku use postgres:// or postgresql:// — convert to asyncpg
+        url = url.replace("postgres://", "postgresql://", 1)
+        if "postgresql://" in url and "+asyncpg" not in url:
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
 
     # Encryption key for SPSS files at rest (optional, Fernet)
     encryption_key: str = ""
@@ -79,10 +92,14 @@ class Settings(BaseSettings):
 
     @property
     def database_url_sync(self) -> str:
-        """Sync version of database_url for Alembic (replaces asyncpg with psycopg2)."""
-        if not self.database_url:
+        """Sync version of database_url for Alembic (standard postgresql:// without asyncpg)."""
+        url = self.database_url
+        if not url:
             return ""
-        return self.database_url.replace("+asyncpg", "").replace("asyncpg://", "postgresql://")
+        # Normalize to plain postgresql://
+        url = url.replace("postgres://", "postgresql://", 1)
+        url = url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        return url
 
     @property
     def has_database(self) -> bool:

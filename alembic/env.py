@@ -52,7 +52,7 @@ def do_run_migrations(connection: Connection) -> None:
 async def run_async_migrations() -> None:
     """Run migrations in 'online' mode with async engine."""
     # For Alembic we use the async URL (asyncpg)
-    async_url = settings.database_url
+    async_url = settings.database_url_async
     if not async_url:
         raise RuntimeError("DATABASE_URL not set — cannot run migrations")
 
