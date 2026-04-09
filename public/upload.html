@@ -166,7 +166,8 @@
 
         try {
             const xhr = new XMLHttpRequest();
-            xhr.open('POST', `${BASE}/v1/files/upload?api_key=${encodeURIComponent(apiKey)}`);
+            xhr.open('POST', `${BASE}/v1/files/upload`);
+            xhr.setRequestHeader('Authorization', `Bearer ${apiKey}`);
 
             xhr.upload.onprogress = (e) => {
                 if (e.lengthComputable) {
