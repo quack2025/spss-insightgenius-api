@@ -115,7 +115,7 @@ def compare_waves(
                 "wave1_pct": round(p1 * 100, 1),
                 "wave2_pct": round(p2 * 100, 1),
                 "delta_pp": delta_pp,
-                "significant": is_sig,
+                "significant": bool(is_sig),
                 "direction": "up" if delta_pp > 0 else "down" if delta_pp < 0 else "flat",
             }
 
@@ -148,7 +148,7 @@ def compare_waves(
                 "wave1_mean": round(mean1, 2),
                 "wave2_mean": round(mean2, 2),
                 "delta": delta_mean,
-                "significant": mean_sig,
+                "significant": bool(mean_sig),
                 "direction": "up" if delta_mean > 0 else "down" if delta_mean < 0 else "flat",
             }
 

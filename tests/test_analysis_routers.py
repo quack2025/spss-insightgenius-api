@@ -136,10 +136,7 @@ class TestSatisfaction:
 
 class TestWaveCompare:
     def test_wave_compare_same_file(self, test_sav_bytes):
-        """Upload same file as both waves.
-        NOTE: Currently returns 500 due to numpy.bool_ serialization bug
-        in wave_comparison.py response. Tracked for fix.
-        """
+        """Upload same file as both waves."""
         resp = _client.post(
             "/v1/wave-compare",
             headers=HEADERS,
@@ -149,9 +146,10 @@ class TestWaveCompare:
             ],
             data={"variables": json.dumps(["satisfaction", "gender"])},
         )
-        # TODO: fix numpy.bool_ serialization in wave_comparison.py
-        # then change to assert resp.status_code == 200
-        assert resp.status_code in (200, 500)
+        assert resp.status_code == 200
+        data = resp.json().get("data", resp.json())
+        assert "comparisons" in data
+        assert data["variables_compared"] == 2
 
     def test_wave_compare_no_files(self):
         resp = _client.post("/v1/wave-compare", headers=HEADERS, data={})
