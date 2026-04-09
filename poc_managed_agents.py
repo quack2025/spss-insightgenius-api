@@ -9,9 +9,9 @@ import json
 import os
 
 # Config
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")  # Set via env var
-INSIGHTGENIUS_API_KEY = "sk_test_2a441a40c84ba0afe73efd47d6bb1066aac82ad5453360f3"
-STUDY_FILE_ID = "a4872af5-6cc2-43e8-afcd-bea85d44b790"
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")  # Set via: export ANTHROPIC_API_KEY=sk-ant-...
+INSIGHTGENIUS_API_KEY = os.environ.get("INSIGHTGENIUS_API_KEY", "")  # Set via env var
+STUDY_FILE_ID = "875241b9-3d10-4165-ae4c-74aebeb1a826"
 
 # Long timeout for SSE streaming (agent can take minutes)
 client = anthropic.Anthropic(

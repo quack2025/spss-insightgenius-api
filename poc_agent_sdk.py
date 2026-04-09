@@ -12,8 +12,8 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='repla
 
 from claude_agent_sdk import query, ClaudeAgentOptions
 
-INSIGHTGENIUS_API_KEY = "sk_test_2a441a40c84ba0afe73efd47d6bb1066aac82ad5453360f3"
-STUDY_FILE_ID = "38175e6c-533c-41b6-bfb9-6e1e2a04eeb2"
+INSIGHTGENIUS_API_KEY = os.environ.get("INSIGHTGENIUS_API_KEY", "")  # Set via env var
+STUDY_FILE_ID = os.environ.get("STUDY_FILE_ID", "")  # Get from https://spss.insightgenius.io/upload
 
 
 async def run_pipeline():
