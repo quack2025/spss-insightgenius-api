@@ -45,4 +45,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
 # Multi-worker: gunicorn manages worker processes, uvicorn handles async I/O.
 # WEB_CONCURRENCY env var overrides worker count (Railway can set this).
 # Default: 4 workers. Each handles ~50 concurrent light requests.
-CMD ["sh", "-c", "gunicorn main:app --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-4} --worker-class uvicorn.workers.UvicornWorker --timeout 120 --graceful-timeout 30 --keep-alive 5 --max-requests 1000 --max-requests-jitter 50"]
+CMD ["sh", "-c", "alembic upgrade head 2>&1 || echo 'Alembic migration skipped (no DATABASE_URL or already up to date)' && gunicorn main:app --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-4} --worker-class uvicorn.workers.UvicornWorker --timeout 120 --graceful-timeout 30 --keep-alive 5 --max-requests 1000 --max-requests-jitter 50"]
