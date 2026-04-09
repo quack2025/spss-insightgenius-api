@@ -20,7 +20,7 @@ os.environ["API_KEYS_JSON"] = json.dumps([
         "key_hash": TEST_KEY_HASH,
         "name": "Test Key",
         "plan": "pro",
-        "scopes": ["process", "metadata", "convert", "crosstab", "frequency", "parse_ticket"],
+        "scopes": ["process", "metadata", "convert", "crosstab", "frequency", "parse_ticket", "tabulate", "auto_analyze", "correlation", "anova", "gap_analysis", "satisfaction_summary"],
     }
 ])
 os.environ["APP_ENV"] = "development"
