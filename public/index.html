@@ -3,6 +3,28 @@
 <html class="light" lang="en"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta name="description" content="SPSS analysis without SPSS. Upload .sav files, get client-ready Excel crosstabs with significance testing (A/B/C letters) in seconds. Free tier. REST API + MCP." />
+
+<link rel="canonical" href="https://spss.insightgenius.io/" />
+
+<!-- Open Graph -->
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://spss.insightgenius.io/" />
+<meta property="og:title" content="SPSS InsightGenius — Crosstabs with A/B/C Significance Testing via REST API" />
+<meta property="og:description" content="SPSS analysis without SPSS. Upload .sav files, get client-ready Excel crosstabs with significance testing (A/B/C letters) in seconds. REST API + Claude MCP." />
+<meta property="og:image" content="https://insightgenius.io/og-images/spss.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="SPSS InsightGenius — Crosstabs with A/B/C Significance Testing via REST API" />
+<meta name="twitter:description" content="SPSS analysis without SPSS. Upload .sav files, get client-ready Excel crosstabs with significance testing (A/B/C letters) in seconds. REST API + Claude MCP." />
+<meta name="twitter:image" content="https://insightgenius.io/og-images/spss.png" />
+
+<!-- Hreflang -->
+<link rel="alternate" hreflang="x-default" href="https://spss.insightgenius.io/" />
+
 <title>InsightGenius | Statistical Precision Guaranteed</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
@@ -78,6 +100,32 @@
         .glass-panel { background: rgba(247, 249, 251, 0.7); backdrop-filter: blur(24px); }
         .sig-letter { color: #ba1a1a; font-size: 0.6875rem; font-weight: 500; vertical-align: super; }
     </style>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Insight Genius",
+  "url": "https://insightgenius.io",
+  "logo": "https://insightgenius.io/icons/hub.svg",
+  "sameAs": [
+    "https://surveycoder.io",
+    "https://spss.insightgenius.io",
+    "https://followups.insightgenius.io",
+    "https://parsing-agent.insightgenius.io",
+    "https://www.voicecapture.ai"
+  ]
+}
+</script>
+
+<!-- Google Analytics 4 -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-QGLQC2PCSD"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-QGLQC2PCSD');
+</script>
 </head>
 <body class="bg-surface text-on-surface font-body selection:bg-primary-container selection:text-white">
 <!-- TopNavBar -->
@@ -569,6 +617,72 @@
 </div>
 </div>
 </section>
+
+<!-- Suite Strip: Insight Genius cross-links (Sprint 0.5) -->
+<section id="ig-suite-strip" aria-label="Explore the Insight Genius suite" style="border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;background:#f9fafb;padding:32px 16px;font-family:inherit;margin-top:32px;">
+  <div style="max-width:1152px;margin:0 auto;">
+    <h2 style="font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;margin:0 0 16px 0;">Explore the Insight Genius suite</h2>
+    <ul id="ig-suite-list" role="list" style="display:flex;gap:16px;overflow-x:auto;padding:0 0 8px 0;margin:0;list-style:none;"></ul>
+  </div>
+</section>
+
+<style>
+  #ig-suite-list li { min-width: 240px; list-style: none; }
+  #ig-suite-list .ig-card { height:100%;padding:16px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;display:flex;flex-direction:column;gap:8px;transition:background .15s; }
+  #ig-suite-list .ig-card:hover { background:#f3f4f6; }
+  #ig-suite-list .ig-card a { margin-top:auto;color:#111827;font-weight:500;font-size:14px;text-decoration:none; }
+  #ig-suite-list .ig-card a:hover, #ig-suite-list .ig-card a:focus { text-decoration:underline; }
+  #ig-suite-list .ig-tagline { font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280; }
+  #ig-suite-list .ig-name { font-size:14px;font-weight:600;color:#111827;margin:0; }
+  #ig-suite-list .ig-pitch { font-size:14px;color:#4b5563;margin:0;line-height:1.4; }
+  @media (min-width:768px) { #ig-suite-list { display:grid;grid-template-columns:repeat(5,1fr);overflow:visible; } #ig-suite-list li { min-width:0; } }
+</style>
+
+<script>
+(function(){
+  var CURRENT_DOMAIN = 'spss.insightgenius.io';
+  var LANG = (document.documentElement.lang || 'en').slice(0,2) === 'es' ? 'es' : 'en';
+  var FALLBACK = [
+    {"id":"insightgenius-hub","name":"Insight Genius","url":"https://insightgenius.io","domain":"insightgenius.io","pitch_en":"The AI research suite for modern insights teams","pitch_es":"La suite de IA para equipos de investigacion modernos","tagline_en":"Research Hub","tagline_es":"Hub de Investigacion","icon_url":"https://insightgenius.io/icons/hub.svg"},
+    {"id":"survey-coder-pro","name":"Survey Coder Pro","url":"https://surveycoder.io","domain":"surveycoder.io","pitch_en":"Automated open-ended coding for survey data","pitch_es":"Codificacion automatica de preguntas abiertas","tagline_en":"Open-End Coding","tagline_es":"Codificacion Abiertas","icon_url":"https://insightgenius.io/icons/survey-coder.svg"},
+    {"id":"spss-insightgenius","name":"SPSS InsightGenius","url":"https://spss.insightgenius.io","domain":"spss.insightgenius.io","pitch_en":"Statistical analysis on SPSS files with AI","pitch_es":"Analisis estadistico sobre archivos SPSS con IA","tagline_en":"SPSS Analytics","tagline_es":"Analitica SPSS","icon_url":"https://insightgenius.io/icons/spss.svg"},
+    {"id":"surveygenius-ai","name":"SurveyGenius AI","url":"https://followups.insightgenius.io","domain":"followups.insightgenius.io","pitch_en":"Real-time AI follow-up questions for Alchemer","pitch_es":"Repreguntas con IA en tiempo real para Alchemer","tagline_en":"Alchemer AI Suite","tagline_es":"Alchemer AI Suite","icon_url":"https://insightgenius.io/icons/followups.svg"},
+    {"id":"parsing-layer","name":"Insight Genius Parsing Layer","url":"https://parsing-agent.insightgenius.io","domain":"parsing-agent.insightgenius.io","pitch_en":"Parse research decks into structured insights","pitch_es":"Convierte presentaciones de research en datos estructurados","tagline_en":"Document Parsing","tagline_es":"Parseo de Documentos","icon_url":"https://insightgenius.io/icons/parsing.svg"},
+    {"id":"voice-capture","name":"Voice Capture","url":"https://www.voicecapture.ai","domain":"www.voicecapture.ai","pitch_en":"Voice responses for Alchemer surveys","pitch_es":"Respuestas de voz para encuestas de Alchemer","tagline_en":"Alchemer AI Suite","tagline_es":"Alchemer AI Suite","icon_url":"https://insightgenius.io/icons/voice.svg"}
+  ];
+
+  function utm(url){
+    var sep = url.indexOf('?') === -1 ? '?' : '&';
+    return url + sep + 'utm_source=' + encodeURIComponent(CURRENT_DOMAIN) + '&utm_medium=suite_strip&utm_campaign=cross_link';
+  }
+  function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function render(products){
+    var cta = LANG === 'es' ? 'Saber mas' : 'Learn more';
+    var list = document.getElementById('ig-suite-list');
+    if (!list) return;
+    list.innerHTML = products
+      .filter(function(p){ return p.domain !== CURRENT_DOMAIN; })
+      .map(function(p){
+        var pitch = LANG === 'es' ? p.pitch_es : p.pitch_en;
+        var tagline = LANG === 'es' ? p.tagline_es : p.tagline_en;
+        var anchor = cta + ': ' + pitch;
+        return '<li><div class="ig-card">'
+          + '<div style="display:flex;align-items:center;gap:8px;"><img src="'+esc(p.icon_url)+'" alt="" aria-hidden="true" width="24" height="24" loading="lazy"><span class="ig-tagline">'+esc(tagline)+'</span></div>'
+          + '<p class="ig-name">'+esc(p.name)+'</p>'
+          + '<p class="ig-pitch">'+esc(pitch)+'</p>'
+          + '<a href="'+esc(utm(p.url))+'" aria-label="'+esc(anchor+' ('+p.name+')')+'">'+esc(anchor)+' &rarr;</a>'
+          + '</div></li>';
+      }).join('');
+  }
+
+  render(FALLBACK);
+  fetch('https://insightgenius.io/api/suite.json')
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(data){ if (data && data.products && data.products.length) render(data.products); })
+    .catch(function(){});
+})();
+</script>
+
 <!-- Section 8: Competitive Comparison Table -->
 <section class="py-24 px-6 max-w-7xl mx-auto">
 <h2 class="text-3xl font-headline font-bold tracking-tight text-[#191c1e] text-center mb-16">The Market Landscape</h2>
@@ -721,7 +835,7 @@
 <a class="text-[#444653] hover:text-[#00288e] transition-colors text-xs" href="/docs/mcp">MCP Docs</a>
 <a class="text-[#444653] hover:text-[#00288e] transition-colors text-xs" href="/privacy">Privacy Policy</a>
 <a class="text-[#444653] hover:text-[#00288e] transition-colors text-xs" href="mailto:hello@insightgenius.io">Contact</a>
-<a class="text-[#444653] hover:text-[#00288e] transition-colors text-xs" href="https://insightgenius.io">Part of Genius Labs</a>
+<a class="text-[#444653] hover:text-[#00288e] transition-colors text-xs" href="https://insightgenius.io/?utm_source=spss.insightgenius.io&utm_medium=footer&utm_campaign=cross_link">Part of the Insight Genius AI Suite</a>
 </div>
 <div class="flex gap-4">
 <button class="w-8 h-8 rounded-full bg-[#f2f4f6] flex items-center justify-center opacity-80 hover:opacity-100 transition-all">
