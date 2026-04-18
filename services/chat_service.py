@@ -385,7 +385,7 @@ class ChatService:
         # Sonnet tool-use loop
         for round_num in range(max_tool_rounds):
             response = await self.client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=4096,
                 system=system,
                 tools=ANALYSIS_TOOLS,
@@ -448,6 +448,6 @@ class ChatService:
             "charts": charts,
             "downloads": downloads,
             "tool_calls": tool_calls_log,
-            "model": "claude-sonnet-4-20250514",
+            "model": "claude-sonnet-4-6",
             "rounds": round_num + 1 if 'round_num' in dir() else 1,
         }

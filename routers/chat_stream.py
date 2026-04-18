@@ -127,7 +127,7 @@ async def chat_stream_endpoint(
                 content_blocks = []
 
                 async with client.messages.stream(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-6",
                     max_tokens=4096,
                     system=system,
                     tools=ANALYSIS_TOOLS,
@@ -194,7 +194,7 @@ async def chat_stream_endpoint(
                 final_text = "".join(text_parts)
 
             # Send done event with full data
-            yield f"event: done\ndata: {json.dumps({'response': final_text, 'charts': charts, 'downloads': downloads, 'tool_calls': tool_calls_log, 'model': 'claude-sonnet-4-20250514'})}\n\n"
+            yield f"event: done\ndata: {json.dumps({'response': final_text, 'charts': charts, 'downloads': downloads, 'tool_calls': tool_calls_log, 'model': 'claude-sonnet-4-6'})}\n\n"
 
         except Exception as e:
             logger.error("Stream error: %s", e, exc_info=True)

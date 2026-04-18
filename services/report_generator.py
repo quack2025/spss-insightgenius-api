@@ -137,7 +137,7 @@ async def _generate_narrative(
         import anthropic
         client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=4000,
             system=f"""You are a senior market research analyst writing an executive report.
 {lang_instruction}

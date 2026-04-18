@@ -119,7 +119,7 @@ class TicketParser:
 
         # Call Sonnet for better reasoning + variable matching
         response = await self.client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=4096,
             system=TICKET_PARSER_PROMPT,
             messages=[{"role": "user", "content": user_content}],

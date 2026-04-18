@@ -175,7 +175,7 @@ class SmartSpecGenerator:
         user_content += "\n\nGenerate the complete tabulation spec. Match every question in the ticket to actual SPSS variables. Detect skip logic, conditional bases, MRS groups, and nested banners. Output ONLY the JSON spec."
 
         response = await self.client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=8192,
             system=SMART_SPEC_PROMPT,
             messages=[{"role": "user", "content": user_content}],

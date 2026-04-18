@@ -22,7 +22,7 @@ client = anthropic.Anthropic(
 # --- 1. Create Agent ---
 print("Creating agent...")
 agent = client.beta.agents.create(
-    model="claude-sonnet-4-5",
+    model="claude-sonnet-4-6",
     name="InsightGenius Analyst",
     description="Expert market research analyst using InsightGenius for SPSS analysis",
     system=f"""You are an expert market research analyst.
